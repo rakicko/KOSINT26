@@ -17,7 +17,8 @@ const state = {
   customKeywords: [],
   map: null,
   mapInitialized: false,
-  mapVisible: false,
+  mapVisible: true,
+  activeModule: null,
   mapMarkers: [],
 };
 
@@ -43,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
   fetch('/api/locations').then(r => r.json()).then(({ locations }) => {
     if (locations?.length) $('locationInput').value = locations[0].name;
   }).catch(() => {});
+
+  initMap();
 });
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
@@ -86,6 +89,7 @@ async function startMonitor() {
   try {
     await fetchAndRender(location, timeline, false);
     schedulePoll();
+    closeModulePanel();
   } catch (err) {
     showToast('critical', '❌', 'Fetch Failed', err.message);
   } finally {
@@ -356,16 +360,48 @@ function renderEarthquakes(data) {
 // ── Interactive Map ───────────────────────────────────────────────────────────
 function toggleMap() {
   state.mapVisible = !state.mapVisible;
-  const panel = $('mapPanel');
+  const mapStage = document.querySelector('.map-stage');
   const btn = $('mapToggle');
-  panel.style.display = state.mapVisible ? 'flex' : 'none';
+  if (mapStage) mapStage.style.display = state.mapVisible ? 'flex' : 'none';
   btn.textContent = state.mapVisible ? 'Hide' : 'Show';
   btn.classList.toggle('active', state.mapVisible);
 
   if (state.mapVisible) {
+    closeModulePanel();
     if (!state.mapInitialized) initMap();
     else if (state.data) updateMap(state.data);
   }
+}
+
+function toggleModule(panelId) {
+  const overlay = $('moduleOverlay');
+  const panel = $(panelId);
+  if (!overlay || !panel) return;
+
+  if (state.activeModule === panelId) {
+    closeModulePanel();
+    return;
+  }
+
+  overlay.querySelectorAll('.overlay-panel').forEach(p => { p.style.display = 'none'; });
+  panel.style.display = 'flex';
+  overlay.classList.add('active');
+  $('overlayTitle').textContent = panel.dataset.panelTitle || 'Module';
+  overlay.setAttribute('aria-hidden', 'false');
+  document.querySelectorAll('.module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === panelId));
+  state.activeModule = panelId;
+
+  if (!state.mapInitialized) initMap();
+  else if (state.data) updateMap(state.data);
+}
+
+function closeModulePanel() {
+  const overlay = $('moduleOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  overlay.setAttribute('aria-hidden', 'true');
+  state.activeModule = null;
+  document.querySelectorAll('.module-btn').forEach(btn => btn.classList.remove('active'));
 }
 
 function initMap() {

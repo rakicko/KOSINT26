@@ -74,8 +74,152 @@
 
 <!-- ── Main Layout ──────────────────────────────────────────────────────────── -->
 <main class="main-layout">
+  <section class="map-stage">
+    <div class="map-toolbar" id="moduleToolbar">
+      <button class="module-btn" data-panel="newsPanel" onclick="toggleModule('newsPanel')"><span class="module-icon">📰</span> News Intelligence</button>
+      <button class="module-btn" data-panel="weatherPanel" onclick="toggleModule('weatherPanel')"><span class="module-icon">🌤</span> Weather Monitor</button>
+      <button class="module-btn" data-panel="trafficPanel" onclick="toggleModule('trafficPanel')"><span class="module-icon">🚦</span> Traffic Intelligence</button>
+      <button class="module-btn" data-panel="radiationPanel" onclick="toggleModule('radiationPanel')"><span class="module-icon">☢️</span> Radiation Monitor</button>
+      <button class="module-btn" data-panel="aqiPanel" onclick="toggleModule('aqiPanel')"><span class="module-icon">🌍</span> Air Quality Index</button>
+      <button class="module-btn" data-panel="earthquakePanel" onclick="toggleModule('earthquakePanel')"><span class="module-icon">🌊</span> Seismic Activity</button>
+    </div>
 
-  <!-- Sidebar -->
+    <div class="map-card">
+      <div class="panel map-panel" id="mapPanel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="panel-icon">🗺️</span>
+            <span>Interactive Situation Map</span>
+            <span class="panel-badge" id="mapBadge" style="display:none"></span>
+          </div>
+          <div class="panel-meta" id="mapMeta">Pinch/scroll to zoom</div>
+        </div>
+        <div id="leafletMap"></div>
+      </div>
+
+      <div class="welcome-panel" id="welcomePanel">
+        <div class="welcome-icon">🛰️</div>
+        <h2 class="welcome-title">SENTINEL Online</h2>
+        <p class="welcome-sub">Enter a location above and click <strong>MONITOR</strong> to begin multi-feed situational awareness tracking.</p>
+        <div class="welcome-features">
+          <div class="feature-chip">📰 High-Intensity News</div>
+          <div class="feature-chip">🌤 Weather Monitoring</div>
+          <div class="feature-chip">🚦 Traffic Intelligence</div>
+          <div class="feature-chip">☢️ Radiation Levels</div>
+          <div class="feature-chip">🌍 Air Quality Index</div>
+          <div class="feature-chip">🌊 Earthquake Monitor</div>
+          <div class="feature-chip">🗺️ Interactive Map</div>
+          <div class="feature-chip">🎯 Composite Threat Level</div>
+          <div class="feature-chip">🔍 Custom Keywords</div>
+          <div class="feature-chip">📤 Report Export</div>
+        </div>
+      </div>
+
+      <div class="module-overlay" id="moduleOverlay" aria-hidden="true">
+        <div class="overlay-shell">
+          <div class="overlay-header">
+            <div>
+              <div class="overlay-title" id="overlayTitle">Module Panel</div>
+              <div class="overlay-sub">Focus on one feed while keeping the map visible behind it.</div>
+            </div>
+            <button class="overlay-close" onclick="closeModulePanel()" aria-label="Close module panel">✕</button>
+          </div>
+          <div class="overlay-content">
+            <!-- News Panel -->
+            <div class="panel overlay-panel" id="newsPanel" data-panel-title="News Intelligence" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="panel-icon">📰</span>
+                  <span>News Intelligence</span>
+                  <span class="panel-badge" id="newsBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="newsMeta"></div>
+              </div>
+              <div class="panel-filter-row">
+                <button class="filter-btn active" onclick="filterNews('all', this)">All</button>
+                <button class="filter-btn" onclick="filterNews('civil_unrest', this)">Civil Unrest</button>
+                <button class="filter-btn" onclick="filterNews('vip_movement', this)">VIP</button>
+                <button class="filter-btn" onclick="filterNews('emergency', this)">Emergency</button>
+                <button class="filter-btn" onclick="filterNews('traffic', this)">Traffic</button>
+              </div>
+              <div class="news-list" id="newsList"></div>
+            </div>
+
+            <!-- Weather Panel -->
+            <div class="panel overlay-panel" id="weatherPanel" data-panel-title="Weather Monitor" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="panel-icon">🌤</span>
+                  <span>Weather Monitor</span>
+                </div>
+                <div class="panel-meta" id="weatherMeta"></div>
+              </div>
+              <div class="weather-current" id="weatherCurrent"></div>
+              <div class="weather-alerts" id="weatherAlerts"></div>
+              <div class="weather-forecast" id="weatherForecast"></div>
+            </div>
+
+            <!-- Traffic Panel -->
+            <div class="panel overlay-panel" id="trafficPanel" data-panel-title="Traffic Intelligence" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="panel-icon">🚦</span>
+                  <span>Traffic Intelligence</span>
+                  <span class="anomaly-indicator" id="trafficAnomaly" style="display:none">⚠ ANOMALY</span>
+                </div>
+                <div class="panel-meta" id="trafficMeta"></div>
+              </div>
+              <div class="traffic-score-row" id="trafficScoreRow"></div>
+              <div class="traffic-anomaly-banner" id="trafficAnomalyBanner" style="display:none"></div>
+              <div class="incident-list" id="incidentList"></div>
+            </div>
+
+            <!-- Radiation Panel -->
+            <div class="panel overlay-panel" id="radiationPanel" data-panel-title="Radiation Monitor" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="panel-icon">☢️</span>
+                  <span>Radiation Monitor</span>
+                  <span class="data-quality-tag" id="radiationQuality"></span>
+                </div>
+                <div class="panel-meta" id="radiationMeta"></div>
+              </div>
+              <div class="radiation-primary" id="radiationPrimary"></div>
+              <div class="radiation-neighbors" id="radiationNeighbors"></div>
+            </div>
+
+            <!-- AQI Panel -->
+            <div class="panel overlay-panel" id="aqiPanel" data-panel-title="Air Quality Index" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="panel-icon">🌍</span>
+                  <span>Air Quality Index</span>
+                  <span class="panel-badge" id="aqiBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="aqiMeta"></div>
+              </div>
+              <div class="aqi-main" id="aqiMain"></div>
+              <div class="aqi-pollutants" id="aqiPollutants"></div>
+            </div>
+
+            <!-- Earthquake Panel -->
+            <div class="panel overlay-panel" id="earthquakePanel" data-panel-title="Seismic Activity" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="panel-icon">🌊</span>
+                  <span>Seismic Activity</span>
+                  <span class="panel-badge" id="eqBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="eqMeta"></div>
+              </div>
+              <div class="earthquake-list" id="earthquakeList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <aside class="sidebar">
     <div class="sidebar-section">
       <div class="section-header">
@@ -132,137 +276,10 @@
       </div>
       <div class="settings-row">
         <label class="setting-label">Map View</label>
-        <button class="btn-toggle" id="mapToggle" onclick="toggleMap()">Show</button>
+        <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide</button>
       </div>
     </div>
   </aside>
-
-  <!-- Dashboard Grid -->
-  <div class="dashboard-grid" id="dashboardGrid">
-
-    <!-- Welcome state -->
-    <div class="welcome-panel" id="welcomePanel">
-      <div class="welcome-icon">🛰️</div>
-      <h2 class="welcome-title">SENTINEL Online</h2>
-      <p class="welcome-sub">Enter a location above and click <strong>MONITOR</strong> to begin multi-feed situational awareness tracking.</p>
-      <div class="welcome-features">
-        <div class="feature-chip">📰 High-Intensity News</div>
-        <div class="feature-chip">🌤 Weather Monitoring</div>
-        <div class="feature-chip">🚦 Traffic Intelligence</div>
-        <div class="feature-chip">☢️ Radiation Levels</div>
-        <div class="feature-chip">🌍 Air Quality Index</div>
-        <div class="feature-chip">🌊 Earthquake Monitor</div>
-        <div class="feature-chip">🗺️ Interactive Map</div>
-        <div class="feature-chip">🎯 Composite Threat Level</div>
-        <div class="feature-chip">🔍 Custom Keywords</div>
-        <div class="feature-chip">📤 Report Export</div>
-      </div>
-    </div>
-
-    <!-- Interactive Map Panel (hidden by default, above grid) -->
-    <div class="panel map-panel" id="mapPanel" style="display:none;grid-column:1/-1">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon">🗺️</span>
-          <span>Interactive Situation Map</span>
-          <span class="panel-badge" id="mapBadge" style="display:none"></span>
-        </div>
-        <div class="panel-meta" id="mapMeta">Pinch/scroll to zoom</div>
-      </div>
-      <div id="leafletMap" style="height:280px;background:#0d1420;border-radius:0 0 12px 12px"></div>
-    </div>
-
-    <!-- News Panel -->
-    <div class="panel" id="newsPanel" style="display:none">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon">📰</span>
-          <span>News Intelligence</span>
-          <span class="panel-badge" id="newsBadge" style="display:none"></span>
-        </div>
-        <div class="panel-meta" id="newsMeta"></div>
-      </div>
-      <div class="panel-filter-row">
-        <button class="filter-btn active" onclick="filterNews('all', this)">All</button>
-        <button class="filter-btn" onclick="filterNews('civil_unrest', this)">Civil Unrest</button>
-        <button class="filter-btn" onclick="filterNews('vip_movement', this)">VIP</button>
-        <button class="filter-btn" onclick="filterNews('emergency', this)">Emergency</button>
-        <button class="filter-btn" onclick="filterNews('traffic', this)">Traffic</button>
-      </div>
-      <div class="news-list" id="newsList"></div>
-    </div>
-
-    <!-- Weather Panel -->
-    <div class="panel" id="weatherPanel" style="display:none">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon">🌤</span>
-          <span>Weather Monitor</span>
-        </div>
-        <div class="panel-meta" id="weatherMeta"></div>
-      </div>
-      <div class="weather-current" id="weatherCurrent"></div>
-      <div class="weather-alerts" id="weatherAlerts"></div>
-      <div class="weather-forecast" id="weatherForecast"></div>
-    </div>
-
-    <!-- Traffic Panel -->
-    <div class="panel" id="trafficPanel" style="display:none">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon">🚦</span>
-          <span>Traffic Intelligence</span>
-          <span class="anomaly-indicator" id="trafficAnomaly" style="display:none">⚠ ANOMALY</span>
-        </div>
-        <div class="panel-meta" id="trafficMeta"></div>
-      </div>
-      <div class="traffic-score-row" id="trafficScoreRow"></div>
-      <div class="traffic-anomaly-banner" id="trafficAnomalyBanner" style="display:none"></div>
-      <div class="incident-list" id="incidentList"></div>
-    </div>
-
-    <!-- Radiation Panel -->
-    <div class="panel" id="radiationPanel" style="display:none">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon">☢️</span>
-          <span>Radiation Monitor</span>
-          <span class="data-quality-tag" id="radiationQuality"></span>
-        </div>
-        <div class="panel-meta" id="radiationMeta"></div>
-      </div>
-      <div class="radiation-primary" id="radiationPrimary"></div>
-      <div class="radiation-neighbors" id="radiationNeighbors"></div>
-    </div>
-
-    <!-- AQI Panel (NEW) -->
-    <div class="panel" id="aqiPanel" style="display:none">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon">🌍</span>
-          <span>Air Quality Index</span>
-          <span class="panel-badge" id="aqiBadge" style="display:none"></span>
-        </div>
-        <div class="panel-meta" id="aqiMeta"></div>
-      </div>
-      <div class="aqi-main" id="aqiMain"></div>
-      <div class="aqi-pollutants" id="aqiPollutants"></div>
-    </div>
-
-    <!-- Earthquake Panel (NEW) -->
-    <div class="panel" id="earthquakePanel" style="display:none">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon">🌊</span>
-          <span>Seismic Activity</span>
-          <span class="panel-badge" id="eqBadge" style="display:none"></span>
-        </div>
-        <div class="panel-meta" id="eqMeta"></div>
-      </div>
-      <div class="earthquake-list" id="earthquakeList"></div>
-    </div>
-
-  </div>
 </main>
 
 <!-- ── Loading overlay ──────────────────────────────────────────────────────── -->
