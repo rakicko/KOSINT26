@@ -7,9 +7,9 @@
   <meta name="description" content="Real-time situational awareness dashboard tracking news, weather, traffic, radiation, AQI, and earthquakes for any location." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <!-- Leaflet.js for interactive map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Local Mapbox GL JS assets for offline-friendly testing -->
+  <link href="vendor/mapbox-gl.css" rel="stylesheet" />
+  <script src="vendor/mapbox-gl.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -25,11 +25,6 @@
   </div>
 
   <div class="header-controls">
-    <div class="input-group">
-      <div class="input-icon">📍</div>
-      <input type="text" id="locationInput" class="input-field" placeholder="Enter location (e.g. Mumbai, India)" autocomplete="off" />
-      <div class="input-suggestions" id="locationSuggestions"></div>
-    </div>
     <div class="input-group slim">
       <div class="input-icon">🕒</div>
       <select id="timelineSelect" class="input-field select-field">
@@ -40,7 +35,7 @@
       </select>
     </div>
     <button id="monitorBtn" class="btn-monitor" onclick="startMonitor()">
-      <span class="btn-icon">⚡</span> MONITOR
+      <span class="btn-icon">⚡</span> REFRESH
     </button>
     <button class="btn-secondary" onclick="exportReport()" title="Export situation report">
       📤 Export
@@ -74,6 +69,40 @@
 
 <!-- ── Main Layout ──────────────────────────────────────────────────────────── -->
 <main class="main-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="section-header">
+        <span class="section-icon">🔔</span>
+        <span>Alert Log</span>
+        <span class="badge" id="unreadBadge" style="display:none"></span>
+      </div>
+      <div class="alert-log" id="alertLog">
+        <div class="empty-state">No alerts yet</div>
+      </div>
+      <button class="btn-sm" onclick="markAllRead()" style="margin-top:8px">Mark all read</button>
+    </div>
+
+    <div class="sidebar-section settings-section">
+      <div class="section-header">
+        <span class="section-icon">⚙️</span>
+        <span>Settings</span>
+      </div>
+      <div class="settings-row">
+        <label class="setting-label">Auto-poll interval</label>
+        <select class="input-field select-field" id="pollInterval" onchange="updatePollInterval()">
+          <option value="60000">1 min</option>
+          <option value="300000" selected>5 min</option>
+          <option value="600000">10 min</option>
+          <option value="0">Manual</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label class="setting-label">Map View</label>
+        <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide Map</button>
+      </div>
+    </div>
+  </aside>
+
   <section class="map-stage">
     <div class="map-toolbar" id="moduleToolbar">
       <button class="module-btn" data-panel="newsPanel" onclick="toggleModule('newsPanel')"><span class="module-icon">📰</span> News Intelligence</button>
@@ -95,24 +124,6 @@
           <div class="panel-meta" id="mapMeta">Pinch/scroll to zoom</div>
         </div>
         <div id="leafletMap"></div>
-      </div>
-
-      <div class="welcome-panel" id="welcomePanel">
-        <div class="welcome-icon">🛰️</div>
-        <h2 class="welcome-title">SENTINEL Online</h2>
-        <p class="welcome-sub">Enter a location above and click <strong>MONITOR</strong> to begin multi-feed situational awareness tracking.</p>
-        <div class="welcome-features">
-          <div class="feature-chip">📰 High-Intensity News</div>
-          <div class="feature-chip">🌤 Weather Monitoring</div>
-          <div class="feature-chip">🚦 Traffic Intelligence</div>
-          <div class="feature-chip">☢️ Radiation Levels</div>
-          <div class="feature-chip">🌍 Air Quality Index</div>
-          <div class="feature-chip">🌊 Earthquake Monitor</div>
-          <div class="feature-chip">🗺️ Interactive Map</div>
-          <div class="feature-chip">🎯 Composite Threat Level</div>
-          <div class="feature-chip">🔍 Custom Keywords</div>
-          <div class="feature-chip">📤 Report Export</div>
-        </div>
       </div>
 
       <div class="module-overlay" id="moduleOverlay" aria-hidden="true">
@@ -219,67 +230,6 @@
       </div>
     </div>
   </section>
-
-  <aside class="sidebar">
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-icon">🔔</span>
-        <span>Alert Log</span>
-        <span class="badge" id="unreadBadge" style="display:none"></span>
-      </div>
-      <div class="alert-log" id="alertLog">
-        <div class="empty-state">No alerts yet</div>
-      </div>
-      <button class="btn-sm" onclick="markAllRead()" style="margin-top:8px">Mark all read</button>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-icon">📍</span>
-        <span>Location History</span>
-      </div>
-      <div class="location-list" id="locationList">
-        <div class="empty-state">No history yet</div>
-      </div>
-    </div>
-
-    <!-- Custom Keywords -->
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-icon">🔍</span>
-        <span>Custom Keywords</span>
-      </div>
-      <div class="keyword-input-row">
-        <input type="text" id="keywordInput" class="input-field" placeholder="e.g. pipeline, minister..." style="width:100%;padding-left:10px" />
-        <button class="btn-add-kw" onclick="addKeyword()">+</button>
-      </div>
-      <div class="keyword-chips" id="keywordChips"></div>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-icon">⚙️</span>
-        <span>Settings</span>
-      </div>
-      <div class="settings-row">
-        <label class="setting-label">Browser Notifications</label>
-        <button class="btn-toggle" id="notifToggle" onclick="toggleNotifications()">Enable</button>
-      </div>
-      <div class="settings-row">
-        <label class="setting-label">Auto-poll interval</label>
-        <select class="input-field select-field" id="pollInterval" onchange="updatePollInterval()">
-          <option value="60000">1 min</option>
-          <option value="300000" selected>5 min</option>
-          <option value="600000">10 min</option>
-          <option value="0">Manual</option>
-        </select>
-      </div>
-      <div class="settings-row">
-        <label class="setting-label">Map View</label>
-        <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide</button>
-      </div>
-    </div>
-  </aside>
 </main>
 
 <!-- ── Loading overlay ──────────────────────────────────────────────────────── -->

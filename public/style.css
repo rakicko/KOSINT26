@@ -128,7 +128,7 @@ a:hover { text-decoration: underline; }
   display: flex; overflow: hidden; flex: 1;
   mask-image: linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent);
 }
-.ticker-items-container { display: flex; animation: scroll-ticker 30s linear infinite; white-space: nowrap; }
+.ticker-items-container { display: flex; animation: scroll-ticker 90s linear infinite; white-space: nowrap; }
 .ticker-item {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 0 24px; font-size: 12px; color: var(--text-secondary); white-space: nowrap;
@@ -142,10 +142,13 @@ a:hover { text-decoration: underline; }
 
 /* ── Main Layout ───────────────────────────────────────────────────────────── */
 body { display: flex; flex-direction: column; min-height: 100vh; }
-.main-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.main-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; width: 100%; }
 
 .map-stage {
-  flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  flex: 1; display: flex; flex-direction: column; min-width: 0; width: 100%; overflow: hidden;
+  height: calc(100vh - 97px); /* ensure map stage fills the space under header and ticker */
+  background: var(--bg-surface);
+  padding-bottom: 32px;
 }
 
 .map-toolbar {
@@ -171,25 +174,71 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 .module-icon { font-size: 14px; }
 
 .map-card {
-  position: relative; flex: 1; min-height: 0; overflow: hidden;
+  position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; width: 100%; overflow: hidden;
+  z-index: 0;
 }
 .map-panel {
-  display: flex; flex-direction: column; flex: 1; min-height: 0;
+  position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; overflow: hidden;
+  z-index: 0;
 }
-#leafletMap { height: 100%; min-height: 0; background: #0d1420; border-radius: 0 0 12px 12px; }
+#leafletMap {
+  flex: 1; min-height: 500px;
+  width: 100%;
+  height: 100%;
+  background: #0d1420;
+  border-radius: 0 0 12px 12px;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.mapboxgl-canvas,
+.mapboxgl-control-container,
+.mapboxgl-ctrl {
+  /* Raise the Mapbox canvas above low-level siblings so the raster basemap stays visible.
+     Overlays (.module-overlay) already use a higher z-index (1300) and will remain on top. */
+  z-index: 100 !important;
+}
+
+.mapboxgl-popup {
+  z-index: 1050 !important;
+}
+
+.mapboxgl-popup-anchor-bottom > .mapboxgl-popup-tip {
+  border-top-color: rgba(255, 255, 255, 0.85);
+}
+
+.mapboxgl-popup-content {
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(99, 179, 237, 0.18);
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+}
 
 .module-overlay {
   position: absolute; top: 0; right: 0; bottom: 0; width: min(420px, 100%);
   display: flex; flex-direction: column; background: rgba(7,11,18,0.96);
-  border-left: 1px solid rgba(99,179,237,0.18); box-shadow: -20px 0 60px rgba(0,0,0,0.5);
+  border-left: 1px solid rgba(99,179,237,0.18);
+  box-shadow: -24px 0 80px rgba(0,0,0,0.55);
   backdrop-filter: blur(14px); transform: translateX(100%); opacity: 0;
-  transition: transform 0.35s ease, opacity 0.35s; pointer-events: none; z-index: 20;
+  transition: transform 0.35s ease, opacity 0.35s; pointer-events: none;
+  z-index: 1300;
 }
-.module-overlay.active {
-  transform: translateX(0); opacity: 1; pointer-events: auto;
+.module-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.20);
+  pointer-events: none;
+  z-index: 0;
 }
 .overlay-shell {
   display: flex; flex-direction: column; flex: 1; min-height: 0;
+  position: relative;
+  z-index: 1;
+}
+.module-overlay.active {
+  transform: translateX(0); opacity: 1; pointer-events: auto;
 }
 .overlay-header {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -223,6 +272,7 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   display: flex; flex-direction: column; gap: 0;
 }
 .sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+.sidebar-section.settings-section { margin-top: auto; }
 
 .section-header {
   display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
@@ -285,25 +335,6 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 
 .empty-state { font-size: 12px; color: var(--text-dim); text-align: center; padding: 12px; font-style: italic; }
 
-/* ── Welcome Panel ─────────────────────────────────────────────────────────── */
-.welcome-panel {
-  position: absolute; left: 24px; right: 24px; top: 28px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 52px 40px; text-align: center;
-  background: rgba(10,16,29,0.94); border: 1px solid rgba(99,179,237,0.15);
-  border-radius: var(--r-lg); box-shadow: 0 32px 80px rgba(0,0,0,0.35);
-  max-width: 780px; margin: 0 auto; z-index: 10;
-}
-.welcome-icon { font-size: 56px; margin-bottom: 20px; filter: drop-shadow(0 0 20px var(--cyan)); animation: float 4s ease-in-out infinite; }
-@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-.welcome-title { font-size: 28px; font-weight: 700; color: var(--cyan); letter-spacing: 4px; font-family: var(--font-mono); margin-bottom: 12px; }
-.welcome-sub { font-size: 14px; color: var(--text-secondary); max-width: 520px; margin-bottom: 30px; }
-.welcome-features { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.feature-chip {
-  padding: 6px 14px; border-radius: 20px;
-  border: 1px solid var(--border-glow); background: var(--cyan-dim);
-  font-size: 12px; color: var(--cyan);
-}
 
 /* ── Panel ─────────────────────────────────────────────────────────────────── */
 .panel {

@@ -5,12 +5,27 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ── State ─────────────────────────────────────────────────────────────────────
+const DEFAULT_LOCATION = 'Kosovo';
+const DEFAULT_MAP_CENTER = { lon: 20.9, lat: 42.6 }; // Kosovo center
+const DEFAULT_MAP_ZOOM = 8.5;
+const DEFAULT_KOSOVO_BOUNDS = [[19.9, 41.8], [21.8, 43.3]]; // [sw, ne]
+
+// Mapbox GL JS v3 migration settings
+const MAPBOX_TOKEN = ''; // Replace with your Mapbox token if using authenticated style sources.
+const MAPBOX_STYLE = '/map-styles/happy-dark.json';
+
+/* Mapbox GL JS v3 migration
+   - Leaflet is replaced by Mapbox GL JS for a darker, more tactical map layer.
+   - The map uses the local happy-dark.json style and initializes automatically on startup.
+   - Markers and popups are rendered with Mapbox Marker/Popup objects.
+   - The map resizes when overlays open/close or when the map visibility toggles.
+*/
+
 const state = {
-  currentLocation: '',
+  currentLocation: DEFAULT_LOCATION,
   currentTimeline: '24h',
   data: null,
   newsFilter: 'all',
-  notificationsEnabled: false,
   pollTimer: null,
   pollIntervalMs: 300000,
   sseSource: null,
@@ -28,24 +43,11 @@ const $ = id => document.getElementById(id);
 document.addEventListener('DOMContentLoaded', () => {
   startClock();
   connectSSE();
-  loadLocationHistory();
   loadAlertHistory();
-  loadCustomKeywords();
 
-  $('locationInput').addEventListener('keydown', e => { if (e.key === 'Enter') startMonitor(); });
-  $('keywordInput').addEventListener('keydown', e => { if (e.key === 'Enter') addKeyword(); });
-
-  if (Notification.permission === 'granted') {
-    state.notificationsEnabled = true;
-    $('notifToggle').textContent = 'Enabled';
-    $('notifToggle').classList.add('active');
-  }
-
-  fetch('/api/locations').then(r => r.json()).then(({ locations }) => {
-    if (locations?.length) $('locationInput').value = locations[0].name;
-  }).catch(() => {});
-
+  // Default dashboard startup behavior: load Kosovo immediately and show the map.
   initMap();
+  startMonitor();
 });
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
@@ -75,12 +77,12 @@ function setLiveStatus(online) {
 
 // ── Monitor ───────────────────────────────────────────────────────────────────
 async function startMonitor() {
-  const location = $('locationInput').value.trim();
+  const location = state.currentLocation || DEFAULT_LOCATION;
   const timeline = $('timelineSelect').value;
-  if (!location) { showToast('medium', '⚠️', 'No Location', 'Please enter a location to monitor.'); return; }
 
   state.currentLocation = location;
   state.currentTimeline = timeline;
+  ensureMapVisible();
   showLoading(true, 'Connecting to all intelligence feeds...');
   $('monitorBtn').classList.add('loading');
   $('monitorBtn').innerHTML = '<span class="btn-icon">⏳</span> ACQUIRING...';
@@ -95,7 +97,7 @@ async function startMonitor() {
   } finally {
     showLoading(false);
     $('monitorBtn').classList.remove('loading');
-    $('monitorBtn').innerHTML = '<span class="btn-icon">⚡</span> MONITOR';
+    $('monitorBtn').innerHTML = '<span class="btn-icon">⚡</span> REFRESH';
   }
 }
 
@@ -119,7 +121,6 @@ async function fetchAndRender(location, timeline, forceRefresh = false) {
   renderEarthquakes(data.earthquakes);
   updateMap(data);
   loadAlertHistory();
-  loadLocationHistory();
 }
 
 // ── Poll Timer ─────────────────────────────────────────────────────────────────
@@ -360,16 +361,66 @@ function renderEarthquakes(data) {
 // ── Interactive Map ───────────────────────────────────────────────────────────
 function toggleMap() {
   state.mapVisible = !state.mapVisible;
-  const mapStage = document.querySelector('.map-stage');
+  const mapPanel = document.querySelector('.map-panel');
   const btn = $('mapToggle');
-  if (mapStage) mapStage.style.display = state.mapVisible ? 'flex' : 'none';
-  btn.textContent = state.mapVisible ? 'Hide' : 'Show';
-  btn.classList.toggle('active', state.mapVisible);
 
-  if (state.mapVisible) {
-    closeModulePanel();
-    if (!state.mapInitialized) initMap();
-    else if (state.data) updateMap(state.data);
+  if (mapPanel) {
+    mapPanel.style.display = state.mapVisible ? 'flex' : 'none';
+  }
+
+  if (btn) {
+    btn.textContent = state.mapVisible ? 'Hide Map' : 'Show Map';
+    btn.classList.toggle('active', state.mapVisible);
+  }
+
+  if (state.mapVisible && state.map) {
+    setTimeout(() => state.map.resize(), 200);
+  }
+}
+
+function showMainMap() {
+  state.mapVisible = true;
+  const mapPanel = document.querySelector('.map-panel');
+  const btn = $('mapToggle');
+
+  if (mapPanel) {
+    mapPanel.style.display = 'flex';
+  }
+  if (btn) {
+    btn.textContent = 'Hide Map';
+    btn.classList.add('active');
+  }
+
+  closeModulePanel();
+
+  if (!state.mapInitialized) initMap();
+  else if (state.data) updateMap(state.data);
+
+  if (state.map) {
+    setTimeout(() => state.map.resize(), 200);
+  }
+}
+
+function ensureMapVisible() {
+  if (!state.mapVisible) {
+    state.mapVisible = true;
+    const mapPanel = document.querySelector('.map-panel');
+    const btn = $('mapToggle');
+
+    if (mapPanel) {
+      mapPanel.style.display = 'flex';
+    }
+    if (btn) {
+      btn.textContent = 'Hide Map';
+      btn.classList.add('active');
+    }
+  }
+
+  if (!state.mapInitialized) initMap();
+  else if (state.data) updateMap(state.data);
+
+  if (state.map) {
+    setTimeout(() => state.map.resize(), 200);
   }
 }
 
@@ -377,6 +428,8 @@ function toggleModule(panelId) {
   const overlay = $('moduleOverlay');
   const panel = $(panelId);
   if (!overlay || !panel) return;
+
+  ensureMapVisible();
 
   if (state.activeModule === panelId) {
     closeModulePanel();
@@ -402,79 +455,170 @@ function closeModulePanel() {
   overlay.setAttribute('aria-hidden', 'true');
   state.activeModule = null;
   document.querySelectorAll('.module-btn').forEach(btn => btn.classList.remove('active'));
+
+  // If the panel closes, keep Mapbox sized correctly.
+  setTimeout(() => { if (state.map) state.map.resize(); }, 200);
+}
+
+function createMapMarkerElement(color, size = 16, border = 3) {
+  const marker = document.createElement('div');
+  marker.className = 'mapbox-marker';
+  marker.style.width = `${size}px`;
+  marker.style.height = `${size}px`;
+  marker.style.border = `${border}px solid rgba(255,255,255,0.92)`;
+  marker.style.borderRadius = '50%';
+  marker.style.backgroundColor = color;
+  marker.style.boxShadow = `0 0 14px ${color}`;
+  marker.style.cursor = 'pointer';
+  return marker;
 }
 
 function initMap() {
   if (state.mapInitialized) return;
   state.mapInitialized = true;
 
-  const coords = state.data?.weather?.coordinates || { lat: 20.5937, lon: 78.9629 };
-  state.map = L.map('leafletMap', { zoomControl: true, attributionControl: true }).setView([coords.lat, coords.lon], 10);
+  if (MAPBOX_TOKEN) {
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+  } else {
+    console.warn('Mapbox access token is not set. Using testMode for local style rendering.');
+    mapboxgl.accessToken = undefined;
+  }
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 18,
-  }).addTo(state.map);
+  state.map = new mapboxgl.Map({
+    container: 'leafletMap',
+    style: MAPBOX_STYLE,
+    center: [DEFAULT_MAP_CENTER.lon, DEFAULT_MAP_CENTER.lat],
+    zoom: DEFAULT_MAP_ZOOM,
+    pitch: 35,
+    projection: 'mercator',
+    attributionControl: false,
+    testMode: true,
+  // Keep the drawing buffer to avoid transient cleared frames during style application
+  preserveDrawingBuffer: true,
+  antialias: true,
+  });
 
+  state.map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+  state.map.on('load', () => {
   if (state.data) updateMap(state.data);
+
+  // Ensure the raster layer is visible & fully opaque after style load and force a repaint.
+  try {
+    const style = state.map.getStyle();
+    if (style && Array.isArray(style.layers)) {
+      const rasterLayer = style.layers.find(l => l.id === 'dark-tiles-layer');
+      if (rasterLayer) {
+        // Ensure layer visibility and opacity are correct
+        try { state.map.setLayoutProperty('dark-tiles-layer', 'visibility', 'visible'); } catch(e) {}
+        try { state.map.setPaintProperty('dark-tiles-layer', 'raster-opacity', 1); } catch(e) {}
+      }
+    }
+  } catch (e) { /* non-fatal */ }
+
+  // Force an immediate repaint and a delayed resize to stabilize rendering.
+  try { state.map.triggerRepaint(); } catch (e) {}
+  setTimeout(() => { try { state.map.resize(); state.map.triggerRepaint(); } catch (e) {} }, 300);
+
+  // Workaround: perform short-lived repeated repaint/resize for the next 3 seconds to avoid a transient cleared frame
+  try {
+    let rrCount = 0;
+    const rrInterval = setInterval(() => {
+      try { state.map.triggerRepaint(); state.map.resize(); } catch (e) {}
+      rrCount += 1;
+      if (rrCount > 10) clearInterval(rrInterval);
+    }, 300);
+  } catch (e) {}
+
+  });
+
+  // Ensure the renderer repaints once idle to avoid a cleared framebuffer.
+  state.map.on('idle', () => { try { state.map.triggerRepaint(); } catch (e) {} });
+
+  state.map.on('error', (event) => {
+  if (event && event.error) {
+    console.warn('Mapbox load error:', event.error);
+    if (/style/i.test(String(event.error.message || ''))) {
+      console.warn('Mapbox style failed to load. Check MAPBOX_STYLE and token settings.');
+    }
+  }
+  });
+
+  setTimeout(() => { if (state.map) state.map.resize(); }, 200);
 }
 
 function updateMap(data) {
-  if (!state.mapInitialized || !state.map) return;
+  if (!state.mapInitialized || !state.map || !data) return;
 
-  // Clear previous markers
+  if (!state.map.isStyleLoaded()) {
+    state.map.once('load', () => updateMap(data));
+    return;
+  }
+
   state.mapMarkers.forEach(m => m.remove());
   state.mapMarkers = [];
 
-  const coords = data.weather?.coordinates;
-  if (!coords) return;
+  const coords = data.weather?.coordinates || DEFAULT_MAP_CENTER;
+  const centerPoint = [coords.lon, coords.lat];
 
-  // Center marker for location
-  const centerMarker = L.marker([coords.lat, coords.lon], {
-    icon: L.divIcon({ className: '', html: `<div style="width:16px;height:16px;background:var(--cyan);border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px var(--cyan)"></div>`, iconSize: [16, 16], iconAnchor: [8, 8] })
-  }).addTo(state.map)
-    .bindPopup(`<strong>📍 ${escHtml(data.location)}</strong><br>Monitoring center`);
+  const centerMarker = new mapboxgl.Marker({ element: createMapMarkerElement('#22d3ee', 18, 3) })
+    .setLngLat(centerPoint)
+    .setPopup(new mapboxgl.Popup({ offset: 25, className: 'mapbox-popup' })
+      .setHTML(`<strong>📍 ${escHtml(data.location)}</strong><br>Monitoring center`))
+    .addTo(state.map);
   state.mapMarkers.push(centerMarker);
-  state.map.setView([coords.lat, coords.lon], 11);
 
-  // Traffic incident pins
+  const shouldShowKosovoView = state.currentLocation.toLowerCase().includes('kosovo') || (data.location && data.location.toLowerCase().includes('kosovo'));
+  if (shouldShowKosovoView) {
+    state.map.fitBounds(DEFAULT_KOSOVO_BOUNDS, { padding: 60, duration: 800 });
+    state.map.setPitch(35);
+  } else {
+    state.map.easeTo({ center: centerPoint, zoom: 11, pitch: 35, duration: 800 });
+  }
+
   (data.traffic?.incidents || []).forEach(inc => {
-    if (!inc.location?.lat) return;
+    if (!inc.location?.lat || !inc.location?.lon) return;
     const color = inc.anomaly ? '#fb923c' : '#fbbf24';
-    const pin = L.circleMarker([inc.location.lat, inc.location.lon], {
-      radius: inc.anomaly ? 10 : 7, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.85
-    }).addTo(state.map)
-      .bindPopup(`<strong>🚦 ${escHtml(inc.type.replace(/_/g,' '))}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`);
-    state.mapMarkers.push(pin);
+    const marker = new mapboxgl.Marker({ element: createMapMarkerElement(color, inc.anomaly ? 14 : 12, 2) })
+      .setLngLat([inc.location.lon, inc.location.lat])
+      .setPopup(new mapboxgl.Popup({ offset: 20, className: 'mapbox-popup' })
+        .setHTML(`<strong>🚦 ${escHtml(inc.type.replace(/_/g, ' '))}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`))
+      .addTo(state.map);
+    state.mapMarkers.push(marker);
   });
 
-  // Earthquake pins
-  (data.earthquakes?.earthquakes || []).filter(e => e.magnitude >= 2.5).forEach(eq => {
-    const radius = Math.max(6, eq.magnitude * 3);
-    const pin = L.circleMarker([eq.lat, eq.lon], {
-      radius, fillColor: eq.color, color: '#fff', weight: 1, fillOpacity: 0.7
-    }).addTo(state.map)
-      .bindPopup(`<strong>🌊 M${eq.magnitude.toFixed(1)} ${escHtml(eq.label)}</strong><br>${escHtml(eq.place)}<br>Depth: ${eq.depth}km · ${formatTimeAgo(eq.time)}`);
-    state.mapMarkers.push(pin);
+  (data.earthquakes?.earthquakes || []).filter(eq => eq.magnitude >= 2.5).forEach(eq => {
+    if (!eq.lat || !eq.lon) return;
+    const radius = Math.max(8, eq.magnitude * 3);
+    const element = createMapMarkerElement(eq.color || '#38bdf8', radius, 3);
+    element.style.width = `${radius}px`;
+    element.style.height = `${radius}px`;
+    element.style.boxShadow = `0 0 18px ${eq.color || '#38bdf8'}`;
+
+    const marker = new mapboxgl.Marker({ element })
+      .setLngLat([eq.lon, eq.lat])
+      .setPopup(new mapboxgl.Popup({ offset: 20, className: 'mapbox-popup' })
+        .setHTML(`<strong>🌊 M${eq.magnitude.toFixed(1)} ${escHtml(eq.label)}</strong><br>${escHtml(eq.place)}<br>Depth: ${eq.depth}km · ${formatTimeAgo(eq.time)}`))
+      .addTo(state.map);
+    state.mapMarkers.push(marker);
   });
 
-  // Radiation neighbor pins
   (data.radiation?.neighbors || []).forEach(n => {
     if (!n.lat || !n.lon) return;
     const color = { normal: '#34d399', elevated: '#fbbf24', high: '#fb923c', critical: '#f87171' }[n.status] || '#94a3b8';
-    const pin = L.circleMarker([n.lat, n.lon], {
-      radius: 7, fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.6, dashArray: '4 2'
-    }).addTo(state.map)
-      .bindPopup(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh} µSv/h<br>Status: ${n.status}`);
-    state.mapMarkers.push(pin);
+    const marker = new mapboxgl.Marker({ element: createMapMarkerElement(color, 12, 2) })
+      .setLngLat([n.lon, n.lat])
+      .setPopup(new mapboxgl.Popup({ offset: 20, className: 'mapbox-popup' })
+        .setHTML(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh} µSv/h<br>Status: ${escHtml(n.status)}`))
+      .addTo(state.map);
+    state.mapMarkers.push(marker);
   });
 
   $('mapBadge').style.display = state.mapMarkers.length > 1 ? '' : 'none';
   $('mapBadge').textContent = `${state.mapMarkers.length - 1} pins`;
   $('mapMeta').textContent = `${state.mapMarkers.length - 1} incident markers · scroll to zoom`;
 
-  // Force Leaflet to recalculate size (in case panel was hidden)
-  setTimeout(() => state.map.invalidateSize(), 100);
+  setTimeout(() => { if (state.map) state.map.resize(); }, 100);
 }
 
 // ── Alert Ticker ──────────────────────────────────────────────────────────────
@@ -600,56 +744,21 @@ async function markAllRead() {
 }
 
 async function loadLocationHistory() {
-  try {
-    const { locations } = await fetch('/api/locations').then(r => r.json());
-    const list = $('locationList');
-    if (!locations.length) { list.innerHTML = '<div class="empty-state">No history yet</div>'; return; }
-    list.innerHTML = locations.slice(0,10).map(loc =>
-      `<div class="location-item" onclick="selectLocation('${escHtml(loc.name)}')">
-        <span class="location-item-name">📍 ${escHtml(loc.name)}</span>
-        <span class="location-item-count">×${loc.monitorCount}</span>
-      </div>`).join('');
-    setupSuggestions(locations.map(l => l.name));
-  } catch {}
+  // Location history is no longer shown in the interface.
+  return;
 }
-function selectLocation(name) { $('locationInput').value = name; startMonitor(); }
+function selectLocation(name) { state.currentLocation = name; startMonitor(); }
 
 function setupSuggestions(names) {
-  const input = $('locationInput'), sugs = $('locationSuggestions');
-  input.removeEventListener('input', input._sugHandler);
-  input._sugHandler = () => {
-    const val = input.value.toLowerCase();
-    const matches = names.filter(n => n.toLowerCase().includes(val) && n !== input.value);
-    if (!matches.length || !val) { sugs.style.display = 'none'; return; }
-    sugs.innerHTML = matches.slice(0,5).map(m => `<div class="suggestion-item" onclick="selectLocation('${escHtml(m)}')">${escHtml(m)}</div>`).join('');
-    sugs.style.display = 'block';
-  };
-  input.addEventListener('input', input._sugHandler);
-  document.addEventListener('click', e => { if (!e.target.closest('.input-group')) sugs.style.display = 'none'; });
+  // Search suggestions are removed from the UI; no-op.
+  return;
 }
 
 // ── SSE Alert Handler ─────────────────────────────────────────────────────────
 function handleIncomingAlert(alert) {
   const sevIcon = { critical:'🚨', high:'⚠️', medium:'⚡', low:'ℹ️' }[alert.severity] || '🔔';
   showToast(alert.severity, sevIcon, alert.title, alert.message);
-  if (state.notificationsEnabled && Notification.permission === 'granted') {
-    new Notification(`SENTINEL: ${alert.title}`, { body: alert.message, icon: '🛰️' });
-  }
   loadAlertHistory();
-}
-
-// ── Notifications ─────────────────────────────────────────────────────────────
-async function toggleNotifications() {
-  if (state.notificationsEnabled) {
-    state.notificationsEnabled = false;
-    $('notifToggle').textContent = 'Enable'; $('notifToggle').classList.remove('active'); return;
-  }
-  const perm = await Notification.requestPermission();
-  if (perm === 'granted') {
-    state.notificationsEnabled = true;
-    $('notifToggle').textContent = 'Enabled'; $('notifToggle').classList.add('active');
-    showToast('medium', '🔔', 'Enabled', 'You\'ll receive alerts for critical events.');
-  } else showToast('medium', '🚫', 'Blocked', 'Enable notifications in browser settings.');
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -668,7 +777,10 @@ function dismissToast(id) {
 
 // ── Loading / Welcome ─────────────────────────────────────────────────────────
 function showLoading(show, sub = '') { $('loadingOverlay').style.display = show ? 'flex' : 'none'; if (sub) $('loadingSub').textContent = sub; }
-function hideWelcome() { $('welcomePanel').style.display = 'none'; }
+function hideWelcome() {
+  const panel = $('welcomePanel');
+  if (panel) panel.style.display = 'none';
+}
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function escHtml(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

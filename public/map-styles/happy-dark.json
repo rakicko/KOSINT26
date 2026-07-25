@@ -1,0 +1,24 @@
+{
+  "version": 8,
+  "name": "Happy Dark Vector Test",
+  "metadata": { "mapbox:autocomposite": true },
+  "sources": {
+    "empty-geo": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": { "background-color": "#0b1220" }
+    },
+    {
+      "id": "empty-fill",
+      "type": "circle",
+      "source": "empty-geo",
+      "paint": { "circle-radius": 0 }
+    }
+  ]
+}
