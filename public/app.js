@@ -45,6 +45,15 @@ const state = {
   markerCluster: null,
   heatLayer: null,
   timelineMarkers: [],
+  // ── Notification suppression ─────────────────────────────────────────────
+  // Toasts are suppressed until notificationsReady=true so that page load,
+  // refresh, and historical event sync never produce popups automatically.
+  notificationsReady: false,
+  // Persisted set of alert IDs already seen so we never re-toast duplicates.
+  seenAlertIds: (() => {
+    try { return new Set(JSON.parse(localStorage.getItem('sentinel_seen_alerts') || '[]')); }
+    catch { return new Set(); }
+  })(),
 };
 
 const $ = id => document.getElementById(id);
@@ -102,6 +111,11 @@ async function startMonitor() {
     await fetchAndRender(location, timeline, false);
     schedulePoll();
     closeModulePanel();
+    // Allow toast notifications only AFTER initial load completes and
+    // loadAlertHistory() has had time to seed seenAlertIds from the server.
+    if (!state.notificationsReady) {
+      setTimeout(() => { state.notificationsReady = true; }, 4000);
+    }
   } catch (err) {
     showToast('critical', '❌', 'Fetch Failed', err.message);
   } finally {
@@ -249,6 +263,108 @@ function focusEventOnMap(event) {
   setTimeout(() => newsMarker.openPopup && newsMarker.openPopup(), 260);
 }
 
+// Softly highlight the map marker corresponding to an intelligence event.
+function highlightMarkerForEvent(event, active) {
+  if (!event || !state.map || !state.mapInitialized) return;
+  const marker = state.mapMarkers.find(m => m._sentinelEventId === event.id || m._sentinelEventId === event.title);
+  if (!marker) return;
+  const el = marker.getElement ? marker.getElement() : null;
+  if (!el) return;
+  el.style.filter = active ? 'brightness(2) drop-shadow(0 0 10px cyan)' : '';
+  el.style.zIndex = active ? '9999' : '';
+}
+
+// Build the full intelligence card HTML — shared between renderNews and filterNews.
+function buildIntelligenceCardHTML(event, index) {
+  const severity = String(event.severity || 'LOW').toUpperCase();
+  const threat = Number(event.threatScore || 0);
+  const confidence = Number(event.confidence || 0);
+  const location = getEventLocation(event);
+  const category = event.category || 'Other';
+  const sourceCount = Array.isArray(event.sources) ? event.sources.length : 1;
+  const articleCount = Array.isArray(event.relatedArticles) ? event.relatedArticles.length : 0;
+  const keywords = (event.keywords || []).slice(0, 5)
+    .map(k => `<span class="intelligence-tag">${escHtml(k)}</span>`).join('');
+  const entities = (event.entities || []).slice(0, 5)
+    .map(e => `<span class="intelligence-entity">${escHtml(e)}</span>`).join('');
+  const sourceLines = (event.sources || []).slice(0, 3).map(source => {
+    const name = source?.name || 'Source';
+    const url = source?.url && isValidArticleUrl(source.url) ? source.url : '';
+    return url
+      ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${escHtml(name)}</a>`
+      : `<span>${escHtml(name)}</span>`;
+  }).join('');
+  const relatedLinks = (event.relatedArticles || []).slice(0, 4).map(article => {
+    const title = article?.title || 'Related report';
+    const url = article?.url && isValidArticleUrl(article.url) ? article.url : '';
+    return url
+      ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${escHtml(title)}</a>`
+      : `<span>${escHtml(title)}</span>`;
+  }).join('');
+  const locationLines = (event.locations || []).slice(0, 3).map(loc => {
+    const name = [loc.municipality, loc.city, loc.normalizedName, loc.country].filter(Boolean).join(', ');
+    return `<span class="intelligence-tag">${escHtml(name)}</span>`;
+  }).join('');
+  const time = event.timeline?.latest || event.updatedAt || event.createdAt || new Date().toISOString();
+  const summary = event.summary || event.title;
+  const locationText = location.text || 'Kosovo';
+  const timelineNote = event.timeline?.earliest && event.timeline.earliest !== event.timeline.latest
+    ? `<span class="intelligence-tag muted">${formatTimeAgo(event.timeline.earliest)} → ${formatTimeAgo(time)}</span>`
+    : '';
+
+  return `
+    <article class="intelligence-card severity-${severity.toLowerCase()}" data-event-id="${escHtml(event.id || `${category}-${index}`)}" data-index="${index}">
+      <div class="intelligence-card-header">
+        <span class="severity-pill severity-${severity.toLowerCase()}">${severity}</span>
+        <span class="threat-pill">Threat ${threat}</span>
+        <span class="confidence-pill">${confidence}%</span>
+      </div>
+      <div class="intelligence-card-main">
+        <div class="intelligence-card-title">${escHtml(event.title)}</div>
+        <div class="intelligence-card-meta">
+          <span>${escHtml(category)}</span>
+          <span>${escHtml(locationText)}</span>
+          <span>${formatTimeAgo(time)}</span>
+        </div>
+        <p class="intelligence-summary">${escHtml(summary)}</p>
+      </div>
+      <div class="intelligence-card-footer">
+        <span>${sourceCount} source${sourceCount !== 1 ? 's' : ''}</span>
+        <span>${articleCount} related</span>
+        <span>${sourceCount > 1 ? '✓ corroborated' : ''}</span>
+      </div>
+      <div class="intelligence-card-detail">
+        <div class="intelligence-detail-grid">
+          <div><label>Entities</label><div class="intelligence-detail-tags">${entities || '<span class="intelligence-tag muted">None extracted</span>'}</div></div>
+          <div><label>Keywords</label><div class="intelligence-detail-tags">${keywords || '<span class="intelligence-tag muted">None</span>'}</div></div>
+          <div><label>Locations</label><div class="intelligence-detail-tags">${locationLines || '<span class="intelligence-tag muted">Kosovo</span>'}</div></div>
+          <div><label>Sources</label><div class="intelligence-source-list">${sourceLines || '<span>Unavailable</span>'}</div></div>
+          <div><label>Related Reports</label><div class="intelligence-source-list">${relatedLinks || '<span>None</span>'}</div></div>
+          ${timelineNote ? `<div><label>Timeline</label><div class="intelligence-detail-tags">${timelineNote}</div></div>` : ''}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+// Attach interaction listeners (click = expand+map, hover = highlight marker)
+function attachCardListeners(listEl, events) {
+  listEl.querySelectorAll('.intelligence-card').forEach(card => {
+    const index = Number(card.dataset.index);
+    const event = events[index];
+    if (!event) return;
+
+    card.addEventListener('click', () => {
+      card.classList.toggle('expanded');
+      focusEventOnMap(event);
+    });
+
+    card.addEventListener('mouseenter', () => highlightMarkerForEvent(event, true));
+    card.addEventListener('mouseleave', () => highlightMarkerForEvent(event, false));
+  });
+}
+
+
 function renderNews(news) {
   const panel = $('newsPanel');
   panel.style.display = 'flex';
@@ -270,76 +386,14 @@ function renderNews(news) {
     return;
   }
 
-  list.innerHTML = events.map((event, index) => {
-    const severity = String(event.severity || 'LOW').toUpperCase();
-    const threat = Number(event.threatScore || 0);
-    const confidence = Number(event.confidence || 0);
-    const location = getEventLocation(event);
-    const category = event.category || 'Other';
-    const sourceCount = Array.isArray(event.sources) ? event.sources.length : 1;
-    const articleCount = Array.isArray(event.relatedArticles) ? event.relatedArticles.length : 0;
-    const keywords = (event.keywords || []).slice(0, 4).map(k => `<span class="intelligence-tag">${escHtml(k)}</span>`).join('');
-    const entities = (event.entities || []).slice(0, 4).map(e => `<span class="intelligence-entity">${escHtml(e)}</span>`).join('');
-    const sourceLines = (event.sources || []).slice(0, 3).map(source => {
-      const name = source?.name || 'Source';
-      const url = source?.url && isValidArticleUrl(source.url) ? source.url : '';
-      return url ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${escHtml(name)}</a>` : `<span>${escHtml(name)}</span>`;
-    }).join('');
-    const relatedLinks = (event.relatedArticles || []).slice(0, 3).map(article => {
-      const title = article?.title || 'Related report';
-      const url = article?.url && isValidArticleUrl(article.url) ? article.url : '';
-      return url ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${escHtml(title)}</a>` : `<span>${escHtml(title)}</span>`;
-    }).join('');
-
-    const time = event.timeline?.latest || event.updatedAt || event.createdAt || new Date().toISOString();
-    const summary = event.summary || event.title;
-    const locationText = location.text || 'Kosovo';
-
-    return `
-      <article class="intelligence-card severity-${severity.toLowerCase()}" data-event-id="${escHtml(event.id || `${category}-${index}`)}" data-index="${index}">
-        <div class="intelligence-card-header">
-          <span class="severity-pill severity-${severity.toLowerCase()}">${severity}</span>
-          <span class="threat-pill">Threat ${threat}</span>
-          <span class="confidence-pill">${confidence}%</span>
-        </div>
-        <div class="intelligence-card-main">
-          <div class="intelligence-card-title">${escHtml(event.title)}</div>
-          <div class="intelligence-card-meta">
-            <span>${escHtml(category)}</span>
-            <span>${escHtml(locationText)}</span>
-            <span>${formatTimeAgo(time)}</span>
-          </div>
-          <p class="intelligence-summary">${escHtml(summary)}</p>
-        </div>
-        <div class="intelligence-card-footer">
-          <span>${sourceCount} sources</span>
-          <span>${articleCount} related</span>
-          <span>${escHtml(String(event.severity || 'LOW'))}</span>
-        </div>
-        <div class="intelligence-card-detail">
-          <div class="intelligence-detail-grid">
-            <div><label>Entities</label><div class="intelligence-detail-tags">${entities || '<span class="intelligence-tag muted">None</span>'}</div></div>
-            <div><label>Keywords</label><div class="intelligence-detail-tags">${keywords || '<span class="intelligence-tag muted">None</span>'}</div></div>
-            <div><label>Sources</label><div class="intelligence-source-list">${sourceLines || '<span>Unavailable</span>'}</div></div>
-            <div><label>Related</label><div class="intelligence-source-list">${relatedLinks || '<span>Unavailable</span>'}</div></div>
-          </div>
-        </div>
-      </article>
-    `;
-  }).join('');
-
-  list.querySelectorAll('.intelligence-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const event = events[Number(card.dataset.index)];
-      card.classList.toggle('expanded');
-      if (event) focusEventOnMap(event);
-    });
-  });
+  list.innerHTML = events.map((event, index) => buildIntelligenceCardHTML(event, index)).join('');
+  attachCardListeners(list, events);
 
   updateTickerFromNews(events.map(event => ({
     title: event.title,
     intensityScore: Number(event.threatScore || event.confidence || 50),
     category: event.category,
+    severity: event.severity,
   })));
 }
 
@@ -347,42 +401,19 @@ function filterNews(cat, btn) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   if (!state.data?.news) return;
-  const events = getNewsIntelligenceEvents(state.data.news);
-  const filtered = cat === 'all' ? events : events.filter(event => String(event.category || 'Other').toLowerCase() === String(cat).toLowerCase());
+  const allEvents = getNewsIntelligenceEvents(state.data.news);
+  const filtered = cat === 'all' ? allEvents : allEvents.filter(event =>
+    String(event.category || 'Other').toLowerCase() === String(cat).toLowerCase()
+  );
   const list = $('newsList');
-  if (!filtered.length) { list.innerHTML = '<div class="empty-state">No matching intelligence events</div>'; return; }
-  list.innerHTML = filtered.map((event, index) => {
-    const severity = String(event.severity || 'LOW').toUpperCase();
-    const threat = Number(event.threatScore || 0);
-    const confidence = Number(event.confidence || 0);
-    const location = getEventLocation(event);
-    const time = event.timeline?.latest || event.updatedAt || event.createdAt || new Date().toISOString();
-    return `
-      <article class="intelligence-card severity-${severity.toLowerCase()}" data-event-id="${escHtml(event.id || `${event.category}-${index}`)}" data-index="${index}">
-        <div class="intelligence-card-header">
-          <span class="severity-pill severity-${severity.toLowerCase()}">${severity}</span>
-          <span class="threat-pill">Threat ${threat}</span>
-          <span class="confidence-pill">${confidence}%</span>
-        </div>
-        <div class="intelligence-card-main">
-          <div class="intelligence-card-title">${escHtml(event.title)}</div>
-          <div class="intelligence-card-meta">
-            <span>${escHtml(event.category || 'Other')}</span>
-            <span>${escHtml(location.text || 'Kosovo')}</span>
-            <span>${formatTimeAgo(time)}</span>
-          </div>
-          <p class="intelligence-summary">${escHtml(event.summary || event.title)}</p>
-        </div>
-      </article>
-    `;
-  }).join('');
-  list.querySelectorAll('.intelligence-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const event = filtered[Number(card.dataset.index)];
-      if (event) focusEventOnMap(event);
-    });
-  });
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-state">No matching intelligence events</div>';
+    return;
+  }
+  list.innerHTML = filtered.map((event, index) => buildIntelligenceCardHTML(event, index)).join('');
+  attachCardListeners(list, filtered);
 }
+
 
 // ── Render: Weather ───────────────────────────────────────────────────────────
 function renderWeather(weather) {
@@ -1102,7 +1133,9 @@ function exportReport() {
     `Threat    : ${tl.level} (${tl.score}/100)`,
     ``,
     `── NEWS INTELLIGENCE ──────────────`,
-    ...(d.news?.items || []).map(n => `[${n.intensityScore}/10] ${n.category}: ${n.title} (${n.source})`),
+    ...getNewsIntelligenceEvents(d.news || {}).map(e =>
+      `[${e.severity}|T${e.threatScore}|${e.confidence}%] ${e.category}: ${e.title}`
+    ),
     ``,
     `── WEATHER ────────────────────────`,
     d.weather?.current ? `Temp: ${d.weather.current.temp}°C, Wind: ${d.weather.current.windSpeed}km/h, ${d.weather.current.description}` : 'N/A',
@@ -1143,6 +1176,11 @@ function exportReport() {
 async function loadAlertHistory() {
   try {
     const { alerts, unreadCount } = await fetch('/api/alerts').then(r => r.json());
+    // Seed seen IDs silently — existing alerts must never produce toasts
+    alerts.forEach(a => {
+      const id = a.id || `${a.title}:${a.timestamp}`;
+      state.seenAlertIds.add(id);
+    });
     const badge = $('unreadBadge');
     if (unreadCount > 0) { badge.textContent = unreadCount; badge.style.display = ''; }
     else badge.style.display = 'none';
@@ -1175,8 +1213,19 @@ function setupSuggestions(names) {
 }
 
 // ── SSE Alert Handler ─────────────────────────────────────────────────────────
+// Toasts are only shown after notificationsReady is set (post initial load)
+// and only for alert IDs that have not been shown before (deduplication).
 function handleIncomingAlert(alert) {
-  const sevIcon = { critical:'🚨', high:'⚠️', medium:'⚡', low:'ℹ️' }[alert.severity] || '🔔';
+  if (!state.notificationsReady) return;
+  const id = alert.id || `${alert.title}:${alert.timestamp}`;
+  if (state.seenAlertIds.has(id)) return;
+  state.seenAlertIds.add(id);
+  // Persist last 500 IDs so duplicates survive page refreshes
+  try {
+    const arr = [...state.seenAlertIds].slice(-500);
+    localStorage.setItem('sentinel_seen_alerts', JSON.stringify(arr));
+  } catch {}
+  const sevIcon = { critical: '🚨', high: '⚠️', medium: '⚡', low: 'ℹ️' }[alert.severity] || '🔔';
   showToast(alert.severity, sevIcon, alert.title, alert.message);
   loadAlertHistory();
 }

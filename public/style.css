@@ -591,10 +591,15 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 
 .intelligence-card {
   display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 10px; border-radius: var(--r-sm);
-  border: 1px solid var(--border); background: rgba(15,23,42,0.8); transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-  cursor: pointer;
+  border: 1px solid var(--border); background: rgba(15,23,42,0.8); transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  cursor: pointer; position: relative;
 }
-.intelligence-card:hover { border-color: var(--border-glow); box-shadow: 0 0 0 1px rgba(56,189,248,0.09); }
+.intelligence-card::after {
+  content: '▸'; position: absolute; top: 10px; right: 10px;
+  font-size: 10px; color: var(--text-dim); transition: transform 0.2s, color 0.2s;
+}
+.intelligence-card.expanded::after { transform: rotate(90deg); color: var(--cyan); }
+.intelligence-card:hover { border-color: var(--border-glow); box-shadow: 0 0 0 1px rgba(56,189,248,0.09); transform: translateY(-1px); }
 .intelligence-card.severity-critical { border-left: 3px solid var(--red); }
 .intelligence-card.severity-high { border-left: 3px solid var(--orange); }
 .intelligence-card.severity-medium { border-left: 3px solid var(--amber); }
