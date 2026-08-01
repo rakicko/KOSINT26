@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -80,6 +82,22 @@
       <button class="btn-sm" onclick="markAllRead()" style="margin-top:8px">Mark all read</button>
     </div>
 
+    <div class="sidebar-section">
+      <div class="section-header">
+        <span class="section-icon">🧭</span>
+        <span>Intelligence Timeline</span>
+      </div>
+      <div id="timelineList" class="timeline-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-header">
+        <span class="section-icon">📡</span>
+        <span>Live Event Feed</span>
+      </div>
+      <div id="liveEventFeed" class="live-feed"></div>
+    </div>
+
     <div class="sidebar-section settings-section">
       <div class="section-header">
         <span class="section-icon">⚙️</span>
@@ -119,7 +137,14 @@
             <span>Interactive Situation Map</span>
             <span class="panel-badge" id="mapBadge" style="display:none"></span>
           </div>
-          <div class="panel-meta" id="mapMeta">Pinch/scroll to zoom</div>
+          <div class="map-panel-controls">
+            <button class="layer-btn active" type="button" data-map-layer="markers" onclick="toggleMapLayer('markers')" title="Toggle incident markers">📍 Markers</button>
+            <button class="layer-btn" type="button" data-map-layer="heatmap" onclick="toggleMapLayer('heatmap')" title="Toggle heatmap">🌡 Heat</button>
+            <button class="layer-btn active" type="button" data-map-layer="radiation" onclick="toggleMapLayer('radiation')" title="Toggle radiation">☢</button>
+            <button class="layer-btn active" type="button" data-map-layer="earthquakes" onclick="toggleMapLayer('earthquakes')" title="Toggle earthquakes">🌊</button>
+            <button class="layer-btn active" type="button" data-map-layer="traffic" onclick="toggleMapLayer('traffic')" title="Toggle traffic">🚦</button>
+            <div class="panel-meta" id="mapMeta">Pinch/scroll to zoom</div>
+          </div>
         </div>
         <div id="leafletMap"></div>
       </div>
@@ -146,10 +171,12 @@
               </div>
               <div class="panel-filter-row">
                 <button class="filter-btn active" onclick="filterNews('all', this)">All</button>
-                <button class="filter-btn" onclick="filterNews('civil_unrest', this)">Civil Unrest</button>
-                <button class="filter-btn" onclick="filterNews('vip_movement', this)">VIP</button>
-                <button class="filter-btn" onclick="filterNews('emergency', this)">Emergency</button>
-                <button class="filter-btn" onclick="filterNews('traffic', this)">Traffic</button>
+                <button class="filter-btn" onclick="filterNews('Security', this)">Security</button>
+                <button class="filter-btn" onclick="filterNews('Military', this)">Military</button>
+                <button class="filter-btn" onclick="filterNews('Politics', this)">Politics</button>
+                <button class="filter-btn" onclick="filterNews('Border Activity', this)">Border</button>
+                <button class="filter-btn" onclick="filterNews('Civil Unrest', this)">Unrest</button>
+                <button class="filter-btn" onclick="filterNews('Terrorism', this)">Terrorism</button>
               </div>
               <div class="news-list" id="newsList"></div>
             </div>
@@ -243,6 +270,8 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

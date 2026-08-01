@@ -7,12 +7,12 @@
 // ── State ─────────────────────────────────────────────────────────────────────
 const DEFAULT_LOCATION = 'Kosovo';
 const DEFAULT_MAP_CENTER = { lon: 20.9, lat: 42.6 }; // Kosovo center
-const DEFAULT_MAP_ZOOM = 8.5;
+const DEFAULT_MAP_ZOOM = 8.8;
 const DEFAULT_KOSOVO_BOUNDS = [[19.9, 41.8], [21.8, 43.3]]; // [sw, ne]
 
 // Leaflet migration settings
-const LEAFLET_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const LEAFLET_ATTRIBUTION = '&copy; OpenStreetMap contributors';
+const LEAFLET_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+const LEAFLET_ATTRIBUTION = 'Tiles &copy; Esri';
 
 /* Leaflet migration
    - The dashboard keeps the same tactical layout and module flow.
@@ -35,6 +35,16 @@ const state = {
   mapVisible: true,
   activeModule: null,
   mapMarkers: [],
+  mapLayers: {
+    markers: true,
+    heatmap: false,
+    radiation: true,
+    earthquakes: true,
+    traffic: true,
+  },
+  markerCluster: null,
+  heatLayer: null,
+  timelineMarkers: [],
 };
 
 const $ = id => document.getElementById(id);
@@ -119,6 +129,9 @@ async function fetchAndRender(location, timeline, forceRefresh = false) {
   renderRadiation(data.radiation);
   renderAQI(data.aqi);
   renderEarthquakes(data.earthquakes);
+  updateStatsRibbon(data);
+  renderTimeline(data);
+  renderLiveEventFeed(data);
   updateMap(data);
   loadAlertHistory();
 }
@@ -153,51 +166,222 @@ function renderThreatLevel(tl) {
   document.querySelector('.header').style.borderBottomColor = tl.score >= 80 ? tl.color : '';
 }
 
-// ── Render: News ──────────────────────────────────────────────────────────────
+// ── Render: News / Intelligence Events ───────────────────────────────────────
+function getNewsIntelligenceEvents(newsData) {
+  if (!newsData) return [];
+  if (Array.isArray(newsData.intelligenceEvents) && newsData.intelligenceEvents.length) return newsData.intelligenceEvents;
+  if (Array.isArray(newsData.items)) {
+    return newsData.items.map((item, index) => ({
+      id: item.id || `legacy-${index}`,
+      title: item.title || 'Untitled intelligence event',
+      summary: item.description || item.summary || '',
+      category: item.category || 'Other',
+      severity: item.severity || (item.intensityScore >= 9 ? 'CRITICAL' : item.intensityScore >= 7 ? 'HIGH' : item.intensityScore >= 5 ? 'MEDIUM' : 'LOW'),
+      confidence: item.confidence || Math.max(20, Math.min(95, (item.intensityScore || 5) * 10)),
+      threatScore: item.threatScore || Math.max(10, (item.intensityScore || 5) * 10),
+      locations: item.location ? [{
+        originalName: item.location,
+        normalizedName: item.location,
+        municipality: item.location,
+        country: 'Kosovo',
+        region: 'Kosovo',
+        coordinates: item.lat && item.lon ? { lat: item.lat, lon: item.lon } : null,
+      }] : [],
+      entities: Array.isArray(item.entities) ? item.entities : [],
+      keywords: Array.isArray(item.tags) ? item.tags : (Array.isArray(item.keywords) ? item.keywords : []),
+      timeline: { earliest: item.publishedAt || new Date().toISOString(), latest: item.publishedAt || new Date().toISOString() },
+      sources: item.source ? [{ name: item.source, url: item.url || '#', language: 'unknown' }] : [],
+      relatedArticles: item.url ? [{ title: item.title, source: item.source, url: item.url, publishedAt: item.publishedAt || new Date().toISOString() }] : [],
+      createdAt: item.publishedAt || new Date().toISOString(),
+      updatedAt: item.publishedAt || new Date().toISOString(),
+    }));
+  }
+  return [];
+}
+
+function getEventLocation(event) {
+  const locations = Array.isArray(event?.locations) ? event.locations : [];
+  const loc = locations.find(l => l?.coordinates && Number.isFinite(l.coordinates.lat) && Number.isFinite(l.coordinates.lon)) || locations[0] || {};
+  const coords = loc.coordinates || {};
+  return {
+    text: loc.municipality || loc.city || loc.normalizedName || loc.originalName || 'Kosovo',
+    lat: Number(coords.lat),
+    lon: Number(coords.lon),
+  };
+}
+
+function summarizeIntelligenceCounters(events) {
+  return {
+    highThreat: events.filter(e => Number(e.threatScore || 0) >= 70).length,
+    critical: events.filter(e => String(e.severity || 'LOW').toUpperCase() === 'CRITICAL').length,
+    security: events.filter(e => String(e.category || 'Other').toLowerCase() === 'security').length,
+    politics: events.filter(e => String(e.category || 'Other').toLowerCase() === 'politics').length,
+    border: events.filter(e => String(e.category || 'Other').toLowerCase() === 'border activity').length,
+    military: events.filter(e => String(e.category || 'Other').toLowerCase() === 'military').length,
+  };
+}
+
+function focusEventOnMap(event) {
+  if (!event || !state.map || !state.mapInitialized) return;
+  const location = getEventLocation(event);
+  if (!Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return;
+
+  const marker = state.mapMarkers.find(item => item._sentinelEventId === (event.id || event.title));
+  if (marker) {
+    const latlng = marker.getLatLng ? marker.getLatLng() : L.latLng(location.lat, location.lon);
+    state.map.flyTo(latlng, Math.max(state.map.getZoom(), 10), { duration: 0.8 });
+    setTimeout(() => marker.openPopup && marker.openPopup(), 260);
+    return;
+  }
+
+  const safeSeverity = (event.severity || 'LOW').toUpperCase();
+  const color = safeSeverity === 'CRITICAL' ? '#f87171' : safeSeverity === 'HIGH' ? '#fb923c' : safeSeverity === 'MEDIUM' ? '#fbbf24' : '#34d399';
+  const newsMarker = L.marker([location.lat, location.lon], {
+    icon: createMapMarkerElement('alert', color, 18, safeSeverity !== 'LOW'),
+  });
+  newsMarker.bindPopup(`<strong>📰 ${escHtml(event.category || 'News')}</strong><br>${escHtml(event.title)}<br>${escHtml(location.text)}`, { className: 'sentinel-popup' });
+  newsMarker._sentinelEventId = event.id || event.title;
+  newsMarker._sentinelType = 'news';
+  state.mapMarkers.push(newsMarker);
+  state.markerCluster.addLayer(newsMarker);
+  state.timelineMarkers.push(newsMarker);
+  state.map.flyTo([location.lat, location.lon], Math.max(state.map.getZoom(), 10), { duration: 0.8 });
+  setTimeout(() => newsMarker.openPopup && newsMarker.openPopup(), 260);
+}
+
 function renderNews(news) {
   const panel = $('newsPanel');
   panel.style.display = 'flex';
-  if (!news || news.error) { $('newsList').innerHTML = `<div class="error-state">News unavailable: ${news?.error || ''}</div>`; return; }
+  if (!news || news.error) {
+    $('newsList').innerHTML = `<div class="error-state">News unavailable: ${news?.error || ''}</div>`;
+    return;
+  }
 
-  const high = news.summary?.highIntensity || 0;
-  $('newsBadge').textContent = high > 0 ? `${high} HIGH` : '';
-  $('newsBadge').style.display = high > 0 ? '' : 'none';
-  $('newsMeta').textContent = `${news.summary?.total || 0} articles · ${news.source}`;
+  const events = getNewsIntelligenceEvents(news);
+  const counters = summarizeIntelligenceCounters(events);
+  $('newsBadge').textContent = counters.highThreat > 0 ? `${counters.highThreat} HIGH` : 'INTEL';
+  $('newsBadge').style.display = '';
+  $('newsMeta').textContent = `${counters.highThreat} high threat · ${counters.critical} critical · ${events.length} events`;
 
-  filterNewsItems(news.items, state.newsFilter);
-  updateTickerFromNews(news.items);
-}
-
-function filterNewsItems(items, filter) {
-  state.newsFilter = filter;
-  const filtered = filter === 'all' ? items : items.filter(i => i.category === filter);
   const list = $('newsList');
-  if (!filtered.length) { list.innerHTML = '<div class="empty-state">No matching articles</div>'; return; }
-  list.innerHTML = filtered.map(item => {
-    const s = item.intensityScore;
-    const cls = s >= 9 ? 'score-critical' : s >= 7 ? 'score-high' : s >= 5 ? 'score-medium' : '';
-    const tags = (item.tags || []).slice(0, 3).map(t => `<span class="news-tag">${escHtml(t)}</span>`).join('');
-    const url = isValidArticleUrl(item.url) ? item.url.trim() : '';
-    const card = `<div class="news-item ${cls}">
-      <div class="news-item-header">
-        <span class="news-score score-${s}">${s}/10</span>
-        <span class="news-category">${(item.category||'other').replace(/_/g,' ')}</span>
-        <span class="news-time">${formatTimeAgo(item.publishedAt)}</span>
-      </div>
-      <div class="news-title">${escHtml(item.title)}</div>
-      ${item.description ? `<div class="news-desc">${escHtml(item.description)}</div>` : ''}
-      <div class="news-footer">
-        <span class="news-source">📡 ${escHtml(item.source)}</span>
-        <div class="news-tags">${tags}</div>
-      </div>
-    </div>`;
-    return url ? `<a class="news-item-link" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${card}</a>` : card;
+  if (!events.length) {
+    list.innerHTML = '<div class="empty-state">No intelligence events available</div>';
+    updateTickerFromNews([]);
+    return;
+  }
+
+  list.innerHTML = events.map((event, index) => {
+    const severity = String(event.severity || 'LOW').toUpperCase();
+    const threat = Number(event.threatScore || 0);
+    const confidence = Number(event.confidence || 0);
+    const location = getEventLocation(event);
+    const category = event.category || 'Other';
+    const sourceCount = Array.isArray(event.sources) ? event.sources.length : 1;
+    const articleCount = Array.isArray(event.relatedArticles) ? event.relatedArticles.length : 0;
+    const keywords = (event.keywords || []).slice(0, 4).map(k => `<span class="intelligence-tag">${escHtml(k)}</span>`).join('');
+    const entities = (event.entities || []).slice(0, 4).map(e => `<span class="intelligence-entity">${escHtml(e)}</span>`).join('');
+    const sourceLines = (event.sources || []).slice(0, 3).map(source => {
+      const name = source?.name || 'Source';
+      const url = source?.url && isValidArticleUrl(source.url) ? source.url : '';
+      return url ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${escHtml(name)}</a>` : `<span>${escHtml(name)}</span>`;
+    }).join('');
+    const relatedLinks = (event.relatedArticles || []).slice(0, 3).map(article => {
+      const title = article?.title || 'Related report';
+      const url = article?.url && isValidArticleUrl(article.url) ? article.url : '';
+      return url ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${escHtml(title)}</a>` : `<span>${escHtml(title)}</span>`;
+    }).join('');
+
+    const time = event.timeline?.latest || event.updatedAt || event.createdAt || new Date().toISOString();
+    const summary = event.summary || event.title;
+    const locationText = location.text || 'Kosovo';
+
+    return `
+      <article class="intelligence-card severity-${severity.toLowerCase()}" data-event-id="${escHtml(event.id || `${category}-${index}`)}" data-index="${index}">
+        <div class="intelligence-card-header">
+          <span class="severity-pill severity-${severity.toLowerCase()}">${severity}</span>
+          <span class="threat-pill">Threat ${threat}</span>
+          <span class="confidence-pill">${confidence}%</span>
+        </div>
+        <div class="intelligence-card-main">
+          <div class="intelligence-card-title">${escHtml(event.title)}</div>
+          <div class="intelligence-card-meta">
+            <span>${escHtml(category)}</span>
+            <span>${escHtml(locationText)}</span>
+            <span>${formatTimeAgo(time)}</span>
+          </div>
+          <p class="intelligence-summary">${escHtml(summary)}</p>
+        </div>
+        <div class="intelligence-card-footer">
+          <span>${sourceCount} sources</span>
+          <span>${articleCount} related</span>
+          <span>${escHtml(String(event.severity || 'LOW'))}</span>
+        </div>
+        <div class="intelligence-card-detail">
+          <div class="intelligence-detail-grid">
+            <div><label>Entities</label><div class="intelligence-detail-tags">${entities || '<span class="intelligence-tag muted">None</span>'}</div></div>
+            <div><label>Keywords</label><div class="intelligence-detail-tags">${keywords || '<span class="intelligence-tag muted">None</span>'}</div></div>
+            <div><label>Sources</label><div class="intelligence-source-list">${sourceLines || '<span>Unavailable</span>'}</div></div>
+            <div><label>Related</label><div class="intelligence-source-list">${relatedLinks || '<span>Unavailable</span>'}</div></div>
+          </div>
+        </div>
+      </article>
+    `;
   }).join('');
+
+  list.querySelectorAll('.intelligence-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const event = events[Number(card.dataset.index)];
+      card.classList.toggle('expanded');
+      if (event) focusEventOnMap(event);
+    });
+  });
+
+  updateTickerFromNews(events.map(event => ({
+    title: event.title,
+    intensityScore: Number(event.threatScore || event.confidence || 50),
+    category: event.category,
+  })));
 }
+
 function filterNews(cat, btn) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  if (state.data?.news) filterNewsItems(state.data.news.items || [], cat);
+  if (btn) btn.classList.add('active');
+  if (!state.data?.news) return;
+  const events = getNewsIntelligenceEvents(state.data.news);
+  const filtered = cat === 'all' ? events : events.filter(event => String(event.category || 'Other').toLowerCase() === String(cat).toLowerCase());
+  const list = $('newsList');
+  if (!filtered.length) { list.innerHTML = '<div class="empty-state">No matching intelligence events</div>'; return; }
+  list.innerHTML = filtered.map((event, index) => {
+    const severity = String(event.severity || 'LOW').toUpperCase();
+    const threat = Number(event.threatScore || 0);
+    const confidence = Number(event.confidence || 0);
+    const location = getEventLocation(event);
+    const time = event.timeline?.latest || event.updatedAt || event.createdAt || new Date().toISOString();
+    return `
+      <article class="intelligence-card severity-${severity.toLowerCase()}" data-event-id="${escHtml(event.id || `${event.category}-${index}`)}" data-index="${index}">
+        <div class="intelligence-card-header">
+          <span class="severity-pill severity-${severity.toLowerCase()}">${severity}</span>
+          <span class="threat-pill">Threat ${threat}</span>
+          <span class="confidence-pill">${confidence}%</span>
+        </div>
+        <div class="intelligence-card-main">
+          <div class="intelligence-card-title">${escHtml(event.title)}</div>
+          <div class="intelligence-card-meta">
+            <span>${escHtml(event.category || 'Other')}</span>
+            <span>${escHtml(location.text || 'Kosovo')}</span>
+            <span>${formatTimeAgo(time)}</span>
+          </div>
+          <p class="intelligence-summary">${escHtml(event.summary || event.title)}</p>
+        </div>
+      </article>
+    `;
+  }).join('');
+  list.querySelectorAll('.intelligence-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const event = filtered[Number(card.dataset.index)];
+      if (event) focusEventOnMap(event);
+    });
+  });
 }
 
 // ── Render: Weather ───────────────────────────────────────────────────────────
@@ -453,7 +637,11 @@ function toggleModule(panelId) {
 function closeModulePanel() {
   const overlay = $('moduleOverlay');
   if (!overlay) return;
+
   overlay.classList.remove('active');
+  overlay.querySelectorAll('.overlay-panel').forEach(panel => {
+    panel.style.display = 'none';
+  });
   overlay.setAttribute('aria-hidden', 'true');
   state.activeModule = null;
   document.querySelectorAll('.module-btn').forEach(btn => btn.classList.remove('active'));
@@ -461,21 +649,25 @@ function closeModulePanel() {
   setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 200);
 }
 
-function createMapMarkerElement(color, size = 16, border = 3) {
-  const markerSize = size + (border * 2);
+function createMapMarkerElement(type, color, size = 16, pulse = false) {
+  const pulseClass = pulse ? ' sentinel-marker--pulse' : '';
+  const markerSize = size + 12;
+  const icons = {
+    monitor: '<path d="M32 6c-9.4 0-17 7.6-17 17 0 12.8 13.7 25.2 16 27.6 2.3-2.4 16-14.8 16-27.6 0-9.4-7.6-17-15-17zm0 24.5A7.5 7.5 0 1 1 32 15a7.5 7.5 0 0 1 0 15.5z" />',
+    traffic: '<path d="M20 12h24l6 22v10a4 4 0 0 1-4 4h-3a4 4 0 0 1-8 0h-8a4 4 0 0 1-8 0h-3a4 4 0 0 1-4-4V34l6-22zm7 10h18l-2 12H29l-2-12zm2 18h14v4H29v-4zm-4 0h4v4h-4v-4zm18 0h4v4h-4v-4z" />',
+    radiation: '<circle cx="32" cy="32" r="18" /><path d="M32 10v11M32 54v-9M10 32h11M43 32h11M18 18l8 8M38 38l8 8M46 18l-8 8M26 38l-8 8" />',
+    earthquake: '<path d="M14 40l12-18 8 10 8-16 12 24H14z" />',
+    alert: '<path d="M32 10l20 36H12L32 10zm0 12v12m0 9h.01" />',
+  };
+
   return L.divIcon({
-    className: 'sentinel-marker',
+    className: `sentinel-map-icon sentinel-map-icon--${type}`,
     html: `
-      <span style="
-        display:block;
-        width:${size}px;
-        height:${size}px;
-        border:${border}px solid rgba(255,255,255,0.92);
-        border-radius:50%;
-        background:${color};
-        box-shadow:0 0 14px ${color};
-        cursor:pointer;
-      "></span>
+      <span class="sentinel-marker sentinel-marker--${type}${pulseClass}" style="--marker-color:${color}; --marker-size:${size}px;">
+        <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          ${icons[type] || icons.alert}
+        </svg>
+      </span>
     `,
     iconSize: [markerSize, markerSize],
     iconAnchor: [markerSize / 2, markerSize / 2],
@@ -494,12 +686,31 @@ function initMap() {
     zoomControl: true,
     attributionControl: true,
     preferCanvas: true,
+    zoomSnap: 0.25,
+    zoomDelta: 0.5,
   }).setView([DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lon], DEFAULT_MAP_ZOOM);
 
   L.tileLayer(LEAFLET_TILE_URL, {
     maxZoom: 19,
     attribution: LEAFLET_ATTRIBUTION,
+    noWrap: false,
   }).addTo(state.map);
+
+  state.markerCluster = L.markerClusterGroup({
+    chunkedLoading: true,
+    disableClusteringAtZoom: 11,
+    maxClusterRadius: 55,
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+  });
+  state.map.addLayer(state.markerCluster);
+
+  state.heatLayer = L.heatLayer([], {
+    radius: 22,
+    blur: 18,
+    maxZoom: 17,
+    minOpacity: 0.35,
+  });
 
   state.map.whenReady(() => {
     if (state.data) updateMap(state.data);
@@ -512,59 +723,137 @@ function initMap() {
 function updateMap(data) {
   if (!state.mapInitialized || !state.map || !data) return;
 
-  state.mapMarkers.forEach(marker => marker.remove());
+  if (state.markerCluster) {
+    state.markerCluster.clearLayers();
+  }
   state.mapMarkers = [];
+  state.timelineMarkers = [];
+
+  if (state.heatLayer) {
+    state.map.removeLayer(state.heatLayer);
+    state.heatLayer = L.heatLayer([], {
+      radius: 22,
+      blur: 18,
+      maxZoom: 17,
+      minOpacity: 0.35,
+    });
+  }
 
   const coords = data.weather?.coordinates || DEFAULT_MAP_CENTER;
   const centerLatLng = [coords.lat, coords.lon];
 
   const centerMarker = L.marker(centerLatLng, {
-    icon: createMapMarkerElement('#22d3ee', 18, 3),
-  }).addTo(state.map);
-  centerMarker.bindPopup(`<strong>📍 ${escHtml(data.location)}</strong><br>Monitoring center`);
+    icon: createMapMarkerElement('monitor', '#38bdf8', 20),
+  });
+  centerMarker.bindPopup(`<strong>📍 ${escHtml(data.location)}</strong><br>Monitoring center`, {
+    className: 'sentinel-popup',
+    offset: [0, -12],
+  });
   state.mapMarkers.push(centerMarker);
+  state.markerCluster.addLayer(centerMarker);
 
   const shouldShowKosovoView = state.currentLocation.toLowerCase().includes('kosovo') || (data.location && data.location.toLowerCase().includes('kosovo'));
   if (shouldShowKosovoView) {
-    state.map.fitBounds(L.latLngBounds([[41.8, 19.9], [43.3, 21.8]]), { padding: [60, 60] });
+    state.map.fitBounds(L.latLngBounds([[41.8, 19.9], [43.3, 21.8]]), { padding: [35, 35] });
   } else {
-    state.map.flyTo(centerLatLng, 11, { duration: 0.8 });
+    state.map.flyTo(centerLatLng, 11.2, { duration: 0.8 });
   }
 
-  (data.traffic?.incidents || []).forEach(inc => {
-    if (!inc.location?.lat || !inc.location?.lon) return;
-    const color = inc.anomaly ? '#fb923c' : '#fbbf24';
-    const marker = L.marker([inc.location.lat, inc.location.lon], {
-      icon: createMapMarkerElement(color, inc.anomaly ? 14 : 12, 2),
-    }).addTo(state.map);
-    marker.bindPopup(`<strong>🚦 ${escHtml(inc.type.replace(/_/g, ' '))}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`);
-    state.mapMarkers.push(marker);
-  });
+  const heatPoints = [];
 
-  (data.earthquakes?.earthquakes || []).filter(eq => eq.magnitude >= 2.5).forEach(eq => {
-    if (!eq.lat || !eq.lon) return;
-    const radius = Math.max(8, eq.magnitude * 3);
-    const marker = L.circleMarker([eq.lat, eq.lon], {
-      radius,
-      color: eq.color || '#38bdf8',
-      fillColor: eq.color || '#38bdf8',
-      fillOpacity: 0.8,
-      weight: 2,
-      opacity: 1,
-    }).addTo(state.map);
-    marker.bindPopup(`<strong>🌊 M${eq.magnitude.toFixed(1)} ${escHtml(eq.label)}</strong><br>${escHtml(eq.place)}<br>Depth: ${eq.depth}km · ${formatTimeAgo(eq.time)}`);
-    state.mapMarkers.push(marker);
-  });
+  if (state.mapLayers.traffic) {
+    (data.traffic?.incidents || []).forEach((inc, index) => {
+      if (!inc.location?.lat || !inc.location?.lon) return;
+      const color = inc.anomaly ? '#fb923c' : '#fbbf24';
+      const marker = L.marker([inc.location.lat, inc.location.lon], {
+        icon: createMapMarkerElement('traffic', color, inc.anomaly ? 16 : 14, inc.anomaly),
+      });
+      marker.bindPopup(`<strong>🚦 ${escHtml(inc.type.replace(/_/g, ' '))}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`, {
+        className: 'sentinel-popup',
+        offset: [0, -10],
+      });
+      marker._sentinelId = `traffic-${index}`;
+      marker._sentinelType = 'traffic';
+      state.mapMarkers.push(marker);
+      state.markerCluster.addLayer(marker);
+      state.timelineMarkers.push(marker);
+      heatPoints.push([inc.location.lat, inc.location.lon, inc.anomaly ? 0.9 : 0.6]);
+    });
+  }
 
-  (data.radiation?.neighbors || []).forEach(n => {
-    if (!n.lat || !n.lon) return;
-    const color = { normal: '#34d399', elevated: '#fbbf24', high: '#fb923c', critical: '#f87171' }[n.status] || '#94a3b8';
-    const marker = L.marker([n.lat, n.lon], {
-      icon: createMapMarkerElement(color, 12, 2),
-    }).addTo(state.map);
-    marker.bindPopup(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh} µSv/h<br>Status: ${escHtml(n.status)}`);
-    state.mapMarkers.push(marker);
-  });
+  if (state.mapLayers.earthquakes) {
+    (data.earthquakes?.earthquakes || []).filter(eq => eq.magnitude >= 2.5).forEach((eq, index) => {
+      if (!eq.lat || !eq.lon) return;
+      const magnitudeSize = Math.max(14, eq.magnitude * 4);
+      const marker = L.marker([eq.lat, eq.lon], {
+        icon: createMapMarkerElement('earthquake', eq.color || '#f87171', magnitudeSize, eq.magnitude >= 5),
+      });
+      marker.bindPopup(`<strong>🌊 M${eq.magnitude.toFixed(1)} ${escHtml(eq.label)}</strong><br>${escHtml(eq.place)}<br>Depth: ${eq.depth}km · ${formatTimeAgo(eq.time)}`, {
+        className: 'sentinel-popup',
+        offset: [0, -12],
+      });
+      marker._sentinelId = `quake-${index}`;
+      marker._sentinelType = 'earthquake';
+      state.mapMarkers.push(marker);
+      state.markerCluster.addLayer(marker);
+      state.timelineMarkers.push(marker);
+      heatPoints.push([eq.lat, eq.lon, 0.95]);
+    });
+  }
+
+  if (state.mapLayers.radiation) {
+    (data.radiation?.neighbors || []).forEach((n, index) => {
+      if (!n.lat || !n.lon) return;
+      const color = { normal: '#34d399', elevated: '#fbbf24', high: '#fb923c', critical: '#f87171' }[n.status] || '#94a3b8';
+      const marker = L.marker([n.lat, n.lon], {
+        icon: createMapMarkerElement('radiation', color, 14),
+      });
+      marker.bindPopup(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh} µSv/h<br>Status: ${escHtml(n.status)}`, {
+        className: 'sentinel-popup',
+        offset: [0, -10],
+      });
+      marker._sentinelId = `radiation-${index}`;
+      marker._sentinelType = 'radiation';
+      state.mapMarkers.push(marker);
+      state.markerCluster.addLayer(marker);
+      state.timelineMarkers.push(marker);
+      heatPoints.push([n.lat, n.lon, 0.7]);
+    });
+  }
+
+  if (state.mapLayers.markers) {
+    const newsEvents = getNewsIntelligenceEvents(data.news || {});
+    newsEvents.forEach((event, index) => {
+      const location = getEventLocation(event);
+      if (!Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return;
+      const safeSeverity = String(event.severity || 'LOW').toUpperCase();
+      const color = safeSeverity === 'CRITICAL' ? '#f87171' : safeSeverity === 'HIGH' ? '#fb923c' : safeSeverity === 'MEDIUM' ? '#fbbf24' : '#34d399';
+      const marker = L.marker([location.lat, location.lon], {
+        icon: createMapMarkerElement('alert', color, 18, safeSeverity !== 'LOW'),
+      });
+      marker.bindPopup(`<strong>📰 ${escHtml(event.category || 'Intelligence')}</strong><br>${escHtml(event.title)}<br>${escHtml(location.text || 'Kosovo')}`, {
+        className: 'sentinel-popup',
+        offset: [0, -12],
+      });
+      marker._sentinelId = event.id || `news-${index}`;
+      marker._sentinelType = 'news';
+      marker._sentinelEvent = event;
+      state.mapMarkers.push(marker);
+      state.markerCluster.addLayer(marker);
+      state.timelineMarkers.push(marker);
+      heatPoints.push([location.lat, location.lon, 0.8]);
+    });
+  }
+
+  if (state.mapLayers.heatmap && heatPoints.length) {
+    state.heatLayer = L.heatLayer(heatPoints, {
+      radius: 22,
+      blur: 18,
+      maxZoom: 17,
+      minOpacity: 0.35,
+    });
+    state.heatLayer.addTo(state.map);
+  }
 
   $('mapBadge').style.display = state.mapMarkers.length > 1 ? '' : 'none';
   $('mapBadge').textContent = `${state.mapMarkers.length - 1} pins`;
@@ -573,16 +862,195 @@ function updateMap(data) {
   setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 100);
 }
 
+function toggleMapLayer(layerName) {
+  if (!state.mapLayers || !(layerName in state.mapLayers)) return;
+  state.mapLayers[layerName] = !state.mapLayers[layerName];
+  const btn = document.querySelector(`[data-map-layer="${layerName}"]`);
+  if (btn) btn.classList.toggle('active', state.mapLayers[layerName]);
+  if (state.data) updateMap(state.data);
+}
+
+function updateStatsRibbon(data) {
+  const events = getNewsIntelligenceEvents(data?.news || {});
+  const counters = summarizeIntelligenceCounters(events);
+
+  const trafficCount = (data?.traffic?.incidents || []).length;
+  const quakeCount = (data?.earthquakes?.earthquakes || []).filter(eq => eq.magnitude >= 2.5).length;
+  const radiationCount = (data?.radiation?.neighbors || []).length;
+  const weatherCount = (data?.weather?.alerts || []).length;
+
+  if ($('statTraffic')) $('statTraffic').textContent = trafficCount;
+  if ($('statEarthquakes')) $('statEarthquakes').textContent = quakeCount;
+  if ($('statRadiation')) $('statRadiation').textContent = radiationCount;
+  if ($('statWeather')) $('statWeather').textContent = weatherCount;
+  if ($('statNews')) $('statNews').textContent = events.length;
+  if ($('statPriority')) $('statPriority').textContent = counters.highThreat;
+}
+
+function getTimelineBucketLabel(timestamp) {
+  if (!timestamp) return 'NOW';
+  const diffMinutes = (Date.now() - new Date(timestamp).getTime()) / 60000;
+  if (diffMinutes < 10) return 'NOW';
+  if (diffMinutes < 60) return '10 MIN AGO';
+  if (diffMinutes < 180) return '1 HOUR AGO';
+  if (diffMinutes < 720) return '6 HOURS AGO';
+  return 'EARLIER';
+}
+
+function renderTimeline(data) {
+  const items = [];
+
+  (data.traffic?.incidents || []).forEach((inc, index) => {
+    items.push({ id: `traffic-${index}`, icon: '🚦', category: 'Traffic', severity: inc.anomaly ? 'HIGH' : 'MEDIUM', time: inc.timestamp || new Date().toISOString(), label: inc.type.replace(/_/g, ' '), source: 'Traffic feed', lat: inc.location?.lat, lon: inc.location?.lon });
+  });
+
+  (data.earthquakes?.earthquakes || []).slice(0, 5).forEach((eq, index) => {
+    items.push({ id: `quake-${index}`, icon: '🌊', category: 'Seismic', severity: eq.magnitude >= 5 ? 'CRITICAL' : eq.magnitude >= 3 ? 'HIGH' : 'MEDIUM', time: eq.time, label: `M${eq.magnitude.toFixed(1)} ${eq.label}`, source: 'Seismic registry', lat: eq.lat, lon: eq.lon });
+  });
+
+  (data.radiation?.neighbors || []).slice(0, 4).forEach((n, index) => {
+    items.push({ id: `radiation-${index}`, icon: '☢️', category: 'Radiation', severity: n.status === 'critical' ? 'CRITICAL' : n.status === 'high' ? 'HIGH' : 'MEDIUM', time: new Date().toISOString(), label: `${n.name} · ${n.status}`, source: 'Radiation network', lat: n.lat, lon: n.lon });
+  });
+
+  (data.weather?.alerts || []).slice(0, 3).forEach((a, index) => {
+    items.push({ id: `weather-${index}`, icon: '⚠', category: 'Weather', severity: (a.severity || 'MEDIUM').toUpperCase(), time: new Date().toISOString(), label: a.type.replace(/_/g, ' '), source: 'Weather alert' });
+  });
+
+  const newsItems = getNewsIntelligenceEvents(data.news || {});
+  newsItems.forEach((event, index) => {
+    const location = getEventLocation(event);
+    items.push({
+      id: event.id || `news-${index}`,
+      icon: '📰',
+      category: event.category || 'News',
+      severity: String(event.severity || 'LOW').toUpperCase(),
+      time: event.timeline?.latest || event.updatedAt || event.createdAt || new Date().toISOString(),
+      label: event.title,
+      source: (event.sources || [{}])[0]?.name || 'Intelligence feed',
+      lat: location.lat,
+      lon: location.lon,
+    });
+  });
+
+  items.sort((a, b) => new Date(b.time || Date.now()) - new Date(a.time || Date.now()));
+  const grouped = {};
+  items.forEach(item => {
+    const key = getTimelineBucketLabel(item.time);
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(item);
+  });
+
+  const timeline = $('timelineList');
+  const groupOrder = ['NOW', '10 MIN AGO', '1 HOUR AGO', '6 HOURS AGO', 'EARLIER'];
+  const finalGroups = groupOrder.filter(key => grouped[key] && grouped[key].length);
+
+  if (!finalGroups.length) {
+    timeline.innerHTML = '<div class="empty-state">No timeline events</div>';
+    return;
+  }
+
+  timeline.innerHTML = finalGroups.map(groupKey => `
+    <div class="timeline-group">
+      <div class="timeline-group-label">${groupKey}</div>
+      ${grouped[groupKey].slice(0, 4).map(item => `
+        <button class="timeline-item severity-${String(item.severity).toLowerCase()}" type="button" data-target-id="${item.id}">
+          <span class="timeline-icon">${item.icon}</span>
+          <span class="timeline-copy">
+            <span class="timeline-topline">
+              <span class="timeline-category">${escHtml(item.category)}</span>
+              <span class="timeline-time">${formatTimeAgo(item.time)}</span>
+            </span>
+            <span class="timeline-title">${escHtml(item.label)}</span>
+            <span class="timeline-source">${escHtml(item.source)}</span>
+          </span>
+        </button>
+      `).join('')}
+    </div>
+  `).join('');
+
+  timeline.querySelectorAll('[data-target-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = state.timelineMarkers.find(marker => marker._sentinelId === btn.dataset.targetId);
+      if (!target) return;
+      const latlng = target.getLatLng ? target.getLatLng() : L.latLng(target._sentinelLat, target._sentinelLon);
+      if (latlng && Number.isFinite(latlng.lat) && Number.isFinite(latlng.lng)) {
+        state.map.flyTo(latlng, Math.max(state.map.getZoom(), 10), { duration: 0.8 });
+        setTimeout(() => target.openPopup && target.openPopup(), 250);
+      }
+    });
+  });
+}
+
+function renderLiveEventFeed(data) {
+  const feed = $('liveEventFeed');
+  const events = [];
+
+  (data.traffic?.incidents || []).forEach((inc, index) => {
+    events.push({ id: `traffic-${index}`, type: 'traffic', icon: '🚦', title: inc.type.replace(/_/g, ' '), message: inc.description, time: inc.timestamp || new Date().toISOString(), severity: inc.anomaly ? 'high' : 'medium' });
+  });
+  (data.earthquakes?.earthquakes || []).slice(0, 3).forEach((eq, index) => {
+    events.push({ id: `quake-${index}`, type: 'earthquake', icon: '🌊', title: `M${eq.magnitude.toFixed(1)} ${eq.label}`, message: eq.place, time: eq.time, severity: eq.magnitude >= 5 ? 'critical' : 'high' });
+  });
+  (data.radiation?.neighbors || []).slice(0, 3).forEach((n, index) => {
+    events.push({ id: `radiation-${index}`, type: 'radiation', icon: '☢️', title: `${n.name}`, message: `${n.status.toUpperCase()} · ${n.usvh} µSv/h`, time: new Date().toISOString(), severity: n.status === 'critical' ? 'critical' : n.status === 'high' ? 'high' : 'medium' });
+  });
+  (data.weather?.alerts || []).slice(0, 3).forEach((a, index) => {
+    events.push({ id: `weather-${index}`, type: 'weather', icon: '⚠', title: a.type.replace(/_/g, ' '), message: a.message, time: new Date().toISOString(), severity: a.severity || 'medium' });
+  });
+
+  const newsEvents = getNewsIntelligenceEvents(data.news || {});
+  newsEvents.slice(0, 3).forEach((event, index) => {
+    const location = getEventLocation(event);
+    events.push({
+      id: event.id || `news-${index}`,
+      type: 'news',
+      icon: '📰',
+      title: event.title,
+      message: location.text || 'Kosovo',
+      time: event.timeline?.latest || event.updatedAt || event.createdAt || new Date().toISOString(),
+      severity: String(event.severity || 'LOW').toLowerCase(),
+    });
+  });
+
+  events.sort((a, b) => new Date(b.time || Date.now()) - new Date(a.time || Date.now()));
+  const selected = events.slice(0, 6);
+  if (!selected.length) {
+    feed.innerHTML = '<div class="empty-state">No live events</div>';
+    return;
+  }
+
+  feed.innerHTML = selected.map(event => `
+    <div class="feed-item severity-${event.severity}">
+      <div class="feed-item-icon">${event.icon}</div>
+      <div class="feed-item-copy">
+        <div class="feed-item-title">${escHtml(event.title)}</div>
+        <div class="feed-item-message">${escHtml(event.message)}</div>
+      </div>
+      <div class="feed-item-meta">${formatTimeAgo(event.time)}</div>
+    </div>
+  `).join('');
+}
+
 // ── Alert Ticker ──────────────────────────────────────────────────────────────
+// updateTickerFromNews now accepts either legacy items (intensityScore) or
+// intelligence event objects (threatScore / confidence) — both shapes are handled.
 function updateTickerFromNews(items) {
-  const high = items.filter(i => i.intensityScore >= 5);
+  if (!items || !items.length) return;
+  const high = items.filter(i => {
+    const score = i.intensityScore || (i.threatScore ? i.threatScore / 10 : 0);
+    return score >= 5;
+  });
   if (!high.length) return;
   const container = document.createElement('div');
   container.className = 'ticker-items-container';
   [...high, ...high].forEach(item => {
+    const score = item.intensityScore || (item.threatScore ? Math.round(item.threatScore / 10) : 5);
+    const severity = item.severity
+      ? String(item.severity).toLowerCase()
+      : (score >= 9 ? 'critical' : score >= 7 ? 'high' : 'medium');
     const div = document.createElement('div');
-    div.className = `ticker-item ${item.intensityScore >= 9 ? 'critical' : item.intensityScore >= 7 ? 'high' : 'medium'}`;
-    div.textContent = `[${item.intensityScore}/10] ${item.title}`;
+    div.className = `ticker-item ${severity}`;
+    div.textContent = `[${item.category || 'INTEL'}] ${item.title}`;
     container.appendChild(div);
   });
   const track = $('alertTicker');
