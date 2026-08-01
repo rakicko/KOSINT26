@@ -1,14 +1,13 @@
 'use strict';
 /* ═══════════════════════════════════════════════════════════════════════════
-   SENTINEL Dashboard — Frontend Application v2
-   New features: Threat Level, AQI, Earthquakes, Map, Custom Keywords, Export
+   SENTINEL Dashboard — Frontend Application
+   Map-first OSINT dashboard with Leaflet, intelligence events, and live feeds.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const DEFAULT_LOCATION = 'Kosovo';
 const DEFAULT_MAP_CENTER = { lon: 20.9, lat: 42.6 }; // Kosovo center
 const DEFAULT_MAP_ZOOM = 8.8;
-const DEFAULT_KOSOVO_BOUNDS = [[19.9, 41.8], [21.8, 43.3]]; // [sw, ne]
 
 // Leaflet migration settings
 const LEAFLET_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
@@ -25,7 +24,6 @@ const state = {
   currentLocation: DEFAULT_LOCATION,
   currentTimeline: '24h',
   data: null,
-  newsFilter: 'all',
   pollTimer: null,
   pollIntervalMs: 300000,
   sseSource: null,
@@ -45,11 +43,10 @@ const state = {
   markerCluster: null,
   heatLayer: null,
   timelineMarkers: [],
-  // ── Notification suppression ─────────────────────────────────────────────
-  // Toasts are suppressed until notificationsReady=true so that page load,
-  // refresh, and historical event sync never produce popups automatically.
+  // Notifications are suppressed until notificationsReady=true (set 4s after
+  // first successful fetch) so page load/refresh never produce toast spam.
   notificationsReady: false,
-  // Persisted set of alert IDs already seen so we never re-toast duplicates.
+  // Persisted set of seen alert IDs — prevents duplicate toasts across sessions.
   seenAlertIds: (() => {
     try { return new Set(JSON.parse(localStorage.getItem('sentinel_seen_alerts') || '[]')); }
     catch { return new Set(); }
@@ -866,6 +863,8 @@ function updateMap(data) {
         className: 'sentinel-popup',
         offset: [0, -12],
       });
+      // Use _sentinelEventId (same key used by focusEventOnMap / highlightMarkerForEvent)
+      marker._sentinelEventId = event.id || event.title;
       marker._sentinelId = event.id || `news-${index}`;
       marker._sentinelType = 'news';
       marker._sentinelEvent = event;
@@ -901,21 +900,10 @@ function toggleMapLayer(layerName) {
   if (state.data) updateMap(state.data);
 }
 
-function updateStatsRibbon(data) {
-  const events = getNewsIntelligenceEvents(data?.news || {});
-  const counters = summarizeIntelligenceCounters(events);
-
-  const trafficCount = (data?.traffic?.incidents || []).length;
-  const quakeCount = (data?.earthquakes?.earthquakes || []).filter(eq => eq.magnitude >= 2.5).length;
-  const radiationCount = (data?.radiation?.neighbors || []).length;
-  const weatherCount = (data?.weather?.alerts || []).length;
-
-  if ($('statTraffic')) $('statTraffic').textContent = trafficCount;
-  if ($('statEarthquakes')) $('statEarthquakes').textContent = quakeCount;
-  if ($('statRadiation')) $('statRadiation').textContent = radiationCount;
-  if ($('statWeather')) $('statWeather').textContent = weatherCount;
-  if ($('statNews')) $('statNews').textContent = events.length;
-  if ($('statPriority')) $('statPriority').textContent = counters.highThreat;
+function updateStatsRibbon(_data) {
+  // Stats ribbon elements were removed from the HTML in Phase 3B.
+  // This function is retained as a no-op so the fetchAndRender call chain
+  // does not need to change. Remove once a replacement stats surface is added.
 }
 
 function getTimelineBucketLabel(timestamp) {
@@ -1089,33 +1077,11 @@ function updateTickerFromNews(items) {
   track.appendChild(container);
 }
 
-// ── Custom Keywords ───────────────────────────────────────────────────────────
+// ── Custom Keywords (state only — UI removed) ─────────────────────────────────
+// Keywords are still passed to the backend fetch; the UI for managing them was
+// removed. customKeywords persists in localStorage and can be set programmatically.
 function loadCustomKeywords() {
   try { state.customKeywords = JSON.parse(localStorage.getItem('sentinel_keywords') || '[]'); } catch { state.customKeywords = []; }
-  renderKeywordChips();
-}
-
-function addKeyword() {
-  const input = $('keywordInput');
-  const kw = input.value.trim().toLowerCase();
-  if (!kw || state.customKeywords.includes(kw)) { input.value = ''; return; }
-  state.customKeywords.push(kw);
-  localStorage.setItem('sentinel_keywords', JSON.stringify(state.customKeywords));
-  renderKeywordChips();
-  input.value = '';
-  showToast('low', '🔍', 'Keyword Added', `Now tracking "${kw}" — re-monitor to apply.`);
-}
-
-function removeKeyword(kw) {
-  state.customKeywords = state.customKeywords.filter(k => k !== kw);
-  localStorage.setItem('sentinel_keywords', JSON.stringify(state.customKeywords));
-  renderKeywordChips();
-}
-
-function renderKeywordChips() {
-  $('keywordChips').innerHTML = state.customKeywords.map(kw =>
-    `<div class="keyword-chip">${escHtml(kw)}<span class="keyword-remove" onclick="removeKeyword('${escHtml(kw)}')">✕</span></div>`
-  ).join('');
 }
 
 // ── Export Report ─────────────────────────────────────────────────────────────
@@ -1201,16 +1167,7 @@ async function markAllRead() {
   loadAlertHistory();
 }
 
-async function loadLocationHistory() {
-  // Location history is no longer shown in the interface.
-  return;
-}
 function selectLocation(name) { state.currentLocation = name; startMonitor(); }
-
-function setupSuggestions(names) {
-  // Search suggestions are removed from the UI; no-op.
-  return;
-}
 
 // ── SSE Alert Handler ─────────────────────────────────────────────────────────
 // Toasts are only shown after notificationsReady is set (post initial load)
