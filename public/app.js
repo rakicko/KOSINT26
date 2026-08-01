@@ -10,14 +10,14 @@ const DEFAULT_MAP_CENTER = { lon: 20.9, lat: 42.6 }; // Kosovo center
 const DEFAULT_MAP_ZOOM = 8.5;
 const DEFAULT_KOSOVO_BOUNDS = [[19.9, 41.8], [21.8, 43.3]]; // [sw, ne]
 
-// Mapbox GL JS v3 migration settings
-const MAPBOX_TOKEN = ''; // Replace with your Mapbox token if using authenticated style sources.
-const MAPBOX_STYLE = '/map-styles/happy-dark.json';
+// Leaflet migration settings
+const LEAFLET_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const LEAFLET_ATTRIBUTION = '&copy; OpenStreetMap contributors';
 
-/* Mapbox GL JS v3 migration
-   - Leaflet is replaced by Mapbox GL JS for a darker, more tactical map layer.
-   - The map uses the local happy-dark.json style and initializes automatically on startup.
-   - Markers and popups are rendered with Mapbox Marker/Popup objects.
+/* Leaflet migration
+   - The dashboard keeps the same tactical layout and module flow.
+   - The map engine is switched to Leaflet to avoid token/billing requirements.
+   - Markers are rendered as lightweight Leaflet layers with popup metadata.
    - The map resizes when overlays open/close or when the map visibility toggles.
 */
 
@@ -374,7 +374,7 @@ function toggleMap() {
   }
 
   if (state.mapVisible && state.map) {
-    setTimeout(() => state.map.resize(), 200);
+    setTimeout(() => state.map.invalidateSize(), 200);
   }
 }
 
@@ -397,7 +397,7 @@ function showMainMap() {
   else if (state.data) updateMap(state.data);
 
   if (state.map) {
-    setTimeout(() => state.map.resize(), 200);
+    setTimeout(() => state.map.invalidateSize(), 200);
   }
 }
 
@@ -420,7 +420,7 @@ function ensureMapVisible() {
   else if (state.data) updateMap(state.data);
 
   if (state.map) {
-    setTimeout(() => state.map.resize(), 200);
+    setTimeout(() => state.map.invalidateSize(), 200);
   }
 }
 
@@ -446,6 +446,8 @@ function toggleModule(panelId) {
 
   if (!state.mapInitialized) initMap();
   else if (state.data) updateMap(state.data);
+
+  setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 180);
 }
 
 function closeModulePanel() {
@@ -456,161 +458,111 @@ function closeModulePanel() {
   state.activeModule = null;
   document.querySelectorAll('.module-btn').forEach(btn => btn.classList.remove('active'));
 
-  // If the panel closes, keep Mapbox sized correctly.
-  setTimeout(() => { if (state.map) state.map.resize(); }, 200);
+  setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 200);
 }
 
 function createMapMarkerElement(color, size = 16, border = 3) {
-  const marker = document.createElement('div');
-  marker.className = 'mapbox-marker';
-  marker.style.width = `${size}px`;
-  marker.style.height = `${size}px`;
-  marker.style.border = `${border}px solid rgba(255,255,255,0.92)`;
-  marker.style.borderRadius = '50%';
-  marker.style.backgroundColor = color;
-  marker.style.boxShadow = `0 0 14px ${color}`;
-  marker.style.cursor = 'pointer';
-  return marker;
+  const markerSize = size + (border * 2);
+  return L.divIcon({
+    className: 'sentinel-marker',
+    html: `
+      <span style="
+        display:block;
+        width:${size}px;
+        height:${size}px;
+        border:${border}px solid rgba(255,255,255,0.92);
+        border-radius:50%;
+        background:${color};
+        box-shadow:0 0 14px ${color};
+        cursor:pointer;
+      "></span>
+    `,
+    iconSize: [markerSize, markerSize],
+    iconAnchor: [markerSize / 2, markerSize / 2],
+    popupAnchor: [0, -(markerSize / 2)],
+  });
 }
 
 function initMap() {
   if (state.mapInitialized) return;
   state.mapInitialized = true;
 
-  if (MAPBOX_TOKEN) {
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-  } else {
-    console.warn('Mapbox access token is not set. Using testMode for local style rendering.');
-    mapboxgl.accessToken = undefined;
-  }
+  const mapContainer = document.getElementById('leafletMap');
+  if (!mapContainer) return;
 
-  state.map = new mapboxgl.Map({
-    container: 'leafletMap',
-    style: MAPBOX_STYLE,
-    center: [DEFAULT_MAP_CENTER.lon, DEFAULT_MAP_CENTER.lat],
-    zoom: DEFAULT_MAP_ZOOM,
-    pitch: 35,
-    projection: 'mercator',
-    attributionControl: false,
-    testMode: true,
-  // Keep the drawing buffer to avoid transient cleared frames during style application
-  preserveDrawingBuffer: true,
-  antialias: true,
+  state.map = L.map('leafletMap', {
+    zoomControl: true,
+    attributionControl: true,
+    preferCanvas: true,
+  }).setView([DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lon], DEFAULT_MAP_ZOOM);
+
+  L.tileLayer(LEAFLET_TILE_URL, {
+    maxZoom: 19,
+    attribution: LEAFLET_ATTRIBUTION,
+  }).addTo(state.map);
+
+  state.map.whenReady(() => {
+    if (state.data) updateMap(state.data);
+    setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 200);
   });
 
-  state.map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
-
-  state.map.on('load', () => {
-  if (state.data) updateMap(state.data);
-
-  // Ensure the raster layer is visible & fully opaque after style load and force a repaint.
-  try {
-    const style = state.map.getStyle();
-    if (style && Array.isArray(style.layers)) {
-      const rasterLayer = style.layers.find(l => l.id === 'dark-tiles-layer');
-      if (rasterLayer) {
-        // Ensure layer visibility and opacity are correct
-        try { state.map.setLayoutProperty('dark-tiles-layer', 'visibility', 'visible'); } catch(e) {}
-        try { state.map.setPaintProperty('dark-tiles-layer', 'raster-opacity', 1); } catch(e) {}
-      }
-    }
-  } catch (e) { /* non-fatal */ }
-
-  // Force an immediate repaint and a delayed resize to stabilize rendering.
-  try { state.map.triggerRepaint(); } catch (e) {}
-  setTimeout(() => { try { state.map.resize(); state.map.triggerRepaint(); } catch (e) {} }, 300);
-
-  // Workaround: perform short-lived repeated repaint/resize for the next 3 seconds to avoid a transient cleared frame
-  try {
-    let rrCount = 0;
-    const rrInterval = setInterval(() => {
-      try { state.map.triggerRepaint(); state.map.resize(); } catch (e) {}
-      rrCount += 1;
-      if (rrCount > 10) clearInterval(rrInterval);
-    }, 300);
-  } catch (e) {}
-
-  });
-
-  // Ensure the renderer repaints once idle to avoid a cleared framebuffer.
-  state.map.on('idle', () => { try { state.map.triggerRepaint(); } catch (e) {} });
-
-  state.map.on('error', (event) => {
-  if (event && event.error) {
-    console.warn('Mapbox load error:', event.error);
-    if (/style/i.test(String(event.error.message || ''))) {
-      console.warn('Mapbox style failed to load. Check MAPBOX_STYLE and token settings.');
-    }
-  }
-  });
-
-  setTimeout(() => { if (state.map) state.map.resize(); }, 200);
+  setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 250);
 }
 
 function updateMap(data) {
   if (!state.mapInitialized || !state.map || !data) return;
 
-  if (!state.map.isStyleLoaded()) {
-    state.map.once('load', () => updateMap(data));
-    return;
-  }
-
-  state.mapMarkers.forEach(m => m.remove());
+  state.mapMarkers.forEach(marker => marker.remove());
   state.mapMarkers = [];
 
   const coords = data.weather?.coordinates || DEFAULT_MAP_CENTER;
-  const centerPoint = [coords.lon, coords.lat];
+  const centerLatLng = [coords.lat, coords.lon];
 
-  const centerMarker = new mapboxgl.Marker({ element: createMapMarkerElement('#22d3ee', 18, 3) })
-    .setLngLat(centerPoint)
-    .setPopup(new mapboxgl.Popup({ offset: 25, className: 'mapbox-popup' })
-      .setHTML(`<strong>📍 ${escHtml(data.location)}</strong><br>Monitoring center`))
-    .addTo(state.map);
+  const centerMarker = L.marker(centerLatLng, {
+    icon: createMapMarkerElement('#22d3ee', 18, 3),
+  }).addTo(state.map);
+  centerMarker.bindPopup(`<strong>📍 ${escHtml(data.location)}</strong><br>Monitoring center`);
   state.mapMarkers.push(centerMarker);
 
   const shouldShowKosovoView = state.currentLocation.toLowerCase().includes('kosovo') || (data.location && data.location.toLowerCase().includes('kosovo'));
   if (shouldShowKosovoView) {
-    state.map.fitBounds(DEFAULT_KOSOVO_BOUNDS, { padding: 60, duration: 800 });
-    state.map.setPitch(35);
+    state.map.fitBounds(L.latLngBounds([[41.8, 19.9], [43.3, 21.8]]), { padding: [60, 60] });
   } else {
-    state.map.easeTo({ center: centerPoint, zoom: 11, pitch: 35, duration: 800 });
+    state.map.flyTo(centerLatLng, 11, { duration: 0.8 });
   }
 
   (data.traffic?.incidents || []).forEach(inc => {
     if (!inc.location?.lat || !inc.location?.lon) return;
     const color = inc.anomaly ? '#fb923c' : '#fbbf24';
-    const marker = new mapboxgl.Marker({ element: createMapMarkerElement(color, inc.anomaly ? 14 : 12, 2) })
-      .setLngLat([inc.location.lon, inc.location.lat])
-      .setPopup(new mapboxgl.Popup({ offset: 20, className: 'mapbox-popup' })
-        .setHTML(`<strong>🚦 ${escHtml(inc.type.replace(/_/g, ' '))}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`))
-      .addTo(state.map);
+    const marker = L.marker([inc.location.lat, inc.location.lon], {
+      icon: createMapMarkerElement(color, inc.anomaly ? 14 : 12, 2),
+    }).addTo(state.map);
+    marker.bindPopup(`<strong>🚦 ${escHtml(inc.type.replace(/_/g, ' '))}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`);
     state.mapMarkers.push(marker);
   });
 
   (data.earthquakes?.earthquakes || []).filter(eq => eq.magnitude >= 2.5).forEach(eq => {
     if (!eq.lat || !eq.lon) return;
     const radius = Math.max(8, eq.magnitude * 3);
-    const element = createMapMarkerElement(eq.color || '#38bdf8', radius, 3);
-    element.style.width = `${radius}px`;
-    element.style.height = `${radius}px`;
-    element.style.boxShadow = `0 0 18px ${eq.color || '#38bdf8'}`;
-
-    const marker = new mapboxgl.Marker({ element })
-      .setLngLat([eq.lon, eq.lat])
-      .setPopup(new mapboxgl.Popup({ offset: 20, className: 'mapbox-popup' })
-        .setHTML(`<strong>🌊 M${eq.magnitude.toFixed(1)} ${escHtml(eq.label)}</strong><br>${escHtml(eq.place)}<br>Depth: ${eq.depth}km · ${formatTimeAgo(eq.time)}`))
-      .addTo(state.map);
+    const marker = L.circleMarker([eq.lat, eq.lon], {
+      radius,
+      color: eq.color || '#38bdf8',
+      fillColor: eq.color || '#38bdf8',
+      fillOpacity: 0.8,
+      weight: 2,
+      opacity: 1,
+    }).addTo(state.map);
+    marker.bindPopup(`<strong>🌊 M${eq.magnitude.toFixed(1)} ${escHtml(eq.label)}</strong><br>${escHtml(eq.place)}<br>Depth: ${eq.depth}km · ${formatTimeAgo(eq.time)}`);
     state.mapMarkers.push(marker);
   });
 
   (data.radiation?.neighbors || []).forEach(n => {
     if (!n.lat || !n.lon) return;
     const color = { normal: '#34d399', elevated: '#fbbf24', high: '#fb923c', critical: '#f87171' }[n.status] || '#94a3b8';
-    const marker = new mapboxgl.Marker({ element: createMapMarkerElement(color, 12, 2) })
-      .setLngLat([n.lon, n.lat])
-      .setPopup(new mapboxgl.Popup({ offset: 20, className: 'mapbox-popup' })
-        .setHTML(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh} µSv/h<br>Status: ${escHtml(n.status)}`))
-      .addTo(state.map);
+    const marker = L.marker([n.lat, n.lon], {
+      icon: createMapMarkerElement(color, 12, 2),
+    }).addTo(state.map);
+    marker.bindPopup(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh} µSv/h<br>Status: ${escHtml(n.status)}`);
     state.mapMarkers.push(marker);
   });
 
@@ -618,7 +570,7 @@ function updateMap(data) {
   $('mapBadge').textContent = `${state.mapMarkers.length - 1} pins`;
   $('mapMeta').textContent = `${state.mapMarkers.length - 1} incident markers · scroll to zoom`;
 
-  setTimeout(() => { if (state.map) state.map.resize(); }, 100);
+  setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 100);
 }
 
 // ── Alert Ticker ──────────────────────────────────────────────────────────────
