@@ -585,6 +585,7 @@ function toggleMap() {
     btn.classList.toggle('active', state.mapVisible);
   }
 
+  
   if (state.mapVisible && state.map) {
     setTimeout(() => state.map.invalidateSize(), 200);
   }
