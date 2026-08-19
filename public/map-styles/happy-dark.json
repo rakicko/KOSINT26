@@ -1,0 +1,36 @@
+{
+  "version": 8,
+  "name": "Sentinel Dark OSM Basemap",
+  "sources": {
+    "osm-tiles": {
+      "type": "raster",
+      "tiles": [
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "attribution": "© OpenStreetMap contributors"
+    }
+  },
+  "sprite": null,
+  "glyphs": null,
+  "transitionAnimation": true,
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#070b12",
+        "background-opacity": 1
+      }
+    },
+    {
+      "id": "osm-basemap",
+      "type": "raster",
+      "source": "osm-tiles",
+      "paint": {
+        "raster-opacity": 0.9
+      }
+    }
+  ],
+  "attribution": "© OpenStreetMap contributors"
+}

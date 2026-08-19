@@ -1,22 +1,17 @@
 'use strict';
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const axios = require('axios');
-
-const INCIDENT_TYPES = { 1: 'accident', 2: 'fog', 4: 'dangerous', 8: 'rain', 16: 'ice', 32: 'accident', 64: 'closure', 128: 'road_works' };
-const TYPE_NAMES = { closure: 'Road Closure', accident: 'Accident', congestion: 'Congestion', hazard: 'Hazard', road_works: 'Road Works' };
-
-function bbox(lat, lon, radiusKm) {
-  const deg = radiusKm / 111;
-  return `${lon - deg},${lat - deg},${lon + deg},${lat + deg}`;
-}
+const TRAFFIC_KEYWORDS = {
+  en: ['accident', 'crash', 'collision', 'traffic accident', 'road closed', 'road closure', 'blocked road', 'traffic disruption', 'roadworks', 'vehicle overturned', 'accident on', 'collision on'],
+  sr: ['saobraćaj', 'saobraćajна nesrećа', 'udes', 'sudar', 'nesrećа', 'nezgoda', 'blokiran put', 'zatворен put', 'obustava saobraćaja', 'gužva', 'zastoj', 'kolona', 'put blokiran', 'uspavljen put', 'saobraćaju', 'saobraćajна nesrećи'],
+  al: ['aksident', 'aksident trafiku', 'përplasje', 'rrugë e bllokuar', 'rrugë e mbyllur', 'trafik', 'kolonë', 'bllokim']
+};
 
 function detectAnomalies(incidents) {
-  const closures = incidents.filter(i => i.type === 'closure');
+  const closures = incidents.filter(i => i.type === 'road_closure');
   const accidents = incidents.filter(i => i.type === 'accident');
 
   if (closures.length >= 2 && accidents.length === 0) {
-    return { detected: true, type: 'vip_movement', summary: `${closures.length} simultaneous road closures — possible VIP convoy or security cordon` };
+    return { detected: true, type: 'vip_movement', summary: `${closures.length} simultaneous road closures — possible security convoy or security cordon` };
   }
   if (closures.length >= 3) {
     return { detected: true, type: 'perimeter', summary: 'Multiple closures forming possible security perimeter' };
@@ -24,87 +19,89 @@ function detectAnomalies(incidents) {
   return { detected: false, type: null, summary: null };
 }
 
-function getDemoData(location) {
-  const incidents = [
-    { id: 'demo-t1', type: 'closure', severity: 3, description: 'Road closed — security operations in progress', affectedRoads: ['Rruga e Qytetit'], location: { lat: 42.89, lon: 20.87 }, startTime: new Date(Date.now() - 3600000).toISOString(), delay: 0, anomaly: true, anomalyType: 'vip_movement' },
-    { id: 'demo-t2', type: 'closure', severity: 3, description: 'Alternate route also closed — convoy expected', affectedRoads: ['Bulevardi i Deshmoreve'], location: { lat: 42.88, lon: 20.85 }, startTime: new Date(Date.now() - 3600000).toISOString(), delay: 0, anomaly: true, anomalyType: 'vip_movement' },
-    { id: 'demo-t3', type: 'accident', severity: 2, description: 'Minor collision — two lanes blocked', affectedRoads: ['Rruga Internacionale'], location: { lat: 42.90, lon: 20.89 }, startTime: new Date(Date.now() - 1800000).toISOString(), delay: 12, anomaly: false, anomalyType: null },
-  ];
-  const anomaly = detectAnomalies(incidents);
+function filterTrafficKeywords(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  for (const lang of Object.keys(TRAFFIC_KEYWORDS)) {
+    for (const kw of TRAFFIC_KEYWORDS[lang]) {
+      if (lower.includes(kw.toLowerCase())) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function determineIncidentType(title, description) {
+  const text = (title + ' ' + (description || '')).toLowerCase();
+  
+  if (text.includes('closure') || text.includes('zатворен') || text.includes('bllokuar') || text.includes('road closure') || text.includes('blocked road') || text.includes('rrugë e bllokuar') || text.includes('rrugë e mbyllur') || text.includes('put blokiran')) {
+    return 'road_closure';
+  }
+  if (text.includes('congestion') || text.includes('gužva') || text.includes('kolonë')) {
+    return 'congestion';
+  }
+  if (text.includes('roadworks') || text.includes('обуставе') || text.includes('construction') || text.includes('radova')) {
+    return 'roadworks';
+  }
+  if (text.includes('accident') || text.includes('collision') || text.includes('crash') || text.includes('udes') || text.includes('sudar') || text.includes('zjarr') || text.includes('përplasje') || text.includes('aksident') || text.includes('nesrećа') || text.includes('nezgода') || text.includes('saobraćaj') || text.includes('saobraćaju') || text.includes('saobraćajна nesrećа')) {
+    return 'accident';
+  }
+  if (text.includes('blockage') || text.includes('blokada') || text.includes('bllokadë') || text.includes('blokiran put')) {
+    return 'road_block';
+  }
+  return 'other';
+}
+
+function extractTrafficIncidents(newsItems) {
+  if (!newsItems || !Array.isArray(newsItems)) return [];
+  
+  return newsItems
+    .filter(item => item.title && filterTrafficKeywords(item.title + ' ' + (item.description || '')))
+    .map(item => {
+      const type = determineIncidentType(item.title, item.description);
+      const desc = (item.description || item.title || 'Traffic event').substring(0, 300);
+      
+      return {
+        id: `traffic-${item.id}`,
+        type,
+        title: item.title,
+        description: desc,
+        source: item.source || 'news',
+        publishedAt: item.publishedAt || new Date().toISOString(),
+        url: item.url || item.link || '#'
+      };
+    });
+}
+
+async function fetchTraffic({ location, news = null }) {
+  let incidents = [];
+  let newsItems = [];
+
+  if (news && news.items && Array.isArray(news.items)) {
+    newsItems = news.items;
+    incidents = extractTrafficIncidents(newsItems);
+  }
+
+  const uniqueIncidents = Array.from(new Map(incidents.map(i => [i.title + i.source, i])).values());
+
+  const anomaly = detectAnomalies(uniqueIncidents);
+  if (anomaly.detected) {
+    uniqueIncidents.forEach(i => {
+      i.anomaly = true;
+      i.anomalyType = anomaly.type;
+    });
+  }
+
   return {
-    skill: 'traffic-intel', location, fetchedAt: new Date().toISOString(),
-    incidents, congestionScore: 7,
-    anomalyDetected: anomaly.detected, anomalySummary: anomaly.summary,
-    source: 'demo',
+    skill: 'traffic-intel',
+    location: location || 'Kosovo',
+    fetchedAt: new Date().toISOString(),
+    incidents: uniqueIncidents,
+    source: uniqueIncidents.length > 0 ? 'news-rss' : 'none',
+    anomalyDetected: anomaly.detected,
+    anomalySummary: anomaly.summary
   };
 }
 
-async function fetchTraffic({ location, lat, lon, radiusKm = 10 }) {
-  const apiKey = process.env.TOMTOM_API_KEY;
-  if (!apiKey) {
-    console.log('[traffic] using fallback demo - no TomTom API key');
-    return getDemoData(location);
-  }
-
-  if (!lat || !lon) {
-    try {
-      const geo = await axios.get('https://nominatim.openstreetmap.org/search', {
-        params: { q: location, format: 'json', limit: 1 },
-        headers: { 'User-Agent': 'Sentinel-Dashboard/1.0' }, timeout: 5000,
-      });
-      if (geo.data.length) { lat = parseFloat(geo.data[0].lat); lon = parseFloat(geo.data[0].lon); }
-      else {
-        console.log('[traffic] using fallback demo - geocoding failed');
-        return getDemoData(location);
-      }
-    } catch (e) {
-      console.log('[traffic] using fallback demo - geocoding error:', e.message);
-      return getDemoData(location);
-    }
-  }
-
-  try {
-    console.log('[traffic] using TomTom');
-    const res = await axios.get('https://api.tomtom.com/traffic/services/5/incidentDetails', {
-      params: { key: apiKey, bbox: bbox(lat, lon, radiusKm), fields: '{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description,code},delay,roadNumbers}}}', language: 'en-GB' },
-      timeout: 8000,
-    });
-
-    const raw = res.data.incidents || [];
-    const incidents = raw.map(inc => {
-      const p = inc.properties || {};
-      const coords = inc.geometry?.coordinates;
-      const incType = INCIDENT_TYPES[p.iconCategory] || 'hazard';
-      return {
-        id: p.id || `t-${Math.random()}`,
-        type: incType,
-        severity: p.magnitudeOfDelay || 1,
-        description: (p.events || []).map(e => e.description).join('; ') || TYPE_NAMES[incType] || incType,
-        affectedRoads: p.roadNumbers || [],
-        location: coords ? { lat: coords[1], lon: coords[0] } : { lat, lon },
-        startTime: new Date().toISOString(),
-        delay: Math.round((p.delay || 0) / 60),
-        anomaly: false, anomalyType: null,
-      };
-    });
-
-    const anomaly = detectAnomalies(incidents);
-    incidents.forEach(i => { if (anomaly.detected) { i.anomaly = true; i.anomalyType = anomaly.type; } });
-
-    const totalDelay = incidents.reduce((s, i) => s + i.delay, 0);
-    const congestionScore = Math.min(10, Math.round((incidents.length * 0.5) + (totalDelay / 10)));
-
-    return { skill: 'traffic-intel', location, fetchedAt: new Date().toISOString(), incidents, congestionScore, anomalyDetected: anomaly.detected, anomalySummary: anomaly.summary, source: 'tomtom' };
-  } catch (err) {
-    console.log('[traffic] using fallback demo - TomTom API error:', err.message);
-    return getDemoData(location);
-  }
-}
-
 module.exports = { fetchTraffic };
-
-if (require.main === module) {
-  const args = process.argv.slice(2);
-  const loc = args[args.indexOf('--location') + 1] || 'Mitrovica, Kosovo';
-  fetchTraffic({ location: loc }).then(r => console.log(JSON.stringify(r, null, 2))).catch(console.error);
-}

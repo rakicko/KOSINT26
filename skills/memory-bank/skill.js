@@ -10,13 +10,13 @@ const DEFAULT_DB = {
    version: 1,
    locations: [],
    alerts: [],
-   preferences: {
-     defaultLocation: 'Mitrovica, Kosovo',
-     defaultTimeline: '24h',
-     alertThresholds: { news: 7, congestion: 8, radiation: 'elevated' },
-     browserNotifications: true,
-     pollIntervalMs: 300000,
-   },
+preferences: {
+      defaultLocation: 'Mitrovica, Kosovo',
+      defaultTimeline: '24h',
+      alertThresholds: { news: 7, trafficIncidents: 3, radiation: 'elevated' },
+      browserNotifications: true,
+      pollIntervalMs: 300000,
+    },
    cache: { lastFetch: null, data: {} },
 };
 

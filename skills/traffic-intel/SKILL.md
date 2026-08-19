@@ -1,9 +1,8 @@
 ---
 name: traffic-intel
 description: |
-  Fetches real-time traffic incidents for a location using TomTom Traffic API.
-  Detects anomalies like VIP-related road closures, major blockages, and unusual congestion patterns.
-  Falls back to demo data without an API key.
+  Extracts traffic incidents from existing news/RSS data.
+  Filters news articles for traffic-related keywords in English, Serbian, and Albanian.
 ---
 
 # Traffic Intel Skill
@@ -11,10 +10,19 @@ description: |
 ## Input
 ```json
 {
-  "location": "Mumbai, India",
-  "lat": 19.0760,
-  "lon": 72.8777,
-  "radiusKm": 10
+  "location": "Kosovo",
+  "news": {
+    "skill": "news-intel",
+    "items": [
+      {
+        "id": "article-1",
+        "title": "Road accident on Mitrovica-Pristina highway",
+        "description": "Two vehicles collided...",
+        "source": "KoSSev",
+        "publishedAt": "ISO"
+      }
+    ]
+  }
 }
 ```
 
@@ -22,36 +30,39 @@ description: |
 ```json
 {
   "skill": "traffic-intel",
-  "location": "Mumbai, India",
+  "location": "Kosovo",
   "fetchedAt": "ISO timestamp",
   "incidents": [
     {
-      "id": "string",
-      "type": "closure | congestion | accident | hazard | construction",
-      "severity": 1-4,
-      "description": "string",
-      "affectedRoads": ["NH 48"],
-      "location": { "lat": 19.1, "lon": 72.8 },
-      "startTime": "ISO",
-      "delay": 15,           // minutes
-      "anomaly": true,
-      "anomalyType": "vip_movement | unusual_closure | perimeter"
+      "id": "traffic-article-1",
+      "type": "accident | road_closure | congestion | road_block | roadworks | other",
+      "title": "Road accident on Mitrovica-Pristina highway",
+      "description": "Two vehicles collided...",
+      "source": "KoSSev",
+      "publishedAt": "ISO",
+      "url": "https://article-url"
     }
   ],
-  "congestionScore": 6,     // 0-10
+  "source": "news-rss | none",
   "anomalyDetected": true,
-  "anomalySummary": "Unusual road closures detected — possible VIP movement",
-  "source": "tomtom | demo"
+  "anomalySummary": "Multiple closures detected — possible security cordon"
 }
 ```
 
-## Anomaly Detection Logic
-- Multiple simultaneous closures on parallel routes → VIP convoy pattern
-- Closures without construction or accident events → Security cordon
-- Congestion score spike > 7 with no reported incidents → Crowd event
-- Closures near government buildings / airports → Security alert
+## Traffic Keywords
+- English: accident, crash, collision, road closed, road closure, blocked road, traffic, congestion, traffic disruption, roadworks, vehicle overturned
+- Serbian: saobraćaj, saobraćajna nezgoda, udes, sudar, blokiran put, zatvoren put, gužva, zastoj, kolona
+- Albanian: aksident, përplasje, rrugë e bllokuar, rrugë e mbyllur, trafik, kolonë, bllokim
+
+## Incident Types
+- `accident` - Vehicle collision or crash
+- `road_closure` - Road blocked or closed
+- `congestion` - Traffic congestion reported
+- `road_block` - Road blocked (bllokim, blokada)
+- `roadworks` - Construction work
+- `other` - General traffic event
 
 ## Usage
 ```bash
-node skills/traffic-intel/skill.js --test --location "Mumbai"
+node skills/traffic-intel/skill.js
 ```

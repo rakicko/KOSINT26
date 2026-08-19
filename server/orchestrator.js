@@ -25,8 +25,10 @@ function computeThreatLevel(result) {
   score += Math.min(20, weatherAlerts * 8);
 
   // Traffic (0-20)
+  const trafficIncidents = result.traffic?.incidents?.length || 0;
   if (result.traffic?.anomalyDetected) score += 18;
-  else score += Math.min(10, (result.traffic?.congestionScore || 0));
+  else if (trafficIncidents >= 3) score += 10;
+  else if (trafficIncidents >= 1) score += 3;
 
   // Radiation (0-15)
   const radStatus = result.radiation?.primary?.status;
@@ -67,10 +69,13 @@ async function orchestrate({ location, lat, lon, timeline = '24h', forceRefresh 
 
   console.log(`[orchestrator] Fetching fresh data for: ${location} (timeline: ${timeline})`);
 
-  const [news, weather, traffic, radiation, aqi, earthquakes] = await Promise.allSettled([
-    fetchNews({ location, timeline, keywords: customKeywords }),
+  const fetchNewsPromise = fetchNews({ location, timeline, keywords: customKeywords });
+  const [newsResolve] = await Promise.allSettled([fetchNewsPromise]);
+  const newsResult = newsResolve.status === 'fulfilled' ? newsResolve.value : { skill: 'news-intel', error: newsResolve.reason?.message, items: [] };
+
+  const [weather, traffic, radiation, aqi, earthquakes] = await Promise.allSettled([
     fetchWeather({ location, lat, lon }),
-    fetchTraffic({ location, lat, lon }),
+    fetchTraffic({ location, lat, lon, news: newsResult }),
     fetchRadiation({ location, lat, lon }),
     fetchAQI({ location, lat, lon }),
     fetchEarthquakes({ location, lat, lon }),
@@ -79,7 +84,7 @@ async function orchestrate({ location, lat, lon, timeline = '24h', forceRefresh 
   const result = {
     location, timeline,
     fetchedAt: new Date().toISOString(),
-    news:        news.status        === 'fulfilled' ? news.value        : { skill: 'news-intel', error: news.reason?.message },
+    news:        newsResult,
     weather:     weather.status     === 'fulfilled' ? weather.value     : { skill: 'weather-monitor', error: weather.reason?.message },
     traffic:     traffic.status     === 'fulfilled' ? traffic.value     : { skill: 'traffic-intel', error: traffic.reason?.message },
     radiation:   radiation.status   === 'fulfilled' ? radiation.value   : { skill: 'radiation-monitor', error: radiation.reason?.message },

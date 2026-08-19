@@ -4,12 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SENTINEL — Situational Awareness Dashboard</title>
-  <meta name="description" content="Real-time situational awareness dashboard tracking news, weather, traffic, radiation, AQI, and earthquakes for any location." />
+  <meta name="description" content="Real-time situational awareness dashboard tracking news, weather, traffic, radiation, AQ, earthquakes, and wildfires for Kosovo and the region." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <!-- Leaflet.js for interactive map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <link href="vendor/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -25,11 +23,6 @@
   </div>
 
   <div class="header-controls">
-    <div class="input-group">
-      <div class="input-icon">📍</div>
-      <input type="text" id="locationInput" class="input-field" placeholder="Enter location (e.g. Mumbai, India)" autocomplete="off" />
-      <div class="input-suggestions" id="locationSuggestions"></div>
-    </div>
     <div class="input-group slim">
       <div class="input-icon">🕒</div>
       <select id="timelineSelect" class="input-field select-field">
@@ -40,7 +33,7 @@
       </select>
     </div>
     <button id="monitorBtn" class="btn-monitor" onclick="startMonitor()">
-      <span class="btn-icon">⚡</span> MONITOR
+      <span class="btn-icon">⚡</span> REFRESH
     </button>
     <button class="btn-secondary" onclick="exportReport()" title="Export situation report">
       📤 Export
@@ -64,16 +57,42 @@
   </div>
 </header>
 
-<!-- ── Alert Ticker ─────────────────────────────────────────────────────────── -->
-<div class="alert-ticker-wrap" id="alertTickerWrap">
-  <div class="ticker-label">⚠ LIVE ALERTS</div>
-  <div class="ticker-track" id="alertTicker">
-    <div class="ticker-item placeholder">No active alerts — system monitoring</div>
-  </div>
-</div>
-
 <!-- ── Main Layout ──────────────────────────────────────────────────────────── -->
 <main class="main-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="section-header">
+        <span class="section-icon">🔔</span>
+        <span>Alert Log</span>
+        <span class="badge" id="unreadBadge" style="display:none"></span>
+      </div>
+      <div class="alert-log" id="alertLog">
+        <div class="empty-state">No alerts yet</div>
+      </div>
+      <button class="btn-sm" onclick="markAllRead()" style="margin-top:8px">Mark all read</button>
+    </div>
+
+    <div class="sidebar-section settings-section">
+      <div class="section-header">
+        <span class="section-icon">⚙️</span>
+        <span>Settings</span>
+      </div>
+      <div class="settings-row">
+        <label class="setting-label">Auto-poll interval</label>
+        <select class="input-field select-field" id="pollInterval" onchange="updatePollInterval()">
+          <option value="60000">1 min</option>
+          <option value="300000" selected>5 min</option>
+          <option value="600000">10 min</option>
+          <option value="0">Manual</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label class="setting-label">Map View</label>
+        <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide Map</button>
+      </div>
+    </div>
+  </aside>
+
   <section class="map-stage">
     <div class="map-toolbar" id="moduleToolbar">
       <button class="module-btn" data-panel="newsPanel" onclick="toggleModule('newsPanel')"><span class="module-icon">📰</span> News Intelligence</button>
@@ -82,6 +101,8 @@
       <button class="module-btn" data-panel="radiationPanel" onclick="toggleModule('radiationPanel')"><span class="module-icon">☢️</span> Radiation Monitor</button>
       <button class="module-btn" data-panel="aqiPanel" onclick="toggleModule('aqiPanel')"><span class="module-icon">🌍</span> Air Quality Index</button>
       <button class="module-btn" data-panel="earthquakePanel" onclick="toggleModule('earthquakePanel')"><span class="module-icon">🌊</span> Seismic Activity</button>
+      <button class="module-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')"><span class="module-icon">🔥</span> Wildfire</button>
+      <button class="module-btn" data-panel="cctvIntelligencePanel" onclick="openCCTVModule()"><span class="module-icon">📹</span> CCTV</button>
     </div>
 
     <div class="map-card">
@@ -95,24 +116,6 @@
           <div class="panel-meta" id="mapMeta">Pinch/scroll to zoom</div>
         </div>
         <div id="leafletMap"></div>
-      </div>
-
-      <div class="welcome-panel" id="welcomePanel">
-        <div class="welcome-icon">🛰️</div>
-        <h2 class="welcome-title">SENTINEL Online</h2>
-        <p class="welcome-sub">Enter a location above and click <strong>MONITOR</strong> to begin multi-feed situational awareness tracking.</p>
-        <div class="welcome-features">
-          <div class="feature-chip">📰 High-Intensity News</div>
-          <div class="feature-chip">🌤 Weather Monitoring</div>
-          <div class="feature-chip">🚦 Traffic Intelligence</div>
-          <div class="feature-chip">☢️ Radiation Levels</div>
-          <div class="feature-chip">🌍 Air Quality Index</div>
-          <div class="feature-chip">🌊 Earthquake Monitor</div>
-          <div class="feature-chip">🗺️ Interactive Map</div>
-          <div class="feature-chip">🎯 Composite Threat Level</div>
-          <div class="feature-chip">🔍 Custom Keywords</div>
-          <div class="feature-chip">📤 Report Export</div>
-        </div>
       </div>
 
       <div class="module-overlay" id="moduleOverlay" aria-hidden="true">
@@ -129,7 +132,7 @@
             <div class="panel overlay-panel" id="newsPanel" data-panel-title="News Intelligence" style="display:none">
               <div class="panel-header">
                 <div class="panel-title">
-                  <span class="panel-icon">📰</span>
+                  <span class="module-icon">📰</span>
                   <span>News Intelligence</span>
                   <span class="panel-badge" id="newsBadge" style="display:none"></span>
                 </div>
@@ -149,7 +152,7 @@
             <div class="panel overlay-panel" id="weatherPanel" data-panel-title="Weather Monitor" style="display:none">
               <div class="panel-header">
                 <div class="panel-title">
-                  <span class="panel-icon">🌤</span>
+                  <span class="module-icon">🌤</span>
                   <span>Weather Monitor</span>
                 </div>
                 <div class="panel-meta" id="weatherMeta"></div>
@@ -163,13 +166,12 @@
             <div class="panel overlay-panel" id="trafficPanel" data-panel-title="Traffic Intelligence" style="display:none">
               <div class="panel-header">
                 <div class="panel-title">
-                  <span class="panel-icon">🚦</span>
+                  <span class="module-icon">🚦</span>
                   <span>Traffic Intelligence</span>
                   <span class="anomaly-indicator" id="trafficAnomaly" style="display:none">⚠ ANOMALY</span>
                 </div>
                 <div class="panel-meta" id="trafficMeta"></div>
               </div>
-              <div class="traffic-score-row" id="trafficScoreRow"></div>
               <div class="traffic-anomaly-banner" id="trafficAnomalyBanner" style="display:none"></div>
               <div class="incident-list" id="incidentList"></div>
             </div>
@@ -178,7 +180,7 @@
             <div class="panel overlay-panel" id="radiationPanel" data-panel-title="Radiation Monitor" style="display:none">
               <div class="panel-header">
                 <div class="panel-title">
-                  <span class="panel-icon">☢️</span>
+                  <span class="module-icon">☢️</span>
                   <span>Radiation Monitor</span>
                   <span class="data-quality-tag" id="radiationQuality"></span>
                 </div>
@@ -192,7 +194,7 @@
             <div class="panel overlay-panel" id="aqiPanel" data-panel-title="Air Quality Index" style="display:none">
               <div class="panel-header">
                 <div class="panel-title">
-                  <span class="panel-icon">🌍</span>
+                  <span class="module-icon">🌍</span>
                   <span>Air Quality Index</span>
                   <span class="panel-badge" id="aqiBadge" style="display:none"></span>
                 </div>
@@ -206,7 +208,7 @@
             <div class="panel overlay-panel" id="earthquakePanel" data-panel-title="Seismic Activity" style="display:none">
               <div class="panel-header">
                 <div class="panel-title">
-                  <span class="panel-icon">🌊</span>
+                  <span class="module-icon">🌊</span>
                   <span>Seismic Activity</span>
                   <span class="panel-badge" id="eqBadge" style="display:none"></span>
                 </div>
@@ -214,72 +216,69 @@
               </div>
               <div class="earthquake-list" id="earthquakeList"></div>
             </div>
+
+            <!-- Wildfire Panel -->
+            <div class="panel overlay-panel" id="wildfirePanel" data-panel-title="Wildfire Detection" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">🔥</span>
+                  <span>Wildfire Detection</span>
+                  <span class="panel-badge" id="wildfireBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="wildfireMeta"></div>
+              </div>
+              <div class="panel-filter-row" id="wildfireFilterRow">
+                <button class="filter-btn" onclick="filterWildfire('24h', this)">24h</button>
+                <button class="filter-btn" onclick="filterWildfire('48h', this)">48h</button>
+                <button class="filter-btn" onclick="filterWildfire('7d', this)">7d</button>
+              </div>
+              <div class="wildfire-list" id="wildfireList"></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+</div>
+    </section>
 
-  <aside class="sidebar">
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-icon">🔔</span>
-        <span>Alert Log</span>
-        <span class="badge" id="unreadBadge" style="display:none"></span>
+  <!-- CCTV Intelligence Panel - serves as both module panel and camera detail view -->
+  <div class="cctv-intelligence-panel" id="cctvIntelligencePanel" style="display: none;">
+    <div class="cctv-intelligence-header">
+      <div class="cctv-intelligence-title">
+        <span class="cctv-icon">📹</span>
+        <span id="cctvName">CAMERA</span>
       </div>
-      <div class="alert-log" id="alertLog">
-        <div class="empty-state">No alerts yet</div>
-      </div>
-      <button class="btn-sm" onclick="markAllRead()" style="margin-top:8px">Mark all read</button>
+      <button id="cctvClose" class="cctv-close-btn cctv-btn" title="Close">✕</button>
     </div>
-
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-icon">📍</span>
-        <span>Location History</span>
+    <div class="cctv-intelligence-video">
+      <div class="cctv-video-unavailable" id="cctvVideoUnavailable">
+        <div class="cctv-unavailable-icon">📹</div>
+        <div class="cctv-unavailable-text">Live video cannot be embedded</div>
+        <a id="cctvOpenFeed" class="cctv-open-feed-btn" href="#" target="_blank" rel="noopener noreferrer">OPEN IN GJIRAFAVIDEO</a>
       </div>
-      <div class="location-list" id="locationList">
-        <div class="empty-state">No history yet</div>
-      </div>
+      <iframe id="cctvVideoFrame" class="cctv-video-frame" src="" loading="lazy" allow="autoplay; fullscreen"></iframe>
     </div>
-
-    <!-- Custom Keywords -->
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-icon">🔍</span>
-        <span>Custom Keywords</span>
-      </div>
-      <div class="keyword-input-row">
-        <input type="text" id="keywordInput" class="input-field" placeholder="e.g. pipeline, minister..." style="width:100%;padding-left:10px" />
-        <button class="btn-add-kw" onclick="addKeyword()">+</button>
-      </div>
-      <div class="keyword-chips" id="keywordChips"></div>
+    <div class="cctv-intelligence-status">
+      <span id="cctvStatus" class="cctv-status-indicator">● STATUS UNKNOWN</span>
     </div>
-
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-icon">⚙️</span>
-        <span>Settings</span>
+    <div class="cctv-intelligence-metadata">
+      <div class="cctv-metadata-row">
+        <span class="cctv-metadata-label">FEED TYPE</span>
+        <span id="cctvFeedType" class="cctv-metadata-value">N/A</span>
       </div>
-      <div class="settings-row">
-        <label class="setting-label">Browser Notifications</label>
-        <button class="btn-toggle" id="notifToggle" onclick="toggleNotifications()">Enable</button>
+      <div class="cctv-metadata-row">
+        <span class="cctv-metadata-label">STATUS</span>
+        <span id="cctvFeedStatus" class="cctv-metadata-value">N/A</span>
       </div>
-      <div class="settings-row">
-        <label class="setting-label">Auto-poll interval</label>
-        <select class="input-field select-field" id="pollInterval" onchange="updatePollInterval()">
-          <option value="60000">1 min</option>
-          <option value="300000" selected>5 min</option>
-          <option value="600000">10 min</option>
-          <option value="0">Manual</option>
-        </select>
-      </div>
-      <div class="settings-row">
-        <label class="setting-label">Map View</label>
-        <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide</button>
+      <div class="cctv-metadata-row">
+        <span class="cctv-metadata-label">RECORDING</span>
+        <span id="cctvRecording" class="cctv-metadata-value">N/A</span>
       </div>
     </div>
-  </aside>
+    <div class="cctv-intelligence-actions">
+      <button id="cctvRawFeed" class="cctv-action-btn" style="flex: 1;">RAW FEED</button>
+      <button id="cctvMapTargetBtn" class="cctv-action-btn" style="flex: 1;">MAP TARGET</button>
+    </div>
+  </div>
 </main>
 
 <!-- ── Loading overlay ──────────────────────────────────────────────────────── -->
@@ -291,9 +290,6 @@
   </div>
 </div>
 
-<!-- ── Toast container ──────────────────────────────────────────────────────── -->
-<div class="toast-container" id="toastContainer"></div>
-
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

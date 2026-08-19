@@ -39,7 +39,7 @@ description: |
     "defaultTimeline": "24h",
     "alertThresholds": {
       "news": 7,
-      "congestion": 8,
+      "trafficIncidents": 3,
       "radiation": "elevated"
     },
     "browserNotifications": true,

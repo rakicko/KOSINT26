@@ -40,8 +40,8 @@ function evaluate({ news, weather, traffic, radiation, location }) {
   if (traffic) {
     if (traffic.anomalyDetected) {
       alerts.push({ id: genId(), timestamp: now, severity: 'high', category: 'traffic', title: '[Traffic] Anomaly Detected', message: traffic.anomalySummary, location, data: { anomalyType: traffic.anomalyType } });
-    } else if (traffic.congestionScore >= THRESHOLDS.traffic.medium) {
-      alerts.push({ id: genId(), timestamp: now, severity: 'medium', category: 'traffic', title: '[Traffic] High Congestion', message: `Congestion score ${traffic.congestionScore}/10`, location, data: { score: traffic.congestionScore } });
+    } else if (traffic.incidents && traffic.incidents.length >= 3) {
+      alerts.push({ id: genId(), timestamp: now, severity: 'medium', category: 'traffic', title: '[Traffic] Multiple Incidents', message: `${traffic.incidents.length} traffic incidents detected`, location, data: { incidentCount: traffic.incidents.length } });
     }
   }
 
@@ -71,7 +71,7 @@ if (require.main === module) {
     location: 'Mumbai, India',
     news: { items: [{ intensityScore: 8, title: 'Test riot event', description: 'Test', category: 'civil_unrest' }] },
     weather: { alerts: [{ type: 'THUNDERSTORM', severity: 'high', message: 'Storm incoming' }] },
-    traffic: { anomalyDetected: true, anomalySummary: 'VIP convoy suspected', anomalyType: 'vip_movement', congestionScore: 7 },
+    traffic: { anomalyDetected: true, anomalySummary: 'VIP convoy suspected', anomalyType: 'vip_movement', incidents: [] },
     radiation: { primary: { usvh: 0.12, status: 'normal', sensorName: 'TEST' }, neighbors: [] },
   };
   console.log(JSON.stringify(evaluate(testData), null, 2));

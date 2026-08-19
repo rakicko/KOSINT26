@@ -39,7 +39,7 @@ Receives the full aggregated result from the orchestrator containing all skill o
 | Weather   | Thunderstorm (code 95-99) or wind > 80 km/h   | high     |
 | Weather   | Heavy rain > 20mm or wind > 50 km/h           | medium   |
 | Traffic   | anomalyDetected = true                         | high     |
-| Traffic   | congestionScore >= 8                           | medium   |
+| Traffic   | 3+ incidents detected                          | medium   |
 | Radiation | status = "critical"                            | critical |
 | Radiation | status = "high"                               | high     |
 | Radiation | status = "elevated"                           | medium   |

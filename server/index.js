@@ -6,6 +6,7 @@ const cors       = require('cors');
 const path       = require('path');
 const { orchestrate } = require('./orchestrator');
 const memoryBank = require('../skills/memory-bank/skill');
+const { fetchWildfire } = require('../skills/wildfire-monitor/skill');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -83,6 +84,18 @@ app.post('/api/preferences', (req, res) => {
   const current = memoryBank.get('preferences');
   memoryBank.set('preferences', { ...current, ...req.body });
   res.json({ ok: true, preferences: memoryBank.get('preferences') });
+});
+
+// ── API: Wildfire detections ─────────────────────────────────────────────────────
+app.get('/api/wildfire', async (req, res) => {
+  const { period = '24h', lat, lon } = req.query;
+  try {
+    const data = await fetchWildfire({ period, lat: lat ? parseFloat(lat) : undefined, lon: lon ? parseFloat(lon) : undefined });
+    res.json(data);
+  } catch (err) {
+    console.error('[server] wildfire fetch error:', err);
+    res.status(500).json({ error: err.message, detections: [], count: 0 });
+  }
 });
 
 // ── Serve frontend ─────────────────────────────────────────────────────────────

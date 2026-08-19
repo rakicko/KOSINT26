@@ -11,7 +11,7 @@
 |-------|-------------|----------|
 | 📰 News Intelligence | GNews API — intensity-scored, categorized | Optional (free tier) |
 | 🌤 Weather Monitor | Open-Meteo — with severe weather alerts | ❌ Not needed |
-| 🚦 Traffic Intelligence | TomTom Traffic — VIP convoy anomaly detection | Optional (free tier) |
+| 🚦 Traffic Intelligence | News RSS — traffic keywords detection | ❌ Not needed |
 | ☢️ Radiation Monitor | Radmon.org — neighboring region table | ❌ Not needed |
 | 🌍 Air Quality Index | Open-Meteo Air Quality — European AQI | ❌ Not needed |
 | 🌊 Seismic Monitor | USGS Earthquake — magnitude + distance | ❌ Not needed |
@@ -35,11 +35,10 @@ node server/index.js
 
 ## API Keys (All Optional)
 
-The dashboard works fully in demo mode without any keys. Add these to `.env` for live data:
+The dashboard works fully without any keys. Add these to `.env` for live data:
 
 ```env
 GNEWS_API_KEY=      # https://gnews.io — 100 req/day free
-TOMTOM_API_KEY=     # https://developer.tomtom.com — 2500 req/day free
 ```
 
 ## Skills Architecture
@@ -50,7 +49,7 @@ Each data feed is a self-contained, reusable skill module:
 skills/
 ├── news-intel/          # GNews + intensity scoring
 ├── weather-monitor/     # Open-Meteo (no key needed)
-├── traffic-intel/       # TomTom + VIP anomaly detection
+├── traffic-intel/       # News RSS traffic keyword detection
 ├── radiation-monitor/   # Radmon.org + neighbour regions
 ├── aqi-monitor/         # Open-Meteo Air Quality (no key)
 ├── earthquake-monitor/  # USGS FDSN API (no key needed)
