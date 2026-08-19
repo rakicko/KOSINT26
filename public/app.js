@@ -17,8 +17,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Stacioni i autobusëve, Prishtinë',
     location: 'Prishtinë - Bus Station',
     city: 'Prishtinë',
-    lat: 42.6629,
-    lon: 21.1655,
+    lat: 42.6515,
+    lon: 21.1490,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-stacioni-i-autobuseve-prishtine',
     status: 'live'
@@ -28,8 +28,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Veternik',
     location: 'Veternik',
     city: 'Prishtinë',
-    lat: 42.6300,
-    lon: 21.0500,
+    lat: 42.6340,
+    lon: 21.1660,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-veternik',
     status: 'live'
@@ -39,8 +39,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Veternik 2',
     location: 'Veternik 2',
     city: 'Prishtinë',
-    lat: 42.6250,
-    lon: 21.0450,
+    lat: 42.6280,
+    lon: 21.1620,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-veternik-2',
     status: 'live'
@@ -50,8 +50,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Ulpianë, Prishtinë',
     location: 'Ulpianë',
     city: 'Prishtinë',
-    lat: 42.6400,
-    lon: 21.1000,
+    lat: 42.6540,
+    lon: 21.1600,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-ulpiane',
     status: 'live'
@@ -61,8 +61,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Gjilani',
     location: 'Gjilani',
     city: 'Gjilani',
-    lat: 42.3622,
-    lon: 21.4717,
+    lat: 42.4635,
+    lon: 21.4694,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-gjilani',
     status: 'live'
@@ -72,8 +72,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Gavran, Gjilan',
     location: 'Gavran near Gjilani',
     city: 'Gjilani',
-    lat: 42.3400,
-    lon: 21.4500,
+    lat: 42.4520,
+    lon: 21.4580,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-gavran-gjilan',
     status: 'live'
@@ -83,8 +83,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Qendra e Prizrenit',
     location: 'Prizren City Center',
     city: 'Prizren',
-    lat: 42.2230,
-    lon: 20.7230,
+    lat: 42.2139,
+    lon: 20.7397,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-prizren-ambienti',
     status: 'live'
@@ -94,8 +94,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Bazhderhane, Prizren',
     location: 'Bazhderhane, Prizren',
     city: 'Prizren',
-    lat: 42.2000,
-    lon: 20.7000,
+    lat: 42.2220,
+    lon: 20.7320,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-bazhderhane-prizren',
     status: 'live'
@@ -105,8 +105,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Ortakoll: Wesley Clark, Prizren',
     location: 'Ortakoll, Prizren',
     city: 'Prizren',
-    lat: 42.1800,
-    lon: 20.6800,
+    lat: 42.2140,
+    lon: 20.7260,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-ortakoll-prizren',
     status: 'live'
@@ -116,8 +116,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Bregu i Diellit 2',
     location: 'Bregu i Diellit',
     city: 'Kosovo',
-    lat: 42.5000,
-    lon: 20.9000,
+    lat: 42.6535,
+    lon: 21.1810,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-bregu-i-diellit-2',
     status: 'live'
@@ -127,8 +127,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Magjistralja Vushtrri-Mitrovice',
     location: 'Vushtrri-Kukës Highway',
     city: 'Vushtrri',
-    lat: 42.5898,
-    lon: 20.9934,
+    lat: 42.8250,
+    lon: 20.9660,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-vushtrri-2',
     status: 'live'
@@ -138,8 +138,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Brezovicë',
     location: 'Brezovica',
     city: 'Prizren',
-    lat: 42.4693,
-    lon: 21.3222,
+    lat: 42.2180,
+    lon: 20.9980,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slowtv-brezovica',
     status: 'live'
@@ -149,8 +149,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Brezovica 2',
     location: 'Brezovica 2',
     city: 'Prizren',
-    lat: 42.4650,
-    lon: 21.3150,
+    lat: 42.1830,
+    lon: 20.9880,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slowtv-brezovica2',
     status: 'live'
@@ -160,8 +160,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Deçan',
     location: 'Deçan',
     city: 'Deçan',
-    lat: 42.4969,
-    lon: 20.8565,
+    lat: 42.5410,
+    lon: 20.2880,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-decan',
     status: 'live'
@@ -171,8 +171,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Qendra e Gjakovës',
     location: 'Gjakova City Center',
     city: 'Gjakova',
-    lat: 42.3311,
-    lon: 20.7147,
+    lat: 42.3810,
+    lon: 20.4320,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/slow-tv-gjakove',
     status: 'live'
@@ -182,8 +182,8 @@ const CCTV_CAMERAS = [
     name: 'SlowTV - Qendra e qytetit, Ferizaj',
     location: 'Ferizaj City Center',
     city: 'Ferizaj',
-    lat: 42.4133,
-    lon: 20.4056,
+    lat: 42.3705,
+    lon: 21.1530,
     provider: 'GjirafaVideo',
     pageUrl: 'https://video.gjirafa.com/qendra-e-qytetit-ferizaj',
     status: 'live'
@@ -382,7 +382,7 @@ function setupCCTVPanelButtons() {
   if (closeBtn) {
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      closeCCTVModule();
+      closeCCTVViewer();
     });
   }
   
@@ -390,8 +390,9 @@ function setupCCTVPanelButtons() {
   if (rawFeedBtn) {
     rawFeedBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (window.cctvCurrentCamera && window.cctvCurrentCamera.pageUrl) {
-        window.open(window.cctvCurrentCamera.pageUrl, '_blank', 'noopener,noreferrer');
+      const camera = currentCCTVCamera || window.cctvCurrentCamera;
+      if (camera && camera.pageUrl) {
+        window.open(camera.pageUrl, '_blank', 'noopener,noreferrer');
       }
     });
   }
@@ -400,8 +401,9 @@ function setupCCTVPanelButtons() {
   if (mapTargetBtn) {
     mapTargetBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (window.cctvCurrentCamera) {
-        centerMapOnCCTV(window.cctvCurrentCamera);
+      const camera = currentCCTVCamera || window.cctvCurrentCamera;
+      if (camera) {
+        centerMapOnCCTV(camera);
       }
     });
   }
@@ -987,20 +989,71 @@ function createMapMarkerElement(color, size = 16, border = 3) {
 }
 
 function createCCTVMarkerElement(camera, map) {
-  const marker = createMapMarkerElement('#3b82f6', 14, 2);
-  marker.style.cursor = 'pointer';
+  const container = document.createElement('div');
+  container.className = 'cctv-marker-container';
+  container.dataset.cameraId = camera.id;
+  container.setAttribute('title', camera.name || 'CCTV Camera');
+
+  const dot = document.createElement('div');
+  dot.className = 'cctv-marker-dot';
+  container.appendChild(dot);
   
-  const markerElement = marker;
-  markerElement.addEventListener('click', (e) => {
+  container.addEventListener('click', (e) => {
     e.stopPropagation();
     e.stopImmediatePropagation();
     openCCTVViewer(camera);
   });
   
-  return markerElement;
+  return container;
 }
 
 let currentCCTVCamera = null;
+
+function renderCCTVCameraList() {
+  const listEl = $('cctvCameraList');
+  if (!listEl) return;
+
+  listEl.innerHTML = CCTV_CAMERAS.map(cam => {
+    const isActive = currentCCTVCamera && currentCCTVCamera.id === cam.id;
+    return `
+      <div class="cctv-camera-item ${isActive ? 'active' : ''}" data-camera-id="${escHtml(cam.id)}">
+        <span class="cctv-camera-item-name" title="${escHtml(cam.name)}">📹 ${escHtml(cam.location || cam.name)}</span>
+        <span class="cctv-camera-item-city">${escHtml(cam.city)}</span>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('.cctv-camera-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const camId = item.dataset.cameraId;
+      const cam = CCTV_CAMERAS.find(c => c.id === camId);
+      if (cam) {
+        openCCTVViewer(cam);
+        centerMapOnCCTV(cam);
+      }
+    });
+  });
+}
+
+function highlightActiveCCTV(camera) {
+  if (!camera) return;
+
+  const listEl = $('cctvCameraList');
+  if (listEl) {
+    listEl.querySelectorAll('.cctv-camera-item').forEach(item => {
+      const isSelected = item.dataset.cameraId === camera.id;
+      item.classList.toggle('active', isSelected);
+      if (isSelected) {
+        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    });
+  }
+
+  document.querySelectorAll('.cctv-marker-container[data-camera-id]').forEach(markerEl => {
+    const isSelected = markerEl.dataset.cameraId === camera.id;
+    markerEl.classList.toggle('active', isSelected);
+  });
+}
 
 function openCCTVViewer(camera) {
   currentCCTVCamera = camera;
@@ -1010,38 +1063,67 @@ function openCCTVViewer(camera) {
   const videoFrame = $('cctvVideoFrame');
   const videoUnavailable = $('cctvVideoUnavailable');
   const openLink = $('cctvOpenFeed');
-  const rawFeedBtn = $('cctvRawFeed');
-  const mapTargetBtn = $('cctvMapTargetBtn');
   const statusEl = $('cctvStatus');
-  const feedTypeEl = $('cctvFeedType');
-  const statusValueEl = $('cctvFeedStatus');
-  const recordingEl = $('cctvRecording');
   
   if (panel) {
     panel.style.display = 'flex';
     
-    nameEl.textContent = camera.name;
-    
-    if (statusEl) {
-      statusEl.textContent = '● LIVE';
-      statusEl.className = 'cctv-status-indicator live';
+    if (nameEl) {
+      nameEl.textContent = camera.name || 'CAMERA';
     }
     
-    if (feedTypeEl) feedTypeEl.textContent = 'JPEG';
-    if (statusValueEl) statusValueEl.textContent = 'ACTIVE';
-    if (recordingEl) recordingEl.textContent = 'LIVE';
+    const isLive = (camera.status || '').toLowerCase() === 'live';
+    if (statusEl) {
+      statusEl.textContent = isLive ? '● LIVE' : `● ${(camera.status || 'UNKNOWN').toUpperCase()}`;
+      statusEl.className = `cctv-status-indicator ${isLive ? 'live' : ''}`;
+    }
+
+    const metadataEl = panel.querySelector('.cctv-intelligence-metadata');
+    if (metadataEl) {
+      const coordsText = (camera.lat != null && camera.lon != null)
+        ? `${camera.lat.toFixed(4)}, ${camera.lon.toFixed(4)}`
+        : 'N/A';
+
+      metadataEl.innerHTML = `
+        <div class="cctv-metadata-row">
+          <span class="cctv-metadata-label">CITY</span>
+          <span class="cctv-metadata-value">${escHtml(camera.city || 'Kosovo')}</span>
+        </div>
+        <div class="cctv-metadata-row">
+          <span class="cctv-metadata-label">LOCATION</span>
+          <span class="cctv-metadata-value">${escHtml(camera.location || 'N/A')}</span>
+        </div>
+        <div class="cctv-metadata-row">
+          <span class="cctv-metadata-label">PROVIDER</span>
+          <span class="cctv-metadata-value">${escHtml(camera.provider || 'N/A')}</span>
+        </div>
+        <div class="cctv-metadata-row">
+          <span class="cctv-metadata-label">STATUS</span>
+          <span class="cctv-metadata-value">${escHtml((camera.status || 'live').toUpperCase())}</span>
+        </div>
+        <div class="cctv-metadata-row">
+          <span class="cctv-metadata-label">COORDINATES</span>
+          <span class="cctv-metadata-value">${escHtml(coordsText)}</span>
+        </div>
+      `;
+    }
     
-    if (openLink) openLink.href = camera.pageUrl;
-    if (videoUnavailable) videoUnavailable.style.display = 'none';
-    if (videoFrame) videoFrame.style.display = 'block';
-    videoFrame.src = camera.pageUrl;
-    videoFrame.onload = () => {
-      if (videoUnavailable) videoUnavailable.style.display = 'none';
-    };
-    videoFrame.onerror = () => {
-      if (videoFrame) videoFrame.style.display = 'none';
-      if (videoUnavailable) videoUnavailable.style.display = 'flex';
-    };
+    if (videoUnavailable) {
+      videoUnavailable.style.display = 'flex';
+      videoUnavailable.innerHTML = `
+        <div class="cctv-unavailable-icon">📹</div>
+        <div class="cctv-unavailable-title" style="font-weight:600; color:var(--text-primary); font-size:13px; text-align:center;">${escHtml(camera.location || camera.name)}</div>
+        <div class="cctv-unavailable-text" style="font-size:11px; color:var(--text-dim); text-align:center;">External live feed via ${escHtml(camera.provider || 'provider')}</div>
+        <a id="cctvOpenFeed" class="cctv-open-feed-btn" href="${escHtml(camera.pageUrl || '#')}" target="_blank" rel="noopener noreferrer" style="margin-top:4px;">↗ OPEN LIVE FEED</a>
+      `;
+    }
+    
+    if (videoFrame) {
+      videoFrame.style.display = 'block';
+      videoFrame.src = camera.pageUrl || '';
+    }
+
+    highlightActiveCCTV(camera);
   }
   
   window.cctvCurrentCamera = camera;
@@ -1090,6 +1172,11 @@ function openCCTVModule() {
 
   state.cctvVisible = true;
   renderCCTVMarkers();
+  renderCCTVCameraList();
+  
+  if (CCTV_CAMERAS.length > 0) {
+    openCCTVViewer(currentCCTVCamera || CCTV_CAMERAS[0]);
+  }
   
   document.querySelectorAll('.module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === 'cctvIntelligencePanel'));
   state.activeModule = 'cctvIntelligencePanel';
@@ -1130,6 +1217,10 @@ function renderCCTVMarkers() {
       .addTo(state.map);
     state.cctvMarkers.push(marker);
   });
+
+  if (currentCCTVCamera) {
+    highlightActiveCCTV(currentCCTVCamera);
+  }
 }
 
 function initMap() {
