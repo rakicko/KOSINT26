@@ -7,6 +7,8 @@ const { fetchTraffic }       = require('../skills/traffic-intel/skill');
 const { fetchRadiation }     = require('../skills/radiation-monitor/skill');
 const { fetchAQI }           = require('../skills/aqi-monitor/skill');
 const { fetchEarthquakes }   = require('../skills/earthquake-monitor/skill');
+const { fetchWildfire }      = require('../skills/wildfire-monitor/skill');
+const { fetchAviation }      = require('../skills/aviation-monitor/skill');
 const { evaluate }           = require('../skills/alert-engine/skill');
 const memoryBank             = require('../skills/memory-bank/skill');
 
@@ -36,14 +38,24 @@ function computeThreatLevel(result) {
   score += radScores[radStatus] || 0;
 
   // AQI (0-5)
-  const aqi = result.aqi?.current?.europeanAQI || 0;
-  if (aqi >= 80) score += 5;
-  else if (aqi >= 60) score += 3;
+  if (result.aqi?.status === 'LIVE_DATA' && typeof result.aqi?.current?.europeanAQI === 'number') {
+    const aqi = result.aqi.current.europeanAQI;
+    if (aqi >= 80) score += 5;
+    else if (aqi >= 60) score += 3;
+  }
 
   // Earthquake (0-5)
   const maxMag = result.earthquakes?.summary?.maxMagnitude || 0;
   if (maxMag >= 5.0) score += 5;
   else if (maxMag >= 3.0) score += 2;
+
+  // Aviation (0-5 conservative)
+  if (result.aviation?.status === 'LIVE_DATA') {
+    const milCount = result.aviation.summary?.military || 0;
+    if (milCount >= 5) score += 5;
+    else if (milCount >= 2) score += 3;
+    else if (milCount >= 1) score += 1;
+  }
 
   score = Math.min(100, Math.round(score));
 
@@ -73,12 +85,14 @@ async function orchestrate({ location, lat, lon, timeline = '24h', forceRefresh 
   const [newsResolve] = await Promise.allSettled([fetchNewsPromise]);
   const newsResult = newsResolve.status === 'fulfilled' ? newsResolve.value : { skill: 'news-intel', error: newsResolve.reason?.message, items: [] };
 
-  const [weather, traffic, radiation, aqi, earthquakes] = await Promise.allSettled([
+  const [weather, traffic, radiation, aqi, earthquakes, wildfire, aviation] = await Promise.allSettled([
     fetchWeather({ location, lat, lon }),
     fetchTraffic({ location, lat, lon, news: newsResult }),
     fetchRadiation({ location, lat, lon }),
     fetchAQI({ location, lat, lon }),
     fetchEarthquakes({ location, lat, lon }),
+    fetchWildfire({ period: timeline, lat, lon }),
+    fetchAviation({ forceRefresh }),
   ]);
 
   const result = {
@@ -90,6 +104,8 @@ async function orchestrate({ location, lat, lon, timeline = '24h', forceRefresh 
     radiation:   radiation.status   === 'fulfilled' ? radiation.value   : { skill: 'radiation-monitor', error: radiation.reason?.message },
     aqi:         aqi.status         === 'fulfilled' ? aqi.value         : { skill: 'aqi-monitor', error: aqi.reason?.message },
     earthquakes: earthquakes.status === 'fulfilled' ? earthquakes.value : { skill: 'earthquake-monitor', error: earthquakes.reason?.message },
+    wildfire:    wildfire.status    === 'fulfilled' ? wildfire.value    : { skill: 'wildfire-monitor', error: wildfire.reason?.message },
+    aviation:    aviation.status    === 'fulfilled' ? aviation.value    : { skill: 'aviation-monitor', status: 'UNAVAILABLE', error: aviation.reason?.message, count: 0, summary: { commercial: 0, private: 0, privateJets: 0, military: 0, unknown: 0 }, aircraft: [] },
   };
 
   // Compute composite threat level

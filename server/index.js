@@ -7,6 +7,7 @@ const path       = require('path');
 const { orchestrate } = require('./orchestrator');
 const memoryBank = require('../skills/memory-bank/skill');
 const { fetchWildfire } = require('../skills/wildfire-monitor/skill');
+const { fetchAviation } = require('../skills/aviation-monitor/skill');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -95,6 +96,27 @@ app.get('/api/wildfire', async (req, res) => {
   } catch (err) {
     console.error('[server] wildfire fetch error:', err);
     res.status(500).json({ error: err.message, detections: [], count: 0 });
+  }
+});
+
+// ── API: Aviation Intelligence ────────────────────────────────────────────────
+app.get('/api/aviation', async (req, res) => {
+  const { forceRefresh = 'false' } = req.query;
+  try {
+    const data = await fetchAviation({ forceRefresh: forceRefresh === 'true' });
+    res.json(data);
+  } catch (err) {
+    console.error('[server] aviation fetch error:', err);
+    res.status(500).json({
+      skill: 'aviation-monitor',
+      status: 'UNAVAILABLE',
+      source: 'Live ADS-B Services',
+      updatedAt: new Date().toISOString(),
+      error: err.message,
+      count: 0,
+      summary: { commercial: 0, private: 0, privateJets: 0, military: 0, unknown: 0 },
+      aircraft: []
+    });
   }
 });
 

@@ -102,7 +102,8 @@
       <button class="module-btn" data-panel="aqiPanel" onclick="toggleModule('aqiPanel')"><span class="module-icon">🌍</span> Air Quality Index</button>
       <button class="module-btn" data-panel="earthquakePanel" onclick="toggleModule('earthquakePanel')"><span class="module-icon">🌊</span> Seismic Activity</button>
       <button class="module-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')"><span class="module-icon">🔥</span> Wildfire</button>
-      <button class="module-btn" data-panel="cctvIntelligencePanel" onclick="openCCTVModule()"><span class="module-icon">📹</span> CCTV</button>
+      <button class="module-btn" data-panel="aviationPanel" onclick="toggleModule('aviationPanel')"><span class="module-icon">✈️</span> Aviation</button>
+      <button class="module-btn" data-panel="cctvIntelligencePanel" onclick="toggleModule('cctvIntelligencePanel')"><span class="module-icon">📹</span> CCTV</button>
     </div>
 
     <div class="map-card">
@@ -140,10 +141,12 @@
               </div>
               <div class="panel-filter-row">
                 <button class="filter-btn active" onclick="filterNews('all', this)">All</button>
-                <button class="filter-btn" onclick="filterNews('civil_unrest', this)">Civil Unrest</button>
-                <button class="filter-btn" onclick="filterNews('vip_movement', this)">VIP</button>
-                <button class="filter-btn" onclick="filterNews('emergency', this)">Emergency</button>
-                <button class="filter-btn" onclick="filterNews('traffic', this)">Traffic</button>
+                <button class="filter-btn" onclick="filterNews('critical', this)">Critical</button>
+                <button class="filter-btn" onclick="filterNews('high', this)">High</button>
+                <button class="filter-btn" onclick="filterNews('medium', this)">Medium</button>
+                <button class="filter-btn" onclick="filterNews('north_kosovo', this)">North Kosovo</button>
+                <button class="filter-btn" onclick="filterNews('event', this)">Events</button>
+                <button class="filter-btn" onclick="filterNews('commentary', this)">Commentary</button>
               </div>
               <div class="news-list" id="newsList"></div>
             </div>
@@ -202,6 +205,11 @@
               </div>
               <div class="aqi-main" id="aqiMain"></div>
               <div class="aqi-pollutants" id="aqiPollutants"></div>
+              <div class="aqi-trend-section" id="aqiTrendSection" style="display:none">
+                <div class="aqi-trend-header">24-Hour Forecast Trend</div>
+                <div class="aqi-trend-bars" id="aqiTrendBars"></div>
+              </div>
+              <div class="aqi-attribution" id="aqiAttribution">Data: Open-Meteo & Copernicus Atmosphere Monitoring Service (CAMS)</div>
             </div>
 
             <!-- Earthquake Panel -->
@@ -228,11 +236,35 @@
                 <div class="panel-meta" id="wildfireMeta"></div>
               </div>
               <div class="panel-filter-row" id="wildfireFilterRow">
-                <button class="filter-btn" onclick="filterWildfire('24h', this)">24h</button>
+                <button class="filter-btn active" onclick="filterWildfire('24h', this)">24h</button>
                 <button class="filter-btn" onclick="filterWildfire('48h', this)">48h</button>
                 <button class="filter-btn" onclick="filterWildfire('7d', this)">7d</button>
               </div>
               <div class="wildfire-list" id="wildfireList"></div>
+            </div>
+
+            <!-- Aviation Panel -->
+            <div class="panel overlay-panel" id="aviationPanel" data-panel-title="Aviation Intelligence" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">✈️</span>
+                  <span>Aviation Intelligence</span>
+                  <span class="panel-badge" id="aviationBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="aviationMeta">OPEN SKY · LIVE</div>
+              </div>
+              <div class="aviation-summary-bar" id="aviationSummaryBar">
+                <div class="aviation-count-total" id="aviationTotalCount">0 AIRCRAFT</div>
+              </div>
+              <div class="panel-filter-row aviation-filter-row" id="aviationFilterRow">
+                <button class="filter-btn active" data-category="all" onclick="filterAviation('all', this)">ALL <span class="aviation-pill-count" id="countAll">0</span></button>
+                <button class="filter-btn" data-category="commercial" onclick="filterAviation('commercial', this)">COMMERCIAL <span class="aviation-pill-count" id="countCommercial">0</span></button>
+                <button class="filter-btn" data-category="private" onclick="filterAviation('private', this)">PRIVATE <span class="aviation-pill-count" id="countPrivate">0</span></button>
+                <button class="filter-btn" data-category="private_jet" onclick="filterAviation('private_jet', this)">PRIVATE JETS <span class="aviation-pill-count" id="countPrivateJets">0</span></button>
+                <button class="filter-btn" data-category="military" onclick="filterAviation('military', this)">MILITARY <span class="aviation-pill-count" id="countMilitary">0</span></button>
+                <button class="filter-btn" data-category="unknown" onclick="filterAviation('unknown', this)">UNKNOWN <span class="aviation-pill-count" id="countUnknown">0</span></button>
+              </div>
+              <div class="aviation-list" id="aviationList"></div>
             </div>
           </div>
         </div>
