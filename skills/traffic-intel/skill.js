@@ -53,6 +53,66 @@ function determineIncidentType(title, description) {
   return 'other';
 }
 
+const KOSOVO_LOCATIONS = [
+  { city: 'Vushtrri', lat: 42.8250, lon: 20.9660, keywords: ['smrekonic', 'smrekovnic', 'vushtrr', 'vučitrn', 'vucitrn'] },
+  { city: 'Drenas', lat: 42.6250, lon: 20.8920, keywords: ['komoran', 'drenas', 'gllogoc', 'glogovac'] },
+  { city: 'Suharekë', lat: 42.3600, lon: 20.8250, keywords: ['duhël', 'duhel', 'dulje', 'suharek', 'suva reka', 'therand'] },
+  { city: 'Podujevë', lat: 42.9100, lon: 21.1900, keywords: ['merdar', 'lluzhan', 'podujev', 'podujevo', 'besian'] },
+  { city: 'Brezovicë', lat: 42.2180, lon: 20.9980, keywords: ['brezovic', 'shtërpc', 'shterpc', 'štrpce', 'strpce'] },
+  { city: 'Shtime', lat: 42.4330, lon: 21.0400, keywords: ['carralev', 'shtime', 'štimlje', 'stimlje'] },
+  { city: 'Pejë', lat: 42.6593, lon: 20.2887, keywords: ['rugov', 'pejë', 'peje', 'peć', 'pec'] },
+  { city: 'Mitrovicë', lat: 42.8914, lon: 20.8660, keywords: ['zveçan', 'zvecan', 'mitrovic', 'mitrovica'] },
+  { city: 'Leposaviq', lat: 43.1000, lon: 20.8000, keywords: ['jaranja', 'jarinj', 'leposaviq', 'leposavić', 'leposavic'] },
+  { city: 'Zubin Potok', lat: 42.9100, lon: 20.6900, keywords: ['gazivod', 'ujman', 'zubin potok'] },
+  { city: 'Fushë Kosovë', lat: 42.6340, lon: 21.0960, keywords: ['fushë kosov', 'fushe kosov', 'kosovo polje'] },
+  { city: 'Prishtinë', lat: 42.6629, lon: 21.1655, keywords: ['veternik', 'çagllavic', 'caglavic', 'prishtin', 'prištin', 'pristina'] },
+  { city: 'Prizren', lat: 42.2139, lon: 20.7397, keywords: ['shadervan', 'ortakoll', 'bazhderhane', 'prizren'] },
+  { city: 'Gjilan', lat: 42.4635, lon: 21.4694, keywords: ['gavran', 'gjilan', 'gnjilan'] },
+  { city: 'Ferizaj', lat: 42.3705, lon: 21.1530, keywords: ['ferizaj', 'uroševac', 'urosevac'] },
+  { city: 'Gjakovë', lat: 42.3810, lon: 20.4320, keywords: ['gjakov', 'đakovic', 'djakovic'] },
+  { city: 'Rahovec', lat: 42.3990, lon: 20.6550, keywords: ['rahovec', 'orahovac'] },
+  { city: 'Klinë', lat: 42.6210, lon: 20.5780, keywords: ['klinë', 'kline', 'klina'] },
+  { city: 'Deçan', lat: 42.5410, lon: 20.2880, keywords: ['deçan', 'decan', 'dečani', 'decani'] },
+  { city: 'Istog', lat: 42.7800, lon: 20.4900, keywords: ['istog', 'istok', 'burim'] },
+  { city: 'Lipjan', lat: 42.5220, lon: 21.1250, keywords: ['janjev', 'lipjan', 'lipljan'] },
+  { city: 'Kaçanik', lat: 42.2300, lon: 21.2600, keywords: ['kaçanik', 'kacanik'] },
+  { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica'] },
+  { city: 'Malishevë', lat: 42.4820, lon: 20.7450, keywords: ['malishev', 'mališevo', 'malisevo'] },
+  { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['dardan', 'kamenic', 'kamenica'] },
+  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['kllokot', 'klokot', 'viti', 'vitina'] },
+];
+
+function extractLocation(title, description) {
+  const titleLower = (title || '').toLowerCase();
+  const descLower = (description || '').toLowerCase();
+  
+  for (const loc of KOSOVO_LOCATIONS) {
+    for (const kw of loc.keywords) {
+      if (titleLower.includes(kw.toLowerCase())) {
+        return {
+          city: loc.city,
+          lat: loc.lat,
+          lon: loc.lon
+        };
+      }
+    }
+  }
+
+  for (const loc of KOSOVO_LOCATIONS) {
+    for (const kw of loc.keywords) {
+      if (descLower.includes(kw.toLowerCase())) {
+        return {
+          city: loc.city,
+          lat: loc.lat,
+          lon: loc.lon
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 function extractTrafficIncidents(newsItems) {
   if (!newsItems || !Array.isArray(newsItems)) return [];
   
@@ -61,6 +121,7 @@ function extractTrafficIncidents(newsItems) {
     .map(item => {
       const type = determineIncidentType(item.title, item.description);
       const desc = (item.description || item.title || 'Traffic event').substring(0, 300);
+      const location = extractLocation(item.title, item.description);
       
       return {
         id: `traffic-${item.id}`,
@@ -69,7 +130,8 @@ function extractTrafficIncidents(newsItems) {
         description: desc,
         source: item.source || 'news',
         publishedAt: item.publishedAt || new Date().toISOString(),
-        url: item.url || item.link || '#'
+        url: item.url || item.link || '#',
+        location: location || null
       };
     });
 }
@@ -104,4 +166,4 @@ async function fetchTraffic({ location, news = null }) {
   };
 }
 
-module.exports = { fetchTraffic };
+module.exports = { fetchTraffic, extractLocation, extractTrafficIncidents };

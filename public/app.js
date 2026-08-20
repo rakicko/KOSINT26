@@ -343,6 +343,10 @@ const state = {
   mapMode: '2d',
   cctvVisible: false,
   cctvMarkers: [],
+  radiationVisible: false,
+  radiationMarkers: [],
+  trafficVisible: false,
+  trafficMarkers: [],
 };
 
 const $ = id => document.getElementById(id);
@@ -471,6 +475,7 @@ async function fetchAndRender(location, timeline, forceRefresh = false) {
   });
   if (!res.ok) throw new Error(`Server error ${res.status}`);
   const data = await res.json();
+  ensureTrafficIncidentLocations(data.traffic);
   state.data = data;
 
   hideWelcome();
@@ -585,7 +590,63 @@ function renderWeather(weather) {
     </div>`).join('');
 }
 
+const KOSOVO_TRAFFIC_LOCATIONS = [
+  { city: 'Vushtrri', lat: 42.8250, lon: 20.9660, keywords: ['smrekonic', 'smrekovnic', 'vushtrr', 'vučitrn', 'vucitrn'] },
+  { city: 'Drenas', lat: 42.6250, lon: 20.8920, keywords: ['komoran', 'drenas', 'gllogoc', 'glogovac'] },
+  { city: 'Suharekë', lat: 42.3600, lon: 20.8250, keywords: ['duhël', 'duhel', 'dulje', 'suharek', 'suva reka', 'therand'] },
+  { city: 'Podujevë', lat: 42.9100, lon: 21.1900, keywords: ['merdar', 'lluzhan', 'podujev', 'podujevo', 'besian'] },
+  { city: 'Brezovicë', lat: 42.2180, lon: 20.9980, keywords: ['brezovic', 'shtërpc', 'shterpc', 'štrpce', 'strpce'] },
+  { city: 'Shtime', lat: 42.4330, lon: 21.0400, keywords: ['carralev', 'shtime', 'štimlje', 'stimlje'] },
+  { city: 'Pejë', lat: 42.6593, lon: 20.2887, keywords: ['rugov', 'pejë', 'peje', 'peć', 'pec'] },
+  { city: 'Mitrovicë', lat: 42.8914, lon: 20.8660, keywords: ['zveçan', 'zvecan', 'mitrovic', 'mitrovica'] },
+  { city: 'Leposaviq', lat: 43.1000, lon: 20.8000, keywords: ['jaranja', 'jarinj', 'leposaviq', 'leposavić', 'leposavic'] },
+  { city: 'Zubin Potok', lat: 42.9100, lon: 20.6900, keywords: ['gazivod', 'ujman', 'zubin potok'] },
+  { city: 'Fushë Kosovë', lat: 42.6340, lon: 21.0960, keywords: ['fushë kosov', 'fushe kosov', 'kosovo polje'] },
+  { city: 'Prishtinë', lat: 42.6629, lon: 21.1655, keywords: ['veternik', 'çagllavic', 'caglavic', 'prishtin', 'prištin', 'pristina'] },
+  { city: 'Prizren', lat: 42.2139, lon: 20.7397, keywords: ['shadervan', 'ortakoll', 'bazhderhane', 'prizren'] },
+  { city: 'Gjilan', lat: 42.4635, lon: 21.4694, keywords: ['gavran', 'gjilan', 'gnjilan'] },
+  { city: 'Ferizaj', lat: 42.3705, lon: 21.1530, keywords: ['ferizaj', 'uroševac', 'urosevac'] },
+  { city: 'Gjakovë', lat: 42.3810, lon: 20.4320, keywords: ['gjakov', 'đakovic', 'djakovic'] },
+  { city: 'Rahovec', lat: 42.3990, lon: 20.6550, keywords: ['rahovec', 'orahovac'] },
+  { city: 'Klinë', lat: 42.6210, lon: 20.5780, keywords: ['klinë', 'kline', 'klina'] },
+  { city: 'Deçan', lat: 42.5410, lon: 20.2880, keywords: ['deçan', 'decan', 'dečani', 'decani'] },
+  { city: 'Istog', lat: 42.7800, lon: 20.4900, keywords: ['istog', 'istok', 'burim'] },
+  { city: 'Lipjan', lat: 42.5220, lon: 21.1250, keywords: ['janjev', 'lipjan', 'lipljan'] },
+  { city: 'Kaçanik', lat: 42.2300, lon: 21.2600, keywords: ['kaçanik', 'kacanik'] },
+  { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica'] },
+  { city: 'Malishevë', lat: 42.4820, lon: 20.7450, keywords: ['malishev', 'mališevo', 'malisevo'] },
+  { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['dardan', 'kamenic', 'kamenica'] },
+  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['kllokot', 'klokot', 'viti', 'vitina'] },
+];
+
+function extractTrafficLocation(title, description) {
+  const titleLower = (title || '').toLowerCase();
+  const descLower = (description || '').toLowerCase();
+  for (const loc of KOSOVO_TRAFFIC_LOCATIONS) {
+    for (const kw of loc.keywords) {
+      if (titleLower.includes(kw.toLowerCase())) return { city: loc.city, lat: loc.lat, lon: loc.lon };
+    }
+  }
+  for (const loc of KOSOVO_TRAFFIC_LOCATIONS) {
+    for (const kw of loc.keywords) {
+      if (descLower.includes(kw.toLowerCase())) return { city: loc.city, lat: loc.lat, lon: loc.lon };
+    }
+  }
+  return null;
+}
+
+function ensureTrafficIncidentLocations(traffic) {
+  if (!traffic || !Array.isArray(traffic.incidents)) return;
+  traffic.incidents.forEach(inc => {
+    if (!inc.location || !inc.location.lat || !inc.location.lon) {
+      const loc = extractTrafficLocation(inc.title, inc.description);
+      if (loc) inc.location = loc;
+    }
+  });
+}
+
 function renderTraffic(traffic) {
+  ensureTrafficIncidentLocations(traffic);
   if (!traffic || traffic.error) { $('incidentList').innerHTML = `<div class="error-state">Traffic data unavailable</div>`; return; }
   if (traffic.source === 'none') {
     $('trafficMeta').textContent = 'via news RSS';
@@ -602,12 +663,36 @@ function renderTraffic(traffic) {
   $('incidentList').innerHTML = (traffic.incidents||[]).length
     ? (traffic.incidents||[]).map(inc => `<div class="incident-item ${inc.anomaly?'anomaly':''}">
         <div class="incident-body">
-          <div class="incident-type">${escHtml(inc.type.replace(/_/g,' '))}${inc.anomaly?`<span class="incident-anomaly-tag">⚠ ${inc.anomalyType}</span>`:''}</div>
+          <div class="incident-type">${escHtml(inc.type.replace(/_/g,' '))}${inc.location?.city ? ` <span class="incident-road">📍 ${escHtml(inc.location.city)}</span>` : ''}${inc.anomaly?`<span class="incident-anomaly-tag">⚠ ${inc.anomalyType}</span>`:''}</div>
           <div class="incident-desc">${escHtml(inc.description)}</div>
           <div class="incident-source">📰 ${escHtml(inc.source)} · ${formatTimeAgo(inc.publishedAt)}</div>
           ${inc.url && inc.url !== '#' ? `<div class="incident-link"><a href="${escHtml(inc.url)}" target="_blank">Read article</a></div>` : ''}
         </div></div>`).join('')
     : '<div class="empty-state">No current traffic incidents reported</div>';
+}
+
+function renderTrafficMarkers(trafficData) {
+  if (!state.map) return;
+  state.trafficMarkers.forEach(m => m.remove());
+  state.trafficMarkers = [];
+
+  if (!state.trafficVisible) return;
+
+  const data = trafficData || state.data?.traffic;
+  if (!data || data.error) return;
+
+  ensureTrafficIncidentLocations(data);
+  (data.incidents || []).forEach(inc => {
+    if (!inc.location?.lat || !inc.location?.lon) return;
+    const color = inc.anomaly ? '#fb923c' : '#fbbf24';
+    const cityLabel = inc.location.city ? ` · ${escHtml(inc.location.city)}` : '';
+    const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, inc.anomaly ? 14 : 12, 2) })
+      .setLngLat([inc.location.lon, inc.location.lat])
+      .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
+        .setHTML(`<strong>🚦 ${escHtml(inc.type.replace(/_/g, ' '))}${cityLabel}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`))
+      .addTo(state.map);
+    state.trafficMarkers.push(marker);
+  });
 }
 
 function renderRadiation(rad) {
@@ -634,6 +719,28 @@ function renderRadiation(rad) {
   $('radiationNeighbors').innerHTML = `<table class="neighbor-table"><thead><tr><th>Region</th><th>Dist.</th><th>µSv/h</th><th>Status</th></tr></thead><tbody>${
     (rad.neighbors||[]).map(n=>`<tr><td>${escHtml(n.name)}</td><td>${n.distanceKm}km</td><td>${n.usvh.toFixed(3)}</td><td><span class="rad-status-pill pill-${n.status}">${n.status}</span></td></tr>`).join('')
   }</tbody></table>`;
+}
+
+function renderRadiationMarkers(radData) {
+  if (!state.map) return;
+  state.radiationMarkers.forEach(m => m.remove());
+  state.radiationMarkers = [];
+
+  if (!state.radiationVisible) return;
+
+  const data = radData || state.data?.radiation;
+  if (!data || data.error) return;
+
+  (data.neighbors || []).forEach(n => {
+    if (!n.lat || !n.lon) return;
+    const color = { normal: '#34d399', elevated: '#fbbf24', high: '#fb923c', critical: '#f87171' }[n.status] || '#94a3b8';
+    const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 12, 2) })
+      .setLngLat([n.lon, n.lat])
+      .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
+        .setHTML(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh != null ? n.usvh.toFixed(3) : 'N/A'} µSv/h<br>Status: <span style="color:${color};font-weight:600">${escHtml((n.status || 'unknown').toUpperCase())}</span>${n.distanceKm ? `<br>Distance: ${n.distanceKm}km` : ''}`))
+      .addTo(state.map);
+    state.radiationMarkers.push(marker);
+  });
 }
 
 function renderAQI(aqi) {
@@ -938,10 +1045,43 @@ function toggleModule(panelId) {
     if (state.map.getLayer('wildfire-layer')) {
       state.map.setLayoutProperty('wildfire-layer', 'visibility', 'visible');
     }
-  } else if (panelId === 'cctvIntelligencePanel') {
+  } else {
+    if (state.wildfireVisible) {
+      state.wildfireVisible = false;
+      if (state.map && state.map.getLayer('wildfire-layer')) {
+        state.map.setLayoutProperty('wildfire-layer', 'visibility', 'none');
+      }
+    }
+  }
+
+  if (panelId === 'cctvIntelligencePanel') {
     openCCTVModule();
-  } else if (panelId === 'radiationPanel') {
-    // Radiation markers are added automatically in updateMap
+  } else {
+    if (state.cctvVisible) {
+      state.cctvVisible = false;
+      state.cctvMarkers.forEach(m => m.remove());
+      state.cctvMarkers = [];
+    }
+  }
+
+  if (panelId === 'trafficPanel') {
+    state.trafficVisible = true;
+    renderTrafficMarkers(state.data?.traffic);
+  } else {
+    if (state.trafficVisible) {
+      state.trafficVisible = false;
+      renderTrafficMarkers();
+    }
+  }
+
+  if (panelId === 'radiationPanel') {
+    state.radiationVisible = true;
+    renderRadiationMarkers(state.data?.radiation);
+  } else {
+    if (state.radiationVisible) {
+      state.radiationVisible = false;
+      renderRadiationMarkers();
+    }
   }
 
   if (state.map) {
@@ -964,6 +1104,16 @@ function closeModulePanel() {
     state.cctvVisible = false;
     state.cctvMarkers.forEach(m => m.remove());
     state.cctvMarkers = [];
+  }
+
+  if (state.trafficVisible) {
+    state.trafficVisible = false;
+    renderTrafficMarkers();
+  }
+
+  if (state.radiationVisible) {
+    state.radiationVisible = false;
+    renderRadiationMarkers();
   }
   
   overlay.classList.remove('active');
@@ -1353,16 +1503,7 @@ function updateMap(data) {
     state.map.easeTo({ center: centerPoint, zoom: 11, pitch: 35, duration: 800 });
   }
 
-  (data.traffic?.incidents || []).forEach(inc => {
-    if (!inc.location?.lat || !inc.location?.lon) return;
-    const color = inc.anomaly ? '#fb923c' : '#fbbf24';
-    const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, inc.anomaly ? 14 : 12, 2) })
-      .setLngLat([inc.location.lon, inc.location.lat])
-      .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
-        .setHTML(`<strong>🚦 ${escHtml(inc.type.replace(/_/g, ' '))}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`))
-      .addTo(state.map);
-    state.mapMarkers.push(marker);
-  });
+  renderTrafficMarkers(data.traffic);
 
   (data.earthquakes?.earthquakes || []).filter(eq => eq.magnitude >= 2.5).forEach(eq => {
     if (!eq.lat || !eq.lon) return;
@@ -1380,16 +1521,7 @@ function updateMap(data) {
     state.mapMarkers.push(marker);
   });
 
-  (data.radiation?.neighbors || []).forEach(n => {
-    if (!n.lat || !n.lon) return;
-    const color = { normal: '#34d399', elevated: '#fbbf24', high: '#fb923c', critical: '#f87171' }[n.status] || '#94a3b8';
-    const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 12, 2) })
-      .setLngLat([n.lon, n.lat])
-      .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
-        .setHTML(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh} µSv/h<br>Status: ${escHtml(n.status)}`))
-      .addTo(state.map);
-    state.mapMarkers.push(marker);
-  });
+  renderRadiationMarkers(data.radiation);
 
   $('mapBadge').style.display = state.mapMarkers.length > 1 ? '' : 'none';
   $('mapBadge').textContent = `${state.mapMarkers.length - 1} pins`;
