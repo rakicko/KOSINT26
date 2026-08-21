@@ -53,6 +53,10 @@ skills/
 ├── radiation-monitor/   # Radmon.org + neighbour regions
 ├── aqi-monitor/         # Open-Meteo Air Quality (no key)
 ├── earthquake-monitor/  # USGS FDSN API (no key needed)
+├── wildfire-monitor/    # NASA FIRMS thermal anomaly detection
+├── aviation-monitor/    # OpenSky & ADS-B aircraft monitoring
+├── telegram-monitor/    # Telegram official API public channel monitor
+├── border-monitor/      # QKMK Kosovo border crossing waiting times
 ├── alert-engine/        # Threshold evaluator → SSE
 └── memory-bank/         # JSON persistence layer
 ```
@@ -62,16 +66,22 @@ Test any skill independently:
 node skills/news-intel/skill.js --test --location "Mumbai, India"
 node skills/weather-monitor/skill.js --test --location "Delhi"
 node skills/earthquake-monitor/skill.js --test --location "Tokyo"
+node skills/telegram-monitor/skill.js --test
+node skills/border-monitor/skill.js
 ```
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/status` | Fetch all 6 skills for a location |
+| `POST` | `/api/status` | Fetch all core skills for a location |
 | `GET` | `/api/alerts` | Alert history |
 | `GET` | `/events` | SSE stream for real-time push |
 | `GET` | `/api/locations` | Location history |
+| `GET` | `/api/wildfire` | Wildfire detections |
+| `GET` | `/api/aviation` | Aviation telemetry |
+| `GET` | `/api/telegram` | Telegram public channel feed |
+| `GET` | `/api/borders` | Kosovo border crossing waiting times |
 
 ## Deploying to Render (Free)
 

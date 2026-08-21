@@ -87,7 +87,7 @@ async function fetchAQI({ location = 'Kosovo', lat, lon, forceRefresh = false } 
       forecast_days: 2
     };
 
-    const res = await axios.get(apiUrl, { params, timeout: 8000 });
+    const res = await axios.get(apiUrl, { params, timeout: 12000 });
 
     if (!res.data || typeof res.data !== 'object') {
       return {

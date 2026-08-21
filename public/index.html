@@ -60,7 +60,7 @@
 <!-- ── Main Layout ──────────────────────────────────────────────────────────── -->
 <main class="main-layout">
   <aside class="sidebar">
-    <div class="sidebar-section">
+    <div class="sidebar-section alert-section">
       <div class="section-header">
         <span class="section-icon">🔔</span>
         <span>Alert Log</span>
@@ -69,7 +69,7 @@
       <div class="alert-log" id="alertLog">
         <div class="empty-state">No alerts yet</div>
       </div>
-      <button class="btn-sm" onclick="markAllRead()" style="margin-top:8px">Mark all read</button>
+      <button class="btn-sm alert-mark-read-btn" onclick="markAllRead()" style="margin-top:8px">Mark all read</button>
     </div>
 
     <div class="sidebar-section settings-section">
@@ -103,6 +103,8 @@
       <button class="module-btn" data-panel="earthquakePanel" onclick="toggleModule('earthquakePanel')"><span class="module-icon">🌊</span> Seismic Activity</button>
       <button class="module-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')"><span class="module-icon">🔥</span> Wildfire</button>
       <button class="module-btn" data-panel="aviationPanel" onclick="toggleModule('aviationPanel')"><span class="module-icon">✈️</span> Aviation</button>
+      <button class="module-btn" data-panel="telegramPanel" onclick="toggleModule('telegramPanel')"><span class="module-icon">📱</span> Telegram Feed</button>
+      <button class="module-btn" data-panel="borderPanel" onclick="toggleModule('borderPanel')"><span class="module-icon">🛂</span> Border Monitor</button>
       <button class="module-btn" data-panel="cctvIntelligencePanel" onclick="toggleModule('cctvIntelligencePanel')"><span class="module-icon">📹</span> CCTV</button>
     </div>
 
@@ -149,20 +151,6 @@
                 <button class="filter-btn" onclick="filterNews('commentary', this)">Commentary</button>
               </div>
               <div class="news-list" id="newsList"></div>
-            </div>
-
-            <!-- Weather Panel -->
-            <div class="panel overlay-panel" id="weatherPanel" data-panel-title="Weather Monitor" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">🌤</span>
-                  <span>Weather Monitor</span>
-                </div>
-                <div class="panel-meta" id="weatherMeta"></div>
-              </div>
-              <div class="weather-current" id="weatherCurrent"></div>
-              <div class="weather-alerts" id="weatherAlerts"></div>
-              <div class="weather-forecast" id="weatherForecast"></div>
             </div>
 
             <!-- Traffic Panel -->
@@ -265,6 +253,49 @@
                 <button class="filter-btn" data-category="unknown" onclick="filterAviation('unknown', this)">UNKNOWN <span class="aviation-pill-count" id="countUnknown">0</span></button>
               </div>
               <div class="aviation-list" id="aviationList"></div>
+            </div>
+
+            <!-- Telegram Feed Panel -->
+            <div class="panel overlay-panel" id="telegramPanel" data-panel-title="Telegram Public Feed" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">📱</span>
+                  <span>Telegram Public Feed</span>
+                  <span class="panel-badge" id="telegramBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="telegramMeta">OFFICIAL API · READ-ONLY</div>
+              </div>
+              <div class="telegram-header-info">
+                <div class="telegram-summary-text" id="telegramSummaryText">MONITORING PUBLIC CHANNELS</div>
+              </div>
+              <div class="panel-filter-row telegram-filter-row" id="telegramFilterRow">
+                <button class="filter-btn active" data-channel="all" onclick="filterTelegram('all', this)">ALL CHANNELS</button>
+                <button class="filter-btn" data-channel="koridorsrb" onclick="filterTelegram('koridorsrb', this)">@koridorsrb</button>
+                <button class="filter-btn" data-channel="srpskinat" onclick="filterTelegram('srpskinat', this)">@srpskinat</button>
+                <button class="filter-btn" data-channel="istokinfo" onclick="filterTelegram('istokinfo', this)">@istokinfo</button>
+              </div>
+              <div class="telegram-list" id="telegramList">
+                <div class="empty-state">Loading Telegram feed...</div>
+              </div>
+            </div>
+
+            <!-- Border Monitor Panel -->
+            <div class="panel overlay-panel" id="borderPanel" data-panel-title="Border Crossing Monitor" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">🛂</span>
+                  <span>Border Crossing Monitor</span>
+                  <span class="panel-badge" id="borderBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="borderMeta">QKMK / MPB KOSOVO · LIVE QUEUES</div>
+              </div>
+              <div class="border-header-info">
+                <div class="border-summary-text" id="borderSummaryText">NATIONAL CENTER FOR BORDER MANAGEMENT</div>
+                <button class="border-refresh-btn" id="borderRefreshBtn" onclick="fetchBorder(true)" title="Force Refresh">↻ Refresh</button>
+              </div>
+              <div class="border-list" id="borderList">
+                <div class="empty-state">Loading border crossings...</div>
+              </div>
             </div>
           </div>
         </div>

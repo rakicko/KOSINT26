@@ -38,11 +38,11 @@ function deriveAlerts(current) {
   return alerts;
 }
 
-function getDemoData(location) {
+function getDemoData(location, coords = { lat: 42.6629, lon: 21.1655 }) {
    const current = { temp: 24, feelsLike: 26, humidity: 65, windSpeed: 12, windDirection: 210, precipitation: 0, weatherCode: 1, description: 'Mainly clear', visibility: 10, uvIndex: 5 };
    return {
      skill: 'weather-monitor', location,
-     coordinates: { lat: 42.89, lon: 20.87 },
+     coordinates: coords,
      fetchedAt: new Date().toISOString(),
      current, alerts: [],
     forecast: [
@@ -57,9 +57,10 @@ function getDemoData(location) {
   };
 }
 
-async function fetchWeather({ location, lat, lon }) {
+async function fetchWeather({ location = 'Prishtinë', lat, lon } = {}) {
+  let coords;
   try {
-    let coords = (lat && lon) ? { lat, lon } : await geocode(location);
+    coords = (lat && lon) ? { lat, lon } : await geocode(location);
     const res = await axios.get('https://api.open-meteo.com/v1/forecast', {
       params: {
         latitude: coords.lat, longitude: coords.lon,
@@ -98,8 +99,9 @@ async function fetchWeather({ location, lat, lon }) {
       current, alerts: deriveAlerts(current), forecast, source: 'open-meteo',
     };
   } catch (err) {
-    console.warn('[weather-monitor] error, using demo:', err.message);
-    return getDemoData(location);
+    console.warn('[weather-monitor] error, using fallback/demo:', err.message);
+    const fallbackCoords = coords || (lat && lon ? { lat, lon } : { lat: 42.6629, lon: 21.1655 });
+    return getDemoData(location, fallbackCoords);
   }
 }
 

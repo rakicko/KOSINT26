@@ -7,7 +7,10 @@ const path       = require('path');
 const { orchestrate } = require('./orchestrator');
 const memoryBank = require('../skills/memory-bank/skill');
 const { fetchWildfire } = require('../skills/wildfire-monitor/skill');
+const { fetchWeather } = require('../skills/weather-monitor/skill');
 const { fetchAviation } = require('../skills/aviation-monitor/skill');
+const { fetchTelegram, fetchMediaThumbnail } = require('../skills/telegram-monitor/skill');
+const { fetchBorders } = require('../skills/border-monitor/skill');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -87,11 +90,32 @@ app.post('/api/preferences', (req, res) => {
   res.json({ ok: true, preferences: memoryBank.get('preferences') });
 });
 
+// ── API: Weather ─────────────────────────────────────────────────────────────
+app.get('/api/weather', async (req, res) => {
+  const { location = 'Prishtinë', lat, lon } = req.query;
+  try {
+    const data = await fetchWeather({
+      location,
+      lat: lat ? parseFloat(lat) : undefined,
+      lon: lon ? parseFloat(lon) : undefined,
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('[server] weather fetch error:', err);
+    res.status(500).json({ error: err.message, skill: 'weather-monitor' });
+  }
+});
+
 // ── API: Wildfire detections ─────────────────────────────────────────────────────
 app.get('/api/wildfire', async (req, res) => {
-  const { period = '24h', lat, lon } = req.query;
+  const { period = '24h', lat, lon, forceRefresh = 'false' } = req.query;
   try {
-    const data = await fetchWildfire({ period, lat: lat ? parseFloat(lat) : undefined, lon: lon ? parseFloat(lon) : undefined });
+    const data = await fetchWildfire({
+      period,
+      lat: lat ? parseFloat(lat) : undefined,
+      lon: lon ? parseFloat(lon) : undefined,
+      forceRefresh: forceRefresh === 'true'
+    });
     res.json(data);
   } catch (err) {
     console.error('[server] wildfire fetch error:', err);
@@ -116,6 +140,85 @@ app.get('/api/aviation', async (req, res) => {
       count: 0,
       summary: { commercial: 0, private: 0, privateJets: 0, military: 0, unknown: 0 },
       aircraft: []
+    });
+  }
+});
+
+// ── API: Telegram Public Feed ─────────────────────────────────────────────────
+app.get('/api/telegram', async (req, res) => {
+  const { forceRefresh = 'false', channels, limit, demo = 'false' } = req.query;
+  try {
+    const channelList = channels ? channels.split(',').map(s => s.trim()).filter(Boolean) : null;
+    const limitNum = limit ? parseInt(limit, 10) : null;
+    const data = await fetchTelegram({
+      channels: channelList,
+      limitPerChannel: limitNum,
+      forceRefresh: forceRefresh === 'true',
+      useDemo: demo === 'true'
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('[server] telegram fetch error:', err);
+    res.status(500).json({
+      skill: 'telegram-monitor',
+      status: 'UNAVAILABLE',
+      source: 'Telegram Official API',
+      updatedAt: new Date().toISOString(),
+      channels: [],
+      count: 0,
+      posts: [],
+      error: 'SERVER_ERROR',
+      message: err.message || 'Failed to fetch Telegram intelligence.'
+    });
+  }
+});
+
+// ── API: Telegram Media Thumbnail Preview ──────────────────────────────────────
+app.get('/api/telegram/media', async (req, res) => {
+  const { channel, id, demo = 'false' } = req.query;
+  if (!channel || !id) {
+    return res.status(400).json({ error: 'channel and id are required' });
+  }
+
+  try {
+    const thumb = await fetchMediaThumbnail({
+      channel,
+      messageId: id,
+      demo: demo === 'true'
+    });
+
+    if (thumb && thumb.buffer) {
+      res.setHeader('Content-Type', thumb.mimeType || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(thumb.buffer);
+    }
+
+    return res.status(404).json({ error: 'Thumbnail not available' });
+  } catch (err) {
+    console.error('[server] Telegram media thumbnail error:', err.message);
+    return res.status(500).json({ error: 'Failed to retrieve media thumbnail' });
+  }
+});
+
+// ── API: Border Crossing Monitor ──────────────────────────────────────────────
+app.get('/api/borders', async (req, res) => {
+  const { forceRefresh = 'false' } = req.query;
+  try {
+    const data = await fetchBorders({
+      forceRefresh: forceRefresh === 'true'
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('[server] borders fetch error:', err.message);
+    res.status(500).json({
+      skill: 'border-monitor',
+      status: 'UNAVAILABLE',
+      source: 'QKMK',
+      updatedAt: new Date().toISOString(),
+      count: 0,
+      crossings: [],
+      error: 'SERVER_ERROR',
+      message: err.message || 'Failed to fetch border crossing intelligence.'
     });
   }
 });

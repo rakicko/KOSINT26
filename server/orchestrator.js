@@ -85,13 +85,16 @@ async function orchestrate({ location, lat, lon, timeline = '24h', forceRefresh 
   const [newsResolve] = await Promise.allSettled([fetchNewsPromise]);
   const newsResult = newsResolve.status === 'fulfilled' ? newsResolve.value : { skill: 'news-intel', error: newsResolve.reason?.message, items: [] };
 
+  const targetLat = (typeof lat === 'number' && !isNaN(lat)) ? lat : 42.6026;
+  const targetLon = (typeof lon === 'number' && !isNaN(lon)) ? lon : 20.9030;
+
   const [weather, traffic, radiation, aqi, earthquakes, wildfire, aviation] = await Promise.allSettled([
-    fetchWeather({ location, lat, lon }),
-    fetchTraffic({ location, lat, lon, news: newsResult }),
-    fetchRadiation({ location, lat, lon }),
-    fetchAQI({ location, lat, lon }),
-    fetchEarthquakes({ location, lat, lon }),
-    fetchWildfire({ period: timeline, lat, lon }),
+    fetchWeather({ location, lat: targetLat, lon: targetLon }),
+    fetchTraffic({ location, lat: targetLat, lon: targetLon, news: newsResult }),
+    fetchRadiation({ location, lat: targetLat, lon: targetLon }),
+    fetchAQI({ location, lat: targetLat, lon: targetLon, forceRefresh }),
+    fetchEarthquakes({ location, lat: targetLat, lon: targetLon }),
+    fetchWildfire({ period: timeline, lat: targetLat, lon: targetLon, forceRefresh }),
     fetchAviation({ forceRefresh }),
   ]);
 

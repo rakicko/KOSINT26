@@ -58,9 +58,20 @@ function addLocation(loc) {
 }
 
 function addAlerts(newAlerts) {
-  if (!newAlerts.length) return;
+  if (!Array.isArray(newAlerts) || !newAlerts.length) return;
   const db = load();
-  db.alerts = [...newAlerts, ...db.alerts].slice(0, MAX_ALERTS);
+  const alertMap = new Map((db.alerts || []).map(a => [a.id, a]));
+  
+  newAlerts.forEach(na => {
+    if (alertMap.has(na.id)) {
+      const existing = alertMap.get(na.id);
+      alertMap.set(na.id, { ...existing, ...na, read: existing.read });
+    } else {
+      alertMap.set(na.id, { ...na, read: false });
+    }
+  });
+
+  db.alerts = Array.from(alertMap.values()).slice(0, MAX_ALERTS);
   save(db);
 }
 

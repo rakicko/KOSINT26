@@ -324,6 +324,16 @@ class MapModeControl {
   }
 }
 
+const KOSOVO_WEATHER_CITIES = [
+  { id: 'prishtine', name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
+  { id: 'mitrovice', name: 'Mitrovicë', lat: 42.8914, lon: 20.8660 },
+  { id: 'peje',      name: 'Pejë',      lat: 42.6591, lon: 20.2883 },
+  { id: 'prizren',   name: 'Prizren',   lat: 42.2153, lon: 20.7415 },
+  { id: 'ferizaj',   name: 'Ferizaj',   lat: 42.3705, lon: 21.1553 },
+  { id: 'gjilan',    name: 'Gjilan',    lat: 42.4635, lon: 21.4694 },
+  { id: 'gjakove',   name: 'Gjakovë',   lat: 42.3803, lon: 20.4308 }
+];
+
 const state = {
   currentLocation: DEFAULT_LOCATION,
   currentTimeline: '24h',
@@ -341,6 +351,12 @@ const state = {
   activeModule: null,
   mapMode: '2d',
   aviationFilter: 'all',
+  telegramFilter: 'all',
+  telegramData: null,
+  selectedWeatherCityId: null,
+  weatherCache: {},
+  weatherPopup: null,
+  activeMapPopup: null,
 };
 
 function clearMarkerList(markerList) {
@@ -393,6 +409,16 @@ const moduleLayers = {
     render: (data) => renderAviationMapMarkers(data?.aviation || state.data?.aviation),
     clear: () => clearMarkerList(moduleLayers.aviation.markers)
   },
+  telegram: {
+    markers: [],
+    render: () => {},
+    clear: () => {}
+  },
+  border: {
+    markers: [],
+    render: (data) => renderBorderMapMarkers(data || state.borderData),
+    clear: () => clearMarkerList(moduleLayers.border.markers)
+  },
   cctv: {
     markers: [],
     render: () => renderCCTVMapMarkers(),
@@ -438,12 +464,30 @@ function updateMapBadgeAndMeta() {
 
   let count = 0;
   const mod = state.activeMapModule;
+  if (mod === 'telegram') {
+    badge.style.display = 'none';
+    meta.textContent = 'Telegram Public Channels · Read-Only Feed';
+    return;
+  }
+  if (mod === 'border') {
+    count = moduleLayers.border.markers.length;
+    badge.style.display = count > 0 ? '' : 'none';
+    badge.textContent = `${count} crossings`;
+    meta.textContent = `${count} border crossings · QKMK Live`;
+    return;
+  }
   if (mod === 'wildfire') {
     const src = state.map?.getSource('wildfire-source');
     count = src?._data?.features?.length || 0;
     badge.style.display = count > 0 ? '' : 'none';
     badge.textContent = `${count} fires`;
     meta.textContent = `${count} active fire detections · NASA FIRMS`;
+  } else if (mod === 'weather') {
+    count = moduleLayers.weather.markers.length;
+    badge.style.display = count > 0 ? '' : 'none';
+    badge.textContent = `${count} cities`;
+    const selectedCity = KOSOVO_WEATHER_CITIES.find(c => c.id === state.selectedWeatherCityId);
+    meta.textContent = `Weather Stations · ${selectedCity ? selectedCity.name : 'Kosovo'} active`;
   } else if (moduleLayers[mod]) {
     count = moduleLayers[mod].markers.length;
     badge.style.display = count > 0 ? '' : 'none';
@@ -579,7 +623,7 @@ async function fetchAndRender(location, timeline, forceRefresh = false) {
   const res = await fetch('/api/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ location, timeline, forceRefresh, customKeywords: state.customKeywords }),
+    body: JSON.stringify({ location, lat: DEFAULT_MAP_CENTER.lat, lon: DEFAULT_MAP_CENTER.lon, timeline, forceRefresh, customKeywords: state.customKeywords }),
   });
   if (!res.ok) throw new Error(`Server error ${res.status}`);
   const data = await res.json();
@@ -596,6 +640,8 @@ async function fetchAndRender(location, timeline, forceRefresh = false) {
   renderEarthquakes(data.earthquakes);
   renderWildfire(data.wildfire);
   renderAviation(data.aviation);
+  fetchTelegram(forceRefresh);
+  fetchBorder(forceRefresh);
   updateMap(data);
   loadAlertHistory();
 }
@@ -654,6 +700,49 @@ function renderNews(news) {
   filterNewsItems(items, state.newsFilter || 'all');
 }
 
+/**
+ * Safely parses any publication timestamp field into epoch milliseconds.
+ * Returns NaN if missing, null, or unparseable.
+ */
+function getArticlePubTime(item) {
+  if (!item) return NaN;
+  const raw = item.publishedAt || item.published || item.pubDate || item.published_at || item.timestamp;
+  if (!raw) return NaN;
+  const time = new Date(raw).getTime();
+  return isNaN(time) ? NaN : time;
+}
+
+/**
+ * Sorts news articles strictly in reverse chronological order (newest publication first, oldest last).
+ * - Valid timestamps are sorted newest -> oldest.
+ * - Missing or invalid timestamps are safely placed at the end without throwing errors.
+ * - Ties with identical publication timestamps are deterministically ordered by title.
+ */
+function sortNewsByChronological(items) {
+  if (!Array.isArray(items)) return [];
+  return [...items].sort((a, b) => {
+    const timeA = getArticlePubTime(a);
+    const timeB = getArticlePubTime(b);
+
+    const validA = !isNaN(timeA);
+    const validB = !isNaN(timeB);
+
+    if (validA && validB) {
+      if (timeB !== timeA) return timeB - timeA;
+      const titleA = String(a.title || a.url || '');
+      const titleB = String(b.title || b.url || '');
+      return titleA.localeCompare(titleB);
+    }
+    if (validA && !validB) return -1;
+    if (!validA && validB) return 1;
+    
+    // Both invalid or missing
+    const titleA = String(a.title || a.url || '');
+    const titleB = String(b.title || b.url || '');
+    return titleA.localeCompare(titleB);
+  });
+}
+
 function filterNewsItems(items, filter) {
   state.newsFilter = filter || 'all';
   items = items || [];
@@ -672,9 +761,11 @@ function filterNewsItems(items, filter) {
     filtered = items.filter(i => i.eventType === 'commentary');
   }
 
+  const sorted = sortNewsByChronological(filtered);
+
   const list = $('newsList');
-  if (!filtered.length) { list.innerHTML = '<div class="empty-state">No matching security events</div>'; return; }
-  list.innerHTML = filtered.map(item => {
+  if (!sorted.length) { list.innerHTML = '<div class="empty-state">No matching security events</div>'; return; }
+  list.innerHTML = sorted.map(item => {
     const s = item.intensityScore || 1;
     const sev = (item.severity || (s >= 9 ? 'critical' : s >= 7 ? 'high' : 'medium')).toLowerCase();
     const cls = sev === 'critical' ? 'score-critical' : sev === 'high' ? 'score-high' : 'score-medium';
@@ -713,33 +804,341 @@ function filterNews(cat, btn) {
   if (state.data?.news) filterNewsItems(state.data.news.items || [], cat);
 }
 
-function renderWeather(weather) {
-  if (!weather || weather.error) { $('weatherCurrent').innerHTML = `<div class="error-state">Weather unavailable</div>`; return; }
-  const c = weather.current;
-  $('weatherMeta').textContent = `via ${weather.source}`;
-  $('weatherCurrent').innerHTML = `
-    <div class="weather-main">
-      <div class="weather-temp">${c.temp}</div><div class="weather-unit">°C</div>
+function renderWeather(weather, explicitCityName) {
+  const selectedCity = KOSOVO_WEATHER_CITIES.find(c => c.id === state.selectedWeatherCityId);
+  const cityName = explicitCityName || weather?.location || selectedCity?.name || 'Prishtinë';
+  const city = KOSOVO_WEATHER_CITIES.find(c => c.name.toLowerCase() === cityName.toLowerCase()) || selectedCity;
+
+  if (weather && !weather.error && city) {
+    if (!state.weatherCache) state.weatherCache = {};
+    state.weatherCache[city.id] = { data: weather, fetchedAt: Date.now() };
+
+    // Update marker temp display if rendered
+    if (moduleLayers.weather?.markers) {
+      const marker = moduleLayers.weather.markers.find(m => m._cityId === city.id);
+      if (marker && typeof weather.current?.temp === 'number') {
+        const el = marker.getElement ? marker.getElement() : marker._element;
+        if (el) {
+          let tempEl = el.querySelector('.weather-marker-temp');
+          if (!tempEl) {
+            tempEl = document.createElement('span');
+            tempEl.className = 'weather-marker-temp';
+            el.appendChild(tempEl);
+          }
+          tempEl.textContent = `${weather.current.temp}°`;
+        }
+      }
+    }
+
+    // Update open popup if currently displayed for this city
+    if (state.weatherPopup && state.selectedWeatherCityId === city.id) {
+      openWeatherPopup(city, weather);
+    }
+  }
+}
+
+/* ── Unified Map Popup System (Design System Reference: Weather Popup) ─────── */
+function buildMapPopupHtml({
+  icon = '📍',
+  title = '',
+  source = '',
+  badge = null, // { text: 'HIGH', color: '#f87171' }
+  primary = null, // { val: '35°C', sub: 'Clear sky', secondary: 'Feels like 32°C' }
+  stats = [], // [ { label: 'Humidity', val: '21%' }, ... ]
+  description = '',
+  contentHtml = '', // direct custom body html
+  sections = '', // raw custom html like hourly forecast
+  footer = '' // raw footer html or text
+}) {
+  const badgeHtml = badge ? `
+    <span class="map-popup-badge" style="background:${badge.color || 'var(--cyan)'}20; color:${badge.color || 'var(--cyan)'}; border:1px solid ${badge.color || 'var(--cyan)'}40;">
+      ${escHtml(badge.text)}
+    </span>
+  ` : '';
+
+  const primaryHtml = primary ? `
+    <div class="map-popup-primary">
+      <div class="map-popup-primary-row">
+        <span class="map-popup-primary-val">${primary.val}</span>
+        ${primary.sub ? `<span class="map-popup-primary-sub">${primary.sub}</span>` : ''}
+      </div>
+      ${primary.secondary ? `<div class="map-popup-secondary">${escHtml(primary.secondary)}</div>` : ''}
     </div>
-    <div class="weather-desc-block">
-      <div class="weather-description">${weatherIcon(c.weatherCode)} ${c.description}</div>
-      <div class="weather-feels">Feels like ${c.feelsLike}°C</div>
+  ` : '';
+
+  const statsHtml = Array.isArray(stats) && stats.length > 0 ? `
+    <div class="map-popup-grid">
+      ${stats.map(s => `
+        <div class="map-popup-stat">
+          <span class="map-popup-stat-label">${escHtml(s.label)}</span>
+          <span class="map-popup-stat-val" ${s.color ? `style="color:${s.color}"` : ''}>${escHtml(String(s.val ?? 'N/A'))}</span>
+        </div>
+      `).join('')}
     </div>
-    <div class="weather-stats">
-      <div class="weather-stat"><span class="weather-stat-label">Humidity</span><span class="weather-stat-value">${c.humidity}%</span></div>
-      <div class="weather-stat"><span class="weather-stat-label">Wind</span><span class="weather-stat-value">${c.windSpeed} km/h</span></div>
-      <div class="weather-stat"><span class="weather-stat-label">Precip.</span><span class="weather-stat-value">${c.precipitation}mm</span></div>
-      <div class="weather-stat"><span class="weather-stat-label">Visibility</span><span class="weather-stat-value">${c.visibility}km</span></div>
-    </div>`;
-  $('weatherAlerts').innerHTML = (weather.alerts||[]).map(a =>
-    `<div class="weather-alert-item ${a.severity}">⚠ ${escHtml(a.type.replace(/_/g,' '))} — ${escHtml(a.message)}</div>`).join('');
-  $('weatherForecast').innerHTML = (weather.forecast||[]).map(f =>
-    `<div class="forecast-item">
-      <div class="forecast-time">${formatHour(f.time)}</div>
-      <div class="forecast-icon">${weatherIcon(f.weatherCode)}</div>
-      <div class="forecast-temp">${f.temp}°</div>
-      ${f.precipitation>0 ? `<div class="forecast-rain">💧${f.precipitation}mm</div>` : ''}
-    </div>`).join('');
+  ` : '';
+
+  const descHtml = description ? `
+    <div class="map-popup-desc-text">${escHtml(description)}</div>
+  ` : '';
+
+  return `
+    <div class="map-popup">
+      <div class="map-popup-header">
+        <div class="map-popup-title">
+          <span class="map-popup-icon">${icon}</span>
+          <span class="map-popup-title-text">${escHtml(title.toUpperCase())}</span>
+          ${badgeHtml}
+        </div>
+        ${source ? `<div class="map-popup-source">via ${escHtml(source)}</div>` : ''}
+      </div>
+      <div class="map-popup-body">
+        ${primaryHtml}
+        ${descHtml}
+        ${statsHtml}
+        ${contentHtml}
+        ${sections || ''}
+      </div>
+      ${footer ? `<div class="map-popup-footer">${footer}</div>` : ''}
+    </div>
+  `;
+}
+
+function createMapPopup(html, opts = {}) {
+  return new maplibregl.Popup({
+    offset: opts.offset || 20,
+    closeButton: opts.closeButton ?? true,
+    closeOnClick: opts.closeOnClick ?? true,
+    className: `mapbox-popup map-unified-popup ${opts.className || ''}`.trim()
+  }).setHTML(html);
+}
+
+function openMapPopup(coords, html, onClose, opts = {}) {
+  if (!state.map) return null;
+  closeMapPopup();
+
+  const popup = createMapPopup(html, opts)
+    .setLngLat(coords);
+
+  popup.on('close', () => {
+    if (state.activeMapPopup === popup) {
+      state.activeMapPopup = null;
+      state.weatherPopup = null;
+      state.selectedWeatherCityId = null;
+      state.selectedMarkerId = null;
+    }
+    if (typeof onClose === 'function') onClose();
+    updateMapBadgeAndMeta();
+  });
+
+  popup.addTo(state.map);
+  state.activeMapPopup = popup;
+  state.weatherPopup = popup;
+  return popup;
+}
+
+function closeMapPopup() {
+  if (state.activeMapPopup) {
+    const p = state.activeMapPopup;
+    state.activeMapPopup = null;
+    state.weatherPopup = null;
+    try { p.remove(); } catch(e) {}
+  }
+}
+
+function buildWeatherPopupHtml(city, weatherData) {
+  if (!weatherData || weatherData.error) {
+    return buildMapPopupHtml({
+      icon: '🌤',
+      title: city.name,
+      source: 'Open-Meteo · UNAVAILABLE',
+      description: weatherData?.error || 'Live weather data currently unavailable.'
+    });
+  }
+
+  const c = weatherData.current || {};
+  const forecast = (weatherData.forecast || []).slice(0, 5);
+  const sourceLabel = (weatherData.source && weatherData.source.toLowerCase() === 'open-meteo') ? 'Open-Meteo' : (weatherData.source || 'Open-Meteo');
+  const forecastHtml = forecast.length > 0 ? `
+    <div class="weather-popup-forecast-section">
+      <div class="weather-popup-forecast-title">HOURLY FORECAST</div>
+      <div class="weather-popup-forecast-row">
+        ${forecast.map(f => `
+          <div class="weather-popup-forecast-item">
+            <div class="weather-popup-f-time">${formatHour(f.time)}</div>
+            <div class="weather-popup-f-icon">${weatherIcon(f.weatherCode)}</div>
+            <div class="weather-popup-f-temp">${f.temp}°</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  return buildMapPopupHtml({
+    icon: '🌤',
+    title: city.name,
+    source: sourceLabel,
+    primary: {
+      val: `${c.temp ?? 'N/A'}°C`,
+      sub: `${weatherIcon(c.weatherCode)} ${escHtml(c.description || 'Clear sky')}`,
+      secondary: `Feels like ${c.feelsLike ?? c.temp ?? 'N/A'}°C`
+    },
+    stats: [
+      { label: 'Humidity', val: `${c.humidity ?? 'N/A'}%` },
+      { label: 'Wind', val: `${c.windSpeed ?? 'N/A'} km/h` },
+      { label: 'Precip.', val: `${c.precipitation ?? 0} mm` },
+      { label: 'Visibility', val: `${c.visibility ?? 'N/A'} km` }
+    ],
+    sections: forecastHtml
+  });
+}
+
+function closeWeatherPopup() {
+  closeMapPopup();
+  state.selectedWeatherCityId = null;
+  if (moduleLayers.weather?.markers) {
+    moduleLayers.weather.markers.forEach(m => {
+      const el = m.getElement ? m.getElement() : m._element;
+      if (el) el.classList.remove('active');
+    });
+  }
+}
+
+function openWeatherPopup(city, weatherData) {
+  if (!state.map) return;
+  
+  closeMapPopup();
+  state.selectedWeatherCityId = city.id;
+
+  // Synchronize active class on all weather markers
+  if (moduleLayers.weather?.markers) {
+    moduleLayers.weather.markers.forEach(m => {
+      const el = m.getElement ? m.getElement() : m._element;
+      if (el) {
+        if (m._cityId === city.id) el.classList.add('active');
+        else el.classList.remove('active');
+      }
+    });
+  }
+
+  const html = buildWeatherPopupHtml(city, weatherData);
+  const popup = createMapPopup(html, { className: 'weather-map-popup' })
+    .setLngLat([city.lon, city.lat]);
+
+  popup.on('close', () => {
+    if (state.activeMapPopup === popup || state.weatherPopup === popup) {
+      state.activeMapPopup = null;
+      state.weatherPopup = null;
+      state.selectedWeatherCityId = null;
+      if (moduleLayers.weather?.markers) {
+        moduleLayers.weather.markers.forEach(m => {
+          const el = m.getElement ? m.getElement() : m._element;
+          if (el) el.classList.remove('active');
+        });
+      }
+    }
+    updateMapBadgeAndMeta();
+  });
+
+  popup.addTo(state.map);
+  state.activeMapPopup = popup;
+  state.weatherPopup = popup;
+}
+
+async function fetchCityWeather(cityId, forceRefresh = false, showPopup = true) {
+  const city = KOSOVO_WEATHER_CITIES.find(c => c.id === cityId) || KOSOVO_WEATHER_CITIES[0];
+  if (!city) return null;
+
+  if (!state.weatherCache) state.weatherCache = {};
+  const cached = state.weatherCache[city.id];
+  const now = Date.now();
+  const CACHE_TTL = 300000; // 5 min
+
+  if (!forceRefresh && cached && cached.data && (now - cached.fetchedAt < CACHE_TTL)) {
+    // Only open popup if this city is STILL currently selected
+    if (showPopup && state.selectedWeatherCityId === city.id) {
+      openWeatherPopup(city, cached.data);
+    }
+    renderWeather(cached.data, city.name);
+    return cached.data;
+  }
+
+  try {
+    const url = `/api/weather?location=${encodeURIComponent(city.name)}&lat=${city.lat}&lon=${city.lon}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    state.weatherCache[city.id] = { data, fetchedAt: now };
+    
+    // Only open popup if this city is STILL currently selected (prevents race condition)
+    if (showPopup && state.selectedWeatherCityId === city.id) {
+      openWeatherPopup(city, data);
+    }
+    renderWeather(data, city.name);
+
+    // Update marker temp display if rendered
+    if (moduleLayers.weather?.markers) {
+      const marker = moduleLayers.weather.markers.find(m => m._cityId === city.id);
+      if (marker) {
+        const el = marker.getElement ? marker.getElement() : marker._element;
+        if (el && typeof data?.current?.temp === 'number') {
+          let tempEl = el.querySelector('.weather-marker-temp');
+          if (!tempEl) {
+            tempEl = document.createElement('span');
+            tempEl.className = 'weather-marker-temp';
+            el.appendChild(tempEl);
+          }
+          tempEl.textContent = `${data.current.temp}°`;
+        }
+      }
+    }
+
+    return data;
+  } catch (err) {
+    console.warn(`[weather] Failed to fetch weather for ${city.name}:`, err.message);
+    const errData = { error: err.message, location: city.name };
+    if (showPopup && state.selectedWeatherCityId === city.id) {
+      openWeatherPopup(city, cached?.data || errData);
+    }
+    if (cached && cached.data) {
+      renderWeather(cached.data, city.name);
+      return cached.data;
+    }
+    renderWeather(errData, city.name);
+    return null;
+  }
+}
+
+function selectWeatherCity(cityId, showPopup = true) {
+  const city = KOSOVO_WEATHER_CITIES.find(c => c.id === cityId);
+  if (!city) return;
+
+  // Toggle behavior: If user clicks the currently active marker whose popup is open, close it!
+  if (state.selectedWeatherCityId === city.id && state.weatherPopup) {
+    closeWeatherPopup();
+    updateMapBadgeAndMeta();
+    return;
+  }
+
+  state.selectedWeatherCityId = city.id;
+
+  // Update active state on weather markers
+  if (moduleLayers.weather?.markers) {
+    moduleLayers.weather.markers.forEach(m => {
+      const el = m.getElement ? m.getElement() : m._element;
+      if (el) {
+        if (m._cityId === city.id) {
+          el.classList.add('active');
+        } else {
+          el.classList.remove('active');
+        }
+      }
+    });
+  }
+
+  // Fetch / render weather data and display map popup directly at the marker
+  fetchCityWeather(city.id, false, showPopup);
+
+  updateMapBadgeAndMeta();
 }
 
 const KOSOVO_TRAFFIC_LOCATIONS = [
@@ -841,11 +1240,23 @@ function renderTrafficMapMarkers(trafficData) {
   data.incidents.forEach(inc => {
     if (!inc.location?.lat || !inc.location?.lon) return;
     const color = inc.anomaly ? '#fb923c' : '#fbbf24';
-    const cityLabel = inc.location.city ? ` · ${escHtml(inc.location.city)}` : '';
+    const popupHtml = buildMapPopupHtml({
+      icon: '🚦',
+      title: inc.type ? inc.type.replace(/_/g, ' ') : 'Traffic Event',
+      source: 'Traffic Intelligence',
+      badge: inc.anomaly ? { text: 'ANOMALY', color: '#fb923c' } : { text: 'MONITORED', color: '#34d399' },
+      description: inc.description || 'Live traffic telemetry point',
+      stats: [
+        { label: 'Location', val: inc.location.city || 'Kosovo Road' },
+        { label: 'Delay', val: inc.delay > 0 ? `+${inc.delay} min` : 'None', color: inc.delay > 0 ? '#fb923c' : '#34d399' },
+        { label: 'Speed', val: inc.avgSpeed ? `${inc.avgSpeed} km/h` : 'Normal' },
+        { label: 'Status', val: inc.status || 'Active' }
+      ]
+    });
+
     const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, inc.anomaly ? 14 : 12, 2) })
       .setLngLat([inc.location.lon, inc.location.lat])
-      .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
-        .setHTML(`<strong>🚦 ${escHtml(inc.type.replace(/_/g, ' '))}${cityLabel}</strong><br>${escHtml(inc.description)}${inc.delay > 0 ? `<br>+${inc.delay} min delay` : ''}`))
+      .setPopup(createMapPopup(popupHtml))
       .addTo(state.map);
 
     marker._module = 'traffic';
@@ -897,10 +1308,27 @@ function renderRadiationMapMarkers(radData) {
   data.neighbors.forEach(n => {
     if (!n.lat || !n.lon) return;
     const color = { normal: '#34d399', elevated: '#fbbf24', high: '#fb923c', critical: '#f87171' }[n.status] || '#94a3b8';
+    const popupHtml = buildMapPopupHtml({
+      icon: '☢️',
+      title: n.name || 'Radiation Sensor',
+      source: data.source || 'EURDEP Sensor Network',
+      badge: { text: (n.status || 'NORMAL').toUpperCase(), color },
+      primary: {
+        val: `${n.usvh != null ? n.usvh.toFixed(3) : 'N/A'} µSv/h`,
+        sub: 'Ambient Dose Rate',
+        secondary: `Baseline: ${data.baseline || '0.100'} µSv/h`
+      },
+      stats: [
+        { label: 'Status', val: (n.status || 'NORMAL').toUpperCase(), color },
+        { label: 'Distance', val: n.distanceKm ? `${n.distanceKm} km` : 'Local' },
+        { label: 'Data Quality', val: (data.dataQuality || 'Verified').toUpperCase() },
+        { label: 'Unit', val: 'µSv/h' }
+      ]
+    });
+
     const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 12, 2) })
       .setLngLat([n.lon, n.lat])
-      .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
-        .setHTML(`<strong>☢️ ${escHtml(n.name)}</strong><br>Radiation: ${n.usvh != null ? n.usvh.toFixed(3) : 'N/A'} µSv/h<br>Status: <span style="color:${color};font-weight:600">${escHtml((n.status || 'unknown').toUpperCase())}</span>${n.distanceKm ? `<br>Distance: ${n.distanceKm}km` : ''}`))
+      .setPopup(createMapPopup(popupHtml))
       .addTo(state.map);
 
     marker._module = 'radiation';
@@ -1048,10 +1476,28 @@ function renderEarthquakeMapMarkers(eqData) {
     element.style.height = `${radius}px`;
     element.style.boxShadow = `0 0 18px ${eq.color || '#38bdf8'}`;
 
+    const color = eq.color || '#38bdf8';
+    const popupHtml = buildMapPopupHtml({
+      icon: '🌊',
+      title: 'Seismic Event',
+      source: data.source || 'USGS / EMSC',
+      badge: { text: `M${eq.magnitude.toFixed(1)}`, color },
+      primary: {
+        val: `M${eq.magnitude.toFixed(1)} ${eq.label || 'Earthquake'}`,
+        sub: eq.place || 'Regional Event',
+        secondary: formatTimeAgo(eq.time)
+      },
+      stats: [
+        { label: 'Depth', val: `${eq.depth} km` },
+        { label: 'Magnitude', val: eq.magnitude.toFixed(1), color },
+        { label: 'Location', val: eq.place || 'Regional' },
+        { label: 'Time', val: formatHour(eq.time) || 'Recent' }
+      ]
+    });
+
     const marker = new maplibregl.Marker({ element })
       .setLngLat([eq.lon, eq.lat])
-      .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
-        .setHTML(`<strong>🌊 M${eq.magnitude.toFixed(1)} ${escHtml(eq.label)}</strong><br>${escHtml(eq.place)}<br>Depth: ${eq.depth}km · ${formatTimeAgo(eq.time)}`))
+      .setPopup(createMapPopup(popupHtml))
       .addTo(state.map);
 
     marker._module = 'earthquake';
@@ -1075,10 +1521,26 @@ function renderNewsMapMarkers(newsData) {
     if (loc && typeof loc.lat === 'number' && typeof loc.lon === 'number') {
       const s = item.intensityScore || 5;
       const color = s >= 9 ? '#f87171' : s >= 7 ? '#fb923c' : '#fbbf24';
+      const sevLabel = s >= 9 ? 'CRITICAL' : (s >= 7 ? 'HIGH' : (s >= 5 ? 'MEDIUM' : 'LOW'));
+      const timeStr = item.publishedAt ? formatTimeAgo(item.publishedAt) : 'Recently';
+
+      const popupHtml = buildMapPopupHtml({
+        icon: '📰',
+        title: 'News Intelligence',
+        source: item.source || 'News Feed',
+        badge: { text: sevLabel, color },
+        description: item.title,
+        stats: [
+          { label: 'Location', val: loc.city },
+          { label: 'Threat Score', val: `${s}/10`, color },
+          { label: 'Published', val: timeStr },
+          { label: 'Category', val: (item.category || 'general').toUpperCase() }
+        ]
+      });
+
       const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 12, 2) })
         .setLngLat([loc.lon, loc.lat])
-        .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
-          .setHTML(`<strong>📰 ${escHtml(item.title)}</strong><br><span style="font-size:10px; color:#94a3b8">📍 ${escHtml(loc.city)} · Score: ${s}/10</span>`))
+        .setPopup(createMapPopup(popupHtml))
         .addTo(state.map);
 
       marker._module = 'news';
@@ -1088,24 +1550,59 @@ function renderNewsMapMarkers(newsData) {
   updateMapBadgeAndMeta();
 }
 
+function createWeatherMarkerElement(city, isActive = false, temp = null) {
+  const container = document.createElement('div');
+  container.className = `weather-marker-container ${isActive ? 'active' : ''}`;
+  container.dataset.cityId = city.id;
+  container.setAttribute('title', `Weather for ${city.name}`);
+
+  const icon = document.createElement('span');
+  icon.className = 'weather-marker-icon';
+  icon.textContent = '🌤';
+  container.appendChild(icon);
+
+  const name = document.createElement('span');
+  name.className = 'weather-marker-name';
+  name.textContent = city.name;
+  container.appendChild(name);
+
+  if (typeof temp === 'number') {
+    const tempEl = document.createElement('span');
+    tempEl.className = 'weather-marker-temp';
+    tempEl.textContent = `${temp}°`;
+    container.appendChild(tempEl);
+  }
+
+  container.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    selectWeatherCity(city.id, true);
+  });
+
+  return container;
+}
+
 function renderWeatherMapMarkers(weatherData) {
   if (!state.map || state.activeMapModule !== 'weather') return;
   clearMarkerList(moduleLayers.weather.markers);
 
-  const data = weatherData || state.data?.weather;
-  if (!data || !data.coordinates) {
-    updateMapBadgeAndMeta();
-    return;
-  }
+  const selectedId = state.selectedWeatherCityId;
 
-  const marker = new maplibregl.Marker({ element: createMapMarkerElement('#38bdf8', 14, 3) })
-    .setLngLat([data.coordinates.lon, data.coordinates.lat])
-    .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
-      .setHTML(`<strong>🌤 Weather Station</strong><br>${escHtml(data.city || data.location || 'Balkans')}<br>Temp: ${data.temperature}°C · ${escHtml(data.conditions || '')}`))
-    .addTo(state.map);
+  KOSOVO_WEATHER_CITIES.forEach(city => {
+    const isActive = (city.id === selectedId) && (state.weatherPopup !== null);
+    const cached = state.weatherCache?.[city.id]?.data;
+    const temp = cached?.current?.temp ?? (city.id === 'prishtine' && weatherData?.current?.temp ? weatherData.current.temp : null);
 
-  marker._module = 'weather';
-  moduleLayers.weather.markers.push(marker);
+    const el = createWeatherMarkerElement(city, isActive, temp);
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat([city.lon, city.lat])
+      .addTo(state.map);
+
+    marker._module = 'weather';
+    marker._cityId = city.id;
+    moduleLayers.weather.markers.push(marker);
+  });
+
   updateMapBadgeAndMeta();
 }
 
@@ -1121,10 +1618,27 @@ function renderAqiMapMarkers(aqiData) {
 
   const c = data.current;
   const color = c?.category?.color || '#34d399';
+  const popupHtml = buildMapPopupHtml({
+    icon: '🌍',
+    title: 'Air Quality Index',
+    source: data.source || 'Open-Meteo',
+    badge: { text: c?.category?.label || 'Good', color },
+    primary: {
+      val: `EAQI ${c?.europeanAQI ?? 'N/A'}`,
+      sub: c?.category?.label || 'Air Quality',
+      secondary: `Dominant: ${c?.dominantPollutant ? c.dominantPollutant.toUpperCase() : 'N/A'}`
+    },
+    stats: [
+      { label: 'PM2.5', val: c?.pollutants?.pm2_5 ? `${c.pollutants.pm2_5.value} µg/m³` : 'N/A' },
+      { label: 'PM10', val: c?.pollutants?.pm10 ? `${c.pollutants.pm10.value} µg/m³` : 'N/A' },
+      { label: 'NO2', val: c?.pollutants?.no2 ? `${c.pollutants.no2.value} µg/m³` : 'N/A' },
+      { label: 'O3', val: c?.pollutants?.o3 ? `${c.pollutants.o3.value} µg/m³` : 'N/A' }
+    ]
+  });
+
   const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 14, 3) })
     .setLngLat([data.coordinates.lon, data.coordinates.lat])
-    .setPopup(new maplibregl.Popup({ offset: 20, className: 'mapbox-popup' })
-      .setHTML(`<strong>🌍 Air Quality Index</strong><br>EAQI: <strong>${c?.europeanAQI ?? 'N/A'}</strong> (${escHtml(c?.category?.label || 'N/A')})<br>Dominant: ${escHtml(c?.dominantPollutant?.toUpperCase() || 'N/A')}`))
+    .setPopup(createMapPopup(popupHtml))
     .addTo(state.map);
 
   marker._module = 'aqi';
@@ -1161,9 +1675,9 @@ function renderWildfire(wildfireData) {
     list.innerHTML = `
       <div class="error-state wildfire-error-state">
         <div class="wildfire-state-title">NO LIVE FIRE DATA</div>
-        <div class="wildfire-state-desc">${escHtml(wildfireData.message || wildfireData.error || 'NASA FIRMS service is currently unavailable.')}</div>
+        <div class="wildfire-state-desc">${escHtml(wildfireData.message || wildfireData.error || 'NASA satellite fire services are currently unavailable.')}</div>
       </div>`;
-    if (meta) meta.textContent = 'NASA FIRMS · Service Unavailable';
+    if (meta) meta.textContent = `${(wildfireData.source || 'NASA SATELLITES').toUpperCase()} · UNAVAILABLE`;
     if (badge) badge.style.display = 'none';
     return;
   }
@@ -1172,6 +1686,9 @@ function renderWildfire(wildfireData) {
     typeof d.lat === 'number' && typeof d.lon === 'number' && !d.isDemo
   );
 
+  const sourceName = (wildfireData.source || 'NASA Satellite Network').toUpperCase();
+  const cachedLabel = wildfireData.isCached ? ' (CACHED)' : '';
+
   if (detections.length === 0 || wildfireData.status === 'NO_ACTIVE_FIRES') {
     list.innerHTML = `
       <div class="empty-state wildfire-empty-state">
@@ -1179,16 +1696,16 @@ function renderWildfire(wildfireData) {
         <div class="wildfire-state-title">NO ACTIVE FIRES</div>
         <div class="wildfire-state-desc">No thermal fire anomalies detected in the selected period (${escHtml(wildfireData.period || '24h')}).</div>
       </div>`;
-    if (meta) meta.textContent = 'NASA FIRMS · LIVE DATA (0 Detections)';
+    if (meta) meta.textContent = `${sourceName} · LIVE DATA (0 Detections)${cachedLabel}`;
     if (badge) badge.style.display = 'none';
     return;
   }
 
-  if (meta) meta.textContent = `NASA FIRMS · LIVE DATA (${detections.length} Detections)`;
+  if (meta) meta.textContent = `${sourceName} · LIVE DATA (${detections.length} Detections)${cachedLabel}`;
   if (badge) {
     badge.style.display = '';
-    badge.className = 'panel-badge badge-critical';
-    badge.textContent = `${detections.length} ACTIVE`;
+    badge.className = wildfireData.isCached ? 'panel-badge badge-warning' : 'panel-badge badge-critical';
+    badge.textContent = wildfireData.isCached ? `${detections.length} ACTIVE (CACHED)` : `${detections.length} ACTIVE`;
   }
 
   list.innerHTML = detections.map(d => {
@@ -1199,12 +1716,14 @@ function renderWildfire(wildfireData) {
     const date = d.acq_date ? formatDate(d.acq_date) : '';
     const bright = typeof d.brightness === 'number' && d.brightness > 0 ? `${d.brightness.toFixed(1)} K` : 'N/A';
     const frp = typeof d.frp === 'number' && d.frp > 0 ? `${d.frp.toFixed(1)} MW` : 'N/A';
+    const distText = d.distanceKm ? ` · ${d.distanceKm} km away` : '';
 
     return `<div class="wildfire-item severity-${confClass}">
       <div class="wildfire-header">
-        <span class="wildfire-confidence">${conf}% Conf</span>
+        <span class="wildfire-confidence">${conf}% Conf${distText}</span>
         <span class="wildfire-sat">${escHtml(sat)}</span>
       </div>
+      ${d.title ? `<div class="wildfire-event-title" style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">🔥 ${escHtml(d.title)}</div>` : ''}
       <div class="wildfire-coords">
         <span class="wildfire-lat">Lat: ${d.lat.toFixed(4)}</span>
         <span class="wildfire-lon">Lon: ${d.lon.toFixed(4)}</span>
@@ -1378,25 +1897,27 @@ function renderAviationMapMarkers(aviationData) {
     const typeStr = ac.aircraftDesc || ac.aircraftType || 'N/A';
     const callsignStr = ac.callsign || ac.icao24.toUpperCase();
 
-    const popupHtml = `
-      <div style="font-family:var(--font-sans); min-width:180px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <span style="font-weight:700; font-size:13px; font-family:var(--font-mono); color:var(--text-primary);">${escHtml(callsignStr)}</span>
-          <span style="font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; background:${catColor}20; color:${catColor}; border:1px solid ${catColor}40; text-transform:uppercase;">${escHtml(ac.category.replace('_', ' '))}</span>
-        </div>
-        <div style="font-size:10px; font-family:var(--font-mono); color:var(--text-dim); margin-bottom:6px;">ICAO: ${ac.icao24.toUpperCase()}${ac.registration ? ' · Reg: ' + escHtml(ac.registration) : ''}</div>
-        <div style="font-size:11px; display:grid; grid-template-columns:1fr 1fr; gap:4px; border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
-          <div><span style="color:var(--text-dim); font-size:9px;">ALT:</span> <strong>${altStr}</strong></div>
-          <div><span style="color:var(--text-dim); font-size:9px;">SPD:</span> <strong>${spdStr}</strong></div>
-          <div><span style="color:var(--text-dim); font-size:9px;">HDG:</span> <strong>${hdgStr}</strong></div>
-          <div><span style="color:var(--text-dim); font-size:9px;">TYPE:</span> <strong>${escHtml(typeStr)}</strong></div>
-        </div>
-      </div>
-    `;
+    const popupHtml = buildMapPopupHtml({
+      icon: '✈️',
+      title: callsignStr,
+      source: 'OpenSky Network',
+      badge: { text: ac.category.replace('_', ' '), color: catColor },
+      primary: {
+        val: callsignStr,
+        sub: `ICAO: ${ac.icao24.toUpperCase()}`,
+        secondary: ac.registration ? `Reg: ${ac.registration}` : (ac.operator || 'Operator Unknown')
+      },
+      stats: [
+        { label: 'Altitude', val: altStr },
+        { label: 'Speed', val: spdStr },
+        { label: 'Heading', val: hdgStr },
+        { label: 'Type', val: typeStr }
+      ]
+    });
 
     const marker = new maplibregl.Marker({ element: el })
       .setLngLat([ac.longitude, ac.latitude])
-      .setPopup(new maplibregl.Popup({ offset: 15, className: 'mapbox-popup' }).setHTML(popupHtml))
+      .setPopup(createMapPopup(popupHtml, { offset: 15 }))
       .addTo(state.map);
 
     marker._module = 'aviation';
@@ -1651,18 +2172,37 @@ function ensureMapVisible() {
 
 function toggleModule(panelId) {
   const overlay = $('moduleOverlay');
+
+  // Weather is purely map-based: toggle weather markers on map without overlay panel
+  if (panelId === 'weatherPanel') {
+    if (state.activeMapModule === 'weather') {
+      closeModulePanel();
+      return;
+    }
+    ensureMapVisible();
+    if (overlay) {
+      overlay.querySelectorAll('.overlay-panel').forEach(p => { p.style.display = 'none'; });
+      overlay.classList.remove('active');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    document.querySelectorAll('.module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === 'weatherPanel'));
+    setActiveMapModule('weather', state.data);
+    return;
+  }
+
   const panel = $(panelId);
   if (!panel) return;
 
   const panelToModule = {
     'newsPanel': 'news',
-    'weatherPanel': 'weather',
     'trafficPanel': 'traffic',
     'radiationPanel': 'radiation',
     'aqiPanel': 'aqi',
     'earthquakePanel': 'earthquake',
     'wildfirePanel': 'wildfire',
     'aviationPanel': 'aviation',
+    'telegramPanel': 'telegram',
+    'borderPanel': 'border',
     'cctvIntelligencePanel': 'cctv'
   };
 
@@ -1732,6 +2272,14 @@ function toggleModule(panelId) {
           .catch(err => {
             renderAviation({ status: 'UNAVAILABLE', error: err.message });
           });
+      }
+    } else if (targetModule === 'telegram') {
+      if (!state.telegramData) {
+        fetchTelegram();
+      }
+    } else if (targetModule === 'border') {
+      if (!state.borderData) {
+        fetchBorder();
       }
     }
   }
@@ -2007,20 +2555,25 @@ function initMap() {
     state.map.on('click', 'wildfire-layer', (e) => {
       if (e.features && e.features.length > 0) {
         const props = e.features[0].properties;
-        const popup = new maplibregl.Popup({ offset: 25, className: 'mapbox-popup' })
-          .setHTML(`
-            <strong>🔥 Live Fire Detection</strong><br>
-            <div style="font-size:11px; color:#94a3b8; margin-top:4px;">
-              Lat: ${Number(props.lat)?.toFixed(4)}<br>
-              Lon: ${Number(props.lon)?.toFixed(4)}<br>
-              Time: ${props.acq_date} ${props.acq_time ? formatHour(props.acq_time) : ''}<br>
-              Satellite: ${escHtml(props.satellite || 'NASA Satellite')}<br>
-              Confidence: ${props.confidence || '?'}%<br>
-              Brightness: ${(Number(props.brightness) || 0).toFixed(1)} K<br>
-              FRP: ${(Number(props.frp) || 0).toFixed(1)} MW
-            </div>
-          `);
-        popup.setLngLat(e.lngLat).addTo(state.map);
+        const popupHtml = buildMapPopupHtml({
+          icon: '🔥',
+          title: 'Wildfire Detection',
+          source: 'NASA FIRMS / EONET',
+          badge: { text: `${props.confidence || 'HIGH'}% CONF`, color: '#f87171' },
+          primary: {
+            val: `${(Number(props.frp) || 0).toFixed(1)} MW`,
+            sub: 'Fire Radiative Power (FRP)',
+            secondary: `Brightness: ${(Number(props.brightness) || 0).toFixed(1)} K`
+          },
+          stats: [
+            { label: 'Satellite', val: props.satellite || 'NASA VIIRS' },
+            { label: 'Confidence', val: `${props.confidence || '?'}%` },
+            { label: 'Acq. Date', val: props.acq_date || 'Live' },
+            { label: 'Acq. Time', val: props.acq_time ? formatHour(props.acq_time) : 'UTC' }
+          ],
+          footer: `COORDINATES: ${Number(props.lat)?.toFixed(4)}, ${Number(props.lon)?.toFixed(4)}`
+        });
+        openMapPopup(e.lngLat, popupHtml);
       }
     });
     
@@ -2034,16 +2587,23 @@ function initMap() {
     state.map.on('click', 'radiation-layer', (e) => {
       if (e.features && e.features.length > 0) {
         const props = e.features[0].properties;
-        const popup = new maplibregl.Popup({ offset: 25, className: 'mapbox-popup' })
-          .setHTML(`
-            <strong>☢️ Radiation Station</strong><br>
-            <div style="font-size:11px; color:#94a3b8">
-              Station: ${escHtml(props.name)}<br>
-              Radiation: ${props.usvh} µSv/h<br>
-              Status: ${escHtml(props.status)}
-            </div>
-          `);
-        popup.setLngLat(e.lngLat).addTo(state.map);
+        const color = { normal: '#34d399', elevated: '#fbbf24', high: '#fb923c', critical: '#f87171' }[props.status] || '#94a3b8';
+        const popupHtml = buildMapPopupHtml({
+          icon: '☢️',
+          title: props.name || 'Radiation Station',
+          source: 'EURDEP Sensor Network',
+          badge: { text: (props.status || 'NORMAL').toUpperCase(), color },
+          primary: {
+            val: `${props.usvh != null ? Number(props.usvh).toFixed(3) : 'N/A'} µSv/h`,
+            sub: 'Ambient Dose Rate'
+          },
+          stats: [
+            { label: 'Station', val: props.name },
+            { label: 'Status', val: (props.status || 'NORMAL').toUpperCase(), color },
+            { label: 'Radiation', val: `${props.usvh} µSv/h` }
+          ]
+        });
+        openMapPopup(e.lngLat, popupHtml);
       }
     });
     
@@ -2197,27 +2757,700 @@ function exportReport() {
   URL.revokeObjectURL(url);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   CENTRAL ALERT LOG & MULTI-MODULE AGGREGATOR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const ALERT_THRESHOLDS = {
+  news: {
+    criticalScore: 9, // intensityScore >= 9 -> CRITICAL
+    highScore: 7,     // intensityScore >= 7 or isSecurityIncident -> HIGH
+    mediumScore: 5    // intensityScore >= 5 (security/military/unrest) -> MEDIUM
+  },
+  weather: {
+    tempExtremeHigh: 38, // > 38°C -> HIGH
+    tempExtremeLow: -10, // < -10°C -> HIGH
+    windSevere: 60,      // > 60 km/h -> HIGH
+    windHigh: 45,        // > 45 km/h -> MEDIUM
+    severeTypes: ['THUNDERSTORM', 'EXTREME_WIND', 'BLIZZARD', 'HEAVY_STORM']
+  },
+  traffic: {
+    anomaly: true,       // anomalyDetected -> HIGH
+    severeCount: 3       // >= 3 incidents -> MEDIUM
+  },
+  radiation: {
+    criticalUsvh: 0.50,  // > 0.50 µSv/h -> CRITICAL
+    highUsvh: 0.30,      // > 0.30 µSv/h -> HIGH
+    elevatedUsvh: 0.20   // > 0.20 µSv/h -> MEDIUM
+  },
+  aqi: {
+    extremeEAQI: 100,    // EAQI > 100 -> CRITICAL
+    veryPoorEAQI: 80,    // EAQI > 80 or 'Very Poor' -> HIGH
+    poorEAQI: 60         // EAQI > 60 or 'Poor'/'Unhealthy' -> MEDIUM
+  },
+  seismic: {
+    criticalMag: 5.0,    // M >= 5.0 -> CRITICAL
+    highMag: 4.0,        // M >= 4.0 -> HIGH
+    mediumMag: 3.2,      // M >= 3.2 (< 300 km) -> MEDIUM
+    infoMag: 3.0         // M >= 3.0 -> INFO
+  },
+  wildfire: {
+    criticalDistKm: 100, // < 100 km from Kosovo -> CRITICAL
+    highDistKm: 250,     // < 250 km -> HIGH
+    mediumDistKm: 500,   // In Balkan region -> MEDIUM
+    minConfidence: 50    // Sat confidence >= 50%
+  },
+  border: {
+    criticalWaitMin: 180, // >= 180 min -> CRITICAL
+    highWaitMin: 60,      // >= 60 min or queue >= 500m -> HIGH
+    mediumWaitMin: 30,    // >= 30 min or queue >= 200m -> MEDIUM
+    queueHighMeters: 500,
+    queueMediumMeters: 200
+  },
+  telegram: {
+    criticalScore: 9,    // Threat score >= 9 -> CRITICAL
+    highScore: 7         // Threat score >= 7 or security alert -> HIGH
+  }
+};
+
+const SEVERITY_WEIGHT = {
+  'CRITICAL': 5,
+  'HIGH': 4,
+  'MEDIUM': 3,
+  'LOW': 2,
+  'INFO': 1
+};
+
+function genFrontendAlertId(module, key) {
+  const cleanKey = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 40);
+  return `alert-${module}-${cleanKey}`;
+}
+
+/**
+ * Aggregates alerts across all 10 intelligence modules from already available data
+ */
+function buildAlerts(statusData = state.data, borderData = state.borderData, telegramData = state.telegramData) {
+  const alerts = [];
+  const now = new Date().toISOString();
+  const location = statusData?.location || state.currentLocation || 'Kosovo';
+
+  // 1. NEWS
+  const news = statusData?.news;
+  if (news?.items && Array.isArray(news.items)) {
+    news.items.forEach(item => {
+      let severity = null;
+      if (item.intensityScore >= ALERT_THRESHOLDS.news.criticalScore || item.threatLevel === 'critical') {
+        severity = 'CRITICAL';
+      } else if (item.intensityScore >= ALERT_THRESHOLDS.news.highScore || item.isSecurityIncident) {
+        severity = 'HIGH';
+      } else if (item.intensityScore >= ALERT_THRESHOLDS.news.mediumScore && (item.category === 'security' || item.category === 'civil_unrest' || item.category === 'military' || item.category === 'border')) {
+        severity = 'MEDIUM';
+      }
+      if (severity) {
+        alerts.push({
+          id: genFrontendAlertId('news', item.url || item.title),
+          module: 'news',
+          panelId: 'newsPanel',
+          type: 'SECURITY_EVENT',
+          severity,
+          title: item.title,
+          message: item.description || item.title,
+          timestamp: item.publishedAt || now,
+          source: item.source || 'News Intelligence',
+          sourceUrl: item.url || '#',
+          location,
+          value: item.intensityScore,
+          threshold: `score >= ${severity === 'CRITICAL' ? 9 : severity === 'HIGH' ? 7 : 5}`,
+          isCached: false
+        });
+      }
+    });
+  }
+
+  // 2. WEATHER
+  const weather = statusData?.weather;
+  if (weather && weather.status !== 'UNAVAILABLE') {
+    if (weather.alerts && Array.isArray(weather.alerts)) {
+      weather.alerts.forEach(a => {
+        const severity = (a.severity === 'high' || ALERT_THRESHOLDS.weather.severeTypes.includes(a.type)) ? 'HIGH' : 'MEDIUM';
+        alerts.push({
+          id: genFrontendAlertId('weather', a.type),
+          module: 'weather',
+          panelId: 'weatherPanel',
+          type: 'WEATHER_ALERT',
+          severity,
+          title: `Weather Alert: ${a.type.replace(/_/g, ' ')}`,
+          message: a.message || a.description || 'Severe weather condition reported',
+          timestamp: now,
+          source: weather.source || 'Open-Meteo',
+          location,
+          isCached: Boolean(weather.isCached)
+        });
+      });
+    }
+
+    if (weather.current) {
+      const { temp, windSpeed } = weather.current;
+      if (typeof temp === 'number' && temp >= ALERT_THRESHOLDS.weather.tempExtremeHigh) {
+        alerts.push({
+          id: genFrontendAlertId('weather', 'extreme_heat'),
+          module: 'weather',
+          panelId: 'weatherPanel',
+          type: 'EXTREME_HEAT',
+          severity: 'HIGH',
+          title: `Extreme Heat Warning (${temp}°C)`,
+          message: `${temp}°C recorded in ${location} — heat advisory`,
+          timestamp: now,
+          source: weather.source || 'Open-Meteo',
+          location,
+          value: temp,
+          threshold: `>= ${ALERT_THRESHOLDS.weather.tempExtremeHigh}°C`,
+          isCached: Boolean(weather.isCached)
+        });
+      } else if (typeof temp === 'number' && temp <= ALERT_THRESHOLDS.weather.tempExtremeLow) {
+        alerts.push({
+          id: genFrontendAlertId('weather', 'extreme_freeze'),
+          module: 'weather',
+          panelId: 'weatherPanel',
+          type: 'EXTREME_FREEZE',
+          severity: 'HIGH',
+          title: `Extreme Freeze Warning (${temp}°C)`,
+          message: `${temp}°C recorded in ${location} — frost/freeze advisory`,
+          timestamp: now,
+          source: weather.source || 'Open-Meteo',
+          location,
+          value: temp,
+          threshold: `<= ${ALERT_THRESHOLDS.weather.tempExtremeLow}°C`,
+          isCached: Boolean(weather.isCached)
+        });
+      }
+
+      if (typeof windSpeed === 'number' && windSpeed >= ALERT_THRESHOLDS.weather.windSevere) {
+        alerts.push({
+          id: genFrontendAlertId('weather', 'gale_wind'),
+          module: 'weather',
+          panelId: 'weatherPanel',
+          type: 'SEVERE_WIND',
+          severity: 'HIGH',
+          title: `Severe Gale Wind Alert (${windSpeed} km/h)`,
+          message: `Strong wind gusts up to ${windSpeed} km/h detected in area`,
+          timestamp: now,
+          source: weather.source || 'Open-Meteo',
+          location,
+          value: windSpeed,
+          threshold: `>= ${ALERT_THRESHOLDS.weather.windSevere} km/h`,
+          isCached: Boolean(weather.isCached)
+        });
+      }
+    }
+  }
+
+  // 3. TRAFFIC
+  const traffic = statusData?.traffic;
+  if (traffic && traffic.status !== 'UNAVAILABLE') {
+    if (traffic.anomalyDetected) {
+      alerts.push({
+        id: genFrontendAlertId('traffic', 'anomaly'),
+        module: 'traffic',
+        panelId: 'trafficPanel',
+        type: 'TRAFFIC_ANOMALY',
+        severity: 'HIGH',
+        title: `Traffic Anomaly: ${traffic.anomalyType || 'Disruption'}`,
+        message: traffic.anomalySummary || 'Abnormal movement or corridor closure detected',
+        timestamp: now,
+        source: traffic.source || 'Traffic Intelligence',
+        location,
+        isCached: Boolean(traffic.isCached)
+      });
+    } else if (traffic.incidents && traffic.incidents.length >= ALERT_THRESHOLDS.traffic.severeCount) {
+      alerts.push({
+        id: genFrontendAlertId('traffic', 'multiple_incidents'),
+        module: 'traffic',
+        panelId: 'trafficPanel',
+        type: 'TRAFFIC_CONGESTION',
+        severity: 'MEDIUM',
+        title: 'Multiple Road Incidents',
+        message: `${traffic.incidents.length} traffic disruptions reported across key corridors`,
+        timestamp: now,
+        source: traffic.source || 'Traffic Intelligence',
+        location,
+        value: traffic.incidents.length,
+        threshold: `>= ${ALERT_THRESHOLDS.traffic.severeCount} incidents`,
+        isCached: Boolean(traffic.isCached)
+      });
+    }
+  }
+
+  // 4. RADIATION
+  const radiation = statusData?.radiation;
+  if (radiation?.primary && radiation.status !== 'UNAVAILABLE') {
+    const s = radiation.primary.status;
+    const usvh = typeof radiation.primary.usvh === 'number' ? radiation.primary.usvh : 0;
+    if (s === 'critical' || usvh >= ALERT_THRESHOLDS.radiation.criticalUsvh) {
+      alerts.push({
+        id: genFrontendAlertId('radiation', 'primary_critical'),
+        module: 'radiation',
+        panelId: 'radiationPanel',
+        type: 'RADIATION_CRITICAL',
+        severity: 'CRITICAL',
+        title: 'CRITICAL Radiation Level',
+        message: `${usvh} µSv/h detected at ${radiation.primary.sensorName || 'Station'} — immediate attention required`,
+        timestamp: now,
+        source: radiation.source || 'EURDEP',
+        location: radiation.primary.sensorName || location,
+        coordinates: { lat: radiation.primary.lat, lon: radiation.primary.lon },
+        value: usvh,
+        threshold: `>= ${ALERT_THRESHOLDS.radiation.criticalUsvh} µSv/h`,
+        isCached: Boolean(radiation.isCached)
+      });
+    } else if (s === 'high' || usvh >= ALERT_THRESHOLDS.radiation.highUsvh) {
+      alerts.push({
+        id: genFrontendAlertId('radiation', 'primary_high'),
+        module: 'radiation',
+        panelId: 'radiationPanel',
+        type: 'RADIATION_HIGH',
+        severity: 'HIGH',
+        title: 'High Radiation Level',
+        message: `${usvh} µSv/h detected at ${radiation.primary.sensorName || 'Station'} — above alert threshold`,
+        timestamp: now,
+        source: radiation.source || 'EURDEP',
+        location: radiation.primary.sensorName || location,
+        coordinates: { lat: radiation.primary.lat, lon: radiation.primary.lon },
+        value: usvh,
+        threshold: `>= ${ALERT_THRESHOLDS.radiation.highUsvh} µSv/h`,
+        isCached: Boolean(radiation.isCached)
+      });
+    } else if (s === 'elevated' || usvh >= ALERT_THRESHOLDS.radiation.elevatedUsvh) {
+      alerts.push({
+        id: genFrontendAlertId('radiation', 'primary_elevated'),
+        module: 'radiation',
+        panelId: 'radiationPanel',
+        type: 'RADIATION_ELEVATED',
+        severity: 'MEDIUM',
+        title: 'Elevated Radiation Level',
+        message: `${usvh} µSv/h detected at ${radiation.primary.sensorName || 'Station'} — monitoring advised`,
+        timestamp: now,
+        source: radiation.source || 'EURDEP',
+        location: radiation.primary.sensorName || location,
+        coordinates: { lat: radiation.primary.lat, lon: radiation.primary.lon },
+        value: usvh,
+        threshold: `>= ${ALERT_THRESHOLDS.radiation.elevatedUsvh} µSv/h`,
+        isCached: Boolean(radiation.isCached)
+      });
+    }
+
+    (radiation.neighbors || []).forEach(n => {
+      const nUsvh = typeof n.usvh === 'number' ? n.usvh : 0;
+      if (n.status === 'critical' || nUsvh >= ALERT_THRESHOLDS.radiation.criticalUsvh) {
+        alerts.push({
+          id: genFrontendAlertId('radiation', `neighbor_${n.name}_critical`),
+          module: 'radiation',
+          panelId: 'radiationPanel',
+          type: 'RADIATION_REGIONAL',
+          severity: 'CRITICAL',
+          title: `Regional CRITICAL Radiation — ${n.name}`,
+          message: `${n.name} sensor: ${nUsvh} µSv/h`,
+          timestamp: now,
+          source: radiation.source || 'EURDEP',
+          location: n.name,
+          coordinates: { lat: n.lat, lon: n.lon },
+          value: nUsvh,
+          isCached: Boolean(radiation.isCached)
+        });
+      } else if (n.status === 'high' || nUsvh >= ALERT_THRESHOLDS.radiation.highUsvh) {
+        alerts.push({
+          id: genFrontendAlertId('radiation', `neighbor_${n.name}_high`),
+          module: 'radiation',
+          panelId: 'radiationPanel',
+          type: 'RADIATION_REGIONAL',
+          severity: 'HIGH',
+          title: `Regional High Radiation — ${n.name}`,
+          message: `${n.name} sensor: ${nUsvh} µSv/h`,
+          timestamp: now,
+          source: radiation.source || 'EURDEP',
+          location: n.name,
+          coordinates: { lat: n.lat, lon: n.lon },
+          value: nUsvh,
+          isCached: Boolean(radiation.isCached)
+        });
+      }
+    });
+  }
+
+  // 5. AQI
+  const aqi = statusData?.aqi;
+  if (aqi?.current && aqi.status !== 'UNAVAILABLE') {
+    const eaqi = typeof aqi.current.eaqi === 'number' ? aqi.current.eaqi : 0;
+    const pm25 = aqi.current.pm25;
+    const pm10 = aqi.current.pm10;
+    const label = aqi.current.label || '';
+
+    if (eaqi >= ALERT_THRESHOLDS.aqi.extremeEAQI || label === 'Hazardous' || label === 'Extreme') {
+      alerts.push({
+        id: genFrontendAlertId('aqi', 'hazardous'),
+        module: 'aqi',
+        panelId: 'aqiPanel',
+        type: 'AIR_QUALITY_CRITICAL',
+        severity: 'CRITICAL',
+        title: `Hazardous Air Quality (EAQI ${eaqi})`,
+        message: `PM2.5: ${pm25} µg/m³ · PM10: ${pm10} µg/m³ · Hazardous health alert`,
+        timestamp: now,
+        source: aqi.source || 'Open-Meteo AQI',
+        location,
+        value: eaqi,
+        threshold: `>= ${ALERT_THRESHOLDS.aqi.extremeEAQI}`,
+        isCached: Boolean(aqi.isCached)
+      });
+    } else if (eaqi >= ALERT_THRESHOLDS.aqi.veryPoorEAQI || label === 'Very Poor' || label === 'Very Unhealthy') {
+      alerts.push({
+        id: genFrontendAlertId('aqi', 'very_poor'),
+        module: 'aqi',
+        panelId: 'aqiPanel',
+        type: 'AIR_QUALITY_HIGH',
+        severity: 'HIGH',
+        title: `Very Poor Air Quality (EAQI ${eaqi})`,
+        message: `PM2.5: ${pm25} µg/m³ · Respiratory precautions recommended`,
+        timestamp: now,
+        source: aqi.source || 'Open-Meteo AQI',
+        location,
+        value: eaqi,
+        threshold: `>= ${ALERT_THRESHOLDS.aqi.veryPoorEAQI}`,
+        isCached: Boolean(aqi.isCached)
+      });
+    } else if (eaqi >= ALERT_THRESHOLDS.aqi.poorEAQI || label === 'Poor' || label === 'Unhealthy') {
+      alerts.push({
+        id: genFrontendAlertId('aqi', 'poor'),
+        module: 'aqi',
+        panelId: 'aqiPanel',
+        type: 'AIR_QUALITY_MEDIUM',
+        severity: 'MEDIUM',
+        title: `Unhealthy Air Quality (EAQI ${eaqi})`,
+        message: `PM2.5: ${pm25} µg/m³ · Sensitive groups should limit outdoor exertion`,
+        timestamp: now,
+        source: aqi.source || 'Open-Meteo AQI',
+        location,
+        value: eaqi,
+        threshold: `>= ${ALERT_THRESHOLDS.aqi.poorEAQI}`,
+        isCached: Boolean(aqi.isCached)
+      });
+    }
+  }
+
+  // 6. SEISMIC (Earthquakes)
+  const earthquakes = statusData?.earthquakes;
+  if (earthquakes?.events && Array.isArray(earthquakes.events) && earthquakes.status !== 'UNAVAILABLE') {
+    earthquakes.events.forEach(ev => {
+      const mag = typeof ev.mag === 'number' ? ev.mag : 0;
+      if (mag >= ALERT_THRESHOLDS.seismic.infoMag) {
+        let severity = 'INFO';
+        if (mag >= ALERT_THRESHOLDS.seismic.criticalMag) severity = 'CRITICAL';
+        else if (mag >= ALERT_THRESHOLDS.seismic.highMag) severity = 'HIGH';
+        else if (mag >= ALERT_THRESHOLDS.seismic.mediumMag) severity = 'MEDIUM';
+
+        alerts.push({
+          id: genFrontendAlertId('earthquake', ev.id || `${ev.lat}_${ev.lon}_${mag}`),
+          module: 'earthquake',
+          panelId: 'earthquakePanel',
+          type: 'SEISMIC_EVENT',
+          severity,
+          title: `M${mag.toFixed(1)} Earthquake · ${ev.place || 'Regional Event'}`,
+          message: `Depth ${ev.depth || 10}km${ev.distanceKm ? ` · ${ev.distanceKm} km from Kosovo` : ''}`,
+          timestamp: ev.time ? new Date(ev.time).toISOString() : now,
+          source: earthquakes.source || 'USGS / EMSC',
+          location: ev.place || 'Balkans',
+          coordinates: { lat: ev.lat, lon: ev.lon },
+          value: mag,
+          threshold: `>= M${ALERT_THRESHOLDS.seismic.infoMag}`,
+          isCached: Boolean(earthquakes.isCached)
+        });
+      }
+    });
+  }
+
+  // 7. WILDFIRE (only on real satellite detections)
+  const wildfire = statusData?.wildfire;
+  if (wildfire?.detections && Array.isArray(wildfire.detections) && wildfire.status === 'LIVE_DATA') {
+    wildfire.detections.forEach(d => {
+      const conf = typeof d.confidence === 'number' ? d.confidence : 50;
+      const dist = typeof d.distanceKm === 'number' ? d.distanceKm : 999;
+      if (conf >= ALERT_THRESHOLDS.wildfire.minConfidence) {
+        let severity = 'MEDIUM';
+        if (dist <= ALERT_THRESHOLDS.wildfire.criticalDistKm) severity = 'CRITICAL';
+        else if (dist <= ALERT_THRESHOLDS.wildfire.highDistKm) severity = 'HIGH';
+
+        const distText = dist < 999 ? `${dist} km from Kosovo` : 'Balkan region';
+        alerts.push({
+          id: genFrontendAlertId('wildfire', d.id || `${d.lat}_${d.lon}`),
+          module: 'wildfire',
+          panelId: 'wildfirePanel',
+          type: 'WILDFIRE_DETECTION',
+          severity,
+          title: dist <= ALERT_THRESHOLDS.wildfire.criticalDistKm ? `Proximate Wildfire (${distText})` : `Wildfire Detected (${distText})`,
+          message: `${d.title || 'Thermal anomaly'} · Sat: ${d.satellite || 'VIIRS/MODIS'} · ${conf}% Conf`,
+          timestamp: d.acq_date ? `${d.acq_date}T${(d.acq_time || '1200').padStart(4, '0').slice(0, 2)}:${(d.acq_time || '1200').padStart(4, '0').slice(2, 4)}:00Z` : now,
+          source: wildfire.source || 'NASA Satellites',
+          sourceUrl: d.sourceUrl || wildfire.sourceUrl || '#',
+          location: d.title || `Lat: ${d.lat.toFixed(2)}, Lon: ${d.lon.toFixed(2)}`,
+          coordinates: { lat: d.lat, lon: d.lon },
+          value: conf,
+          isCached: Boolean(wildfire.isCached || d.isCached)
+        });
+      }
+    });
+  }
+
+  // 8. BORDER CROSSINGS
+  const borders = borderData || statusData?.borders;
+  if (borders?.crossings && Array.isArray(borders.crossings) && borders.status !== 'UNAVAILABLE') {
+    borders.crossings.forEach(c => {
+      const entryWait = c.entryWaitMin || 0;
+      const exitWait = c.exitWaitMin || 0;
+      const entryQ = c.entryQueueMeters || (c.entryCars ? c.entryCars * 8 : 0);
+      const exitQ = c.exitQueueMeters || (c.exitCars ? c.exitCars * 8 : 0);
+      const maxWait = Math.max(entryWait, exitWait);
+      const maxQ = Math.max(entryQ, exitQ);
+
+      if (maxWait >= ALERT_THRESHOLDS.border.mediumWaitMin || maxQ >= ALERT_THRESHOLDS.border.queueMediumMeters) {
+        let severity = 'MEDIUM';
+        if (maxWait >= ALERT_THRESHOLDS.border.criticalWaitMin) severity = 'CRITICAL';
+        else if (maxWait >= ALERT_THRESHOLDS.border.highWaitMin || maxQ >= ALERT_THRESHOLDS.border.queueHighMeters) severity = 'HIGH';
+
+        const dir = entryWait >= exitWait ? 'ENTRY' : 'EXIT';
+        const waitVal = dir === 'ENTRY' ? entryWait : exitWait;
+        const qVal = dir === 'ENTRY' ? entryQ : exitQ;
+        const carsVal = dir === 'ENTRY' ? c.entryCars : c.exitCars;
+        const qStr = qVal > 0 ? `Queue: ${qVal}m` : (carsVal ? `Queue: ${carsVal} vehicles` : 'Heavy congestion');
+
+        alerts.push({
+          id: genFrontendAlertId('border', `${c.id || c.name}_${dir.toLowerCase()}`),
+          module: 'border',
+          panelId: 'borderPanel',
+          type: 'BORDER_DELAY',
+          severity,
+          title: `${c.name} ${dir} · ${waitVal} min wait`,
+          message: `${qStr} · Severe delay at border crossing point`,
+          timestamp: borders.updatedAt || now,
+          source: borders.source || 'Border Monitor (Nakordoni/QKMK)',
+          location: c.name,
+          coordinates: { lat: c.lat, lon: c.lon },
+          value: waitVal,
+          threshold: `>= ${ALERT_THRESHOLDS.border.mediumWaitMin} min`,
+          isCached: Boolean(borders.isCached || c.isCached)
+        });
+      }
+    });
+  }
+
+  // 9. TELEGRAM
+  const telegram = telegramData || statusData?.telegram;
+  if (telegram?.posts && Array.isArray(telegram.posts) && telegram.status !== 'UNAVAILABLE') {
+    telegram.posts.forEach(p => {
+      const score = typeof p.threatScore === 'number' ? p.threatScore : 0;
+      if (score >= ALERT_THRESHOLDS.telegram.highScore || p.isSecurityAlert) {
+        const severity = score >= ALERT_THRESHOLDS.telegram.criticalScore ? 'CRITICAL' : 'HIGH';
+        alerts.push({
+          id: genFrontendAlertId('telegram', `${p.channel}_${p.id}`),
+          module: 'telegram',
+          panelId: 'telegramPanel',
+          type: 'TELEGRAM_INTEL',
+          severity,
+          title: `[Telegram @${p.channel}] Intelligence Alert`,
+          message: p.text ? p.text.slice(0, 140) : 'Security-relevant channel publication',
+          timestamp: p.date ? new Date(p.date * 1000).toISOString() : now,
+          source: `@${p.channel} (Telegram)`,
+          location,
+          value: score,
+          threshold: `>= ${ALERT_THRESHOLDS.telegram.highScore}`,
+          isCached: Boolean(telegram.isCached)
+        });
+      }
+    });
+  }
+
+  // 10. AVIATION
+  const aviation = statusData?.aviation;
+  if (aviation && aviation.status !== 'UNAVAILABLE') {
+    if (aviation.anomalyDetected) {
+      alerts.push({
+        id: genFrontendAlertId('aviation', 'anomaly'),
+        module: 'aviation',
+        panelId: 'aviationPanel',
+        type: 'AVIATION_ANOMALY',
+        severity: 'HIGH',
+        title: 'Aviation Anomaly / Squawk Detected',
+        message: aviation.anomalySummary || 'Unusual flight pattern or emergency transponder detected',
+        timestamp: now,
+        source: aviation.source || 'ADS-B Network',
+        location,
+        isCached: Boolean(aviation.isCached)
+      });
+    }
+  }
+
+  return alerts;
+}
+
+/**
+ * Main entrypoint for accumulating, deduplicating, sorting and rendering alerts
+ */
+function aggregateAndRenderAlerts(statusData = state.data, borderData = state.borderData, telegramData = state.telegramData) {
+  if (!state.alertStore) {
+    state.alertStore = new Map();
+  }
+
+  const freshAlerts = buildAlerts(statusData, borderData, telegramData);
+
+  // Merge into state.alertStore with deduplication & stability
+  freshAlerts.forEach(a => {
+    if (state.alertStore.has(a.id)) {
+      const existing = state.alertStore.get(a.id);
+      const shouldUnread = (SEVERITY_WEIGHT[a.severity] || 0) > (SEVERITY_WEIGHT[existing.severity] || 0);
+      state.alertStore.set(a.id, {
+        ...existing,
+        ...a,
+        read: shouldUnread ? false : existing.read,
+        timestamp: a.timestamp || existing.timestamp
+      });
+    } else {
+      state.alertStore.set(a.id, {
+        ...a,
+        read: false
+      });
+    }
+  });
+
+  // Convert to array and sort by severity descending, then timestamp descending
+  const allAlerts = Array.from(state.alertStore.values());
+  allAlerts.sort((a, b) => {
+    const sDiff = (SEVERITY_WEIGHT[b.severity] || 0) - (SEVERITY_WEIGHT[a.severity] || 0);
+    if (sDiff !== 0) return sDiff;
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
+
+  // Cap alerts list at 40
+  const cappedAlerts = allAlerts.slice(0, 40);
+  state.alertStore = new Map(cappedAlerts.map(a => [a.id, a]));
+
+  renderAlertLog(cappedAlerts);
+}
+
+function renderAlertLog(alerts = []) {
+  const log = $('alertLog');
+  const badge = $('unreadBadge');
+  if (!log) return;
+
+  const unreadCount = alerts.filter(a => !a.read).length;
+  if (badge) {
+    if (unreadCount > 0) {
+      badge.textContent = unreadCount;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (!alerts || alerts.length === 0) {
+    log.innerHTML = '<div class="empty-state">No active alerts · All systems normal</div>';
+    return;
+  }
+
+  log.innerHTML = alerts.map(a => {
+    const sev = (a.severity || 'INFO').toUpperCase();
+    const sevClass = sev.toLowerCase();
+    const isUnread = !a.read;
+    const timeAgo = formatTimeAgo(a.timestamp);
+    const cachedTag = a.isCached ? '<span class="alert-cached-tag">CACHED</span>' : '';
+    const moduleName = (a.module || 'SYSTEM').toUpperCase();
+
+    return `
+      <div class="alert-log-item severity-${sevClass} ${isUnread ? 'unread' : ''}" 
+           onclick="handleAlertClick('${escHtml(a.id)}')" 
+           title="Click to open ${escHtml(moduleName)} module">
+        <div class="alert-log-header">
+          <span class="alert-sev-tag sev-${sevClass}">[${sev}]</span>
+          <span class="alert-module-tag">${escHtml(moduleName)}</span>
+          ${cachedTag}
+          <span class="alert-log-time">${escHtml(timeAgo)}</span>
+        </div>
+        <div class="alert-log-title">${escHtml(a.title)}</div>
+        ${a.message && a.message !== a.title ? `<div class="alert-log-msg">${escHtml(a.message)}</div>` : ''}
+        <div class="alert-log-footer">
+          <span class="alert-log-source">${escHtml(a.source || '')}</span>
+          <span class="alert-log-nav">→ ${escHtml(moduleName)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function handleAlertClick(alertId) {
+  if (!state.alertStore || !state.alertStore.has(alertId)) return;
+  const alert = state.alertStore.get(alertId);
+  
+  // Mark clicked alert as read
+  alert.read = true;
+  state.alertStore.set(alertId, alert);
+  renderAlertLog(Array.from(state.alertStore.values()));
+
+  // Focus map on coordinates if available
+  if (alert.coordinates && typeof alert.coordinates.lat === 'number' && typeof alert.coordinates.lon === 'number' && state.map) {
+    try {
+      state.map.flyTo({
+        center: [alert.coordinates.lon, alert.coordinates.lat],
+        zoom: 10,
+        essential: true
+      });
+    } catch (e) {}
+  }
+
+  // Open corresponding module panel
+  if (alert.panelId) {
+    if (state.activeModule !== alert.panelId) {
+      toggleModule(alert.panelId);
+    }
+  }
+}
+
 async function loadAlertHistory() {
   try {
-    const { alerts, unreadCount } = await fetch('/api/alerts').then(r => r.json());
-    const badge = $('unreadBadge');
-    if (unreadCount > 0) { badge.textContent = unreadCount; badge.style.display = ''; }
-    else badge.style.display = 'none';
-    const log = $('alertLog');
-    if (!alerts.length) { log.innerHTML = '<div class="empty-state">No alerts yet</div>'; return; }
-    log.innerHTML = alerts.slice(0,20).map(a => {
-      const url = isValidArticleUrl(a.url) ? a.url.trim() : '';
-      const item = `<div class="alert-log-item severity-${a.severity} ${!a.read?'unread':''}" title="${escHtml(a.message||'')}">
-        <div class="alert-log-title">${escHtml(a.title)}</div>
-        <div class="alert-log-time">${formatTimeAgo(a.timestamp)}</div>
-      </div>`;
-      return url ? `<a class="alert-log-link" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${item}</a>` : item;
-    }).join('');
-  } catch {}
+    const { alerts } = await fetch('/api/alerts').then(r => r.json());
+    if (Array.isArray(alerts) && alerts.length > 0) {
+      if (!state.alertStore) state.alertStore = new Map();
+      alerts.forEach(a => {
+        const mod = a.module || a.category || 'news';
+        const normAlert = {
+          id: a.id || `alert-legacy-${Math.random().toString(36).slice(2)}`,
+          module: mod,
+          panelId: a.panelId || `${mod}Panel`,
+          type: a.type || 'SYSTEM_ALERT',
+          severity: (a.severity || 'INFO').toUpperCase(),
+          title: a.title,
+          message: a.message || a.title,
+          timestamp: a.timestamp || new Date().toISOString(),
+          source: a.source || 'Alert Log',
+          sourceUrl: a.sourceUrl || a.url || '#',
+          location: a.location || 'Kosovo',
+          read: Boolean(a.read),
+          isCached: Boolean(a.isCached)
+        };
+        if (!state.alertStore.has(normAlert.id)) {
+          state.alertStore.set(normAlert.id, normAlert);
+        }
+      });
+    }
+  } catch (e) {}
+  aggregateAndRenderAlerts();
 }
+
 async function markAllRead() {
+  if (state.alertStore) {
+    for (const [id, a] of state.alertStore.entries()) {
+      a.read = true;
+      state.alertStore.set(id, a);
+    }
+    renderAlertLog(Array.from(state.alertStore.values()));
+  }
   await fetch('/api/alerts/read', { method: 'POST' }).catch(() => {});
-  loadAlertHistory();
 }
 
 async function loadLocationHistory() {
@@ -2261,6 +3494,567 @@ function weatherIcon(code) {
   if (code<=67) return '🌧️'; if (code<=77) return '🌨️'; if (code<=82) return '🌦️'; if (code<=99) return '⛈️'; return '🌤️';
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   TELEGRAM FEED MODULE (Read-Only Public Feed)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+async function fetchTelegram(forceRefresh = false) {
+  try {
+    const url = `/api/telegram${forceRefresh ? '?forceRefresh=true' : ''}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    state.telegramData = data;
+    renderTelegram(data);
+    aggregateAndRenderAlerts(state.data, state.borderData, data);
+    return data;
+  } catch (err) {
+    console.warn('[telegram] Fetch error:', err.message);
+    const errData = {
+      skill: 'telegram-monitor',
+      status: 'UNAVAILABLE',
+      source: 'Telegram Official API',
+      updatedAt: new Date().toISOString(),
+      channels: ['koridorsrb', 'srpskinat', 'istokinfo'],
+      count: 0,
+      posts: [],
+      error: err.message || 'Failed to connect to Telegram feed'
+    };
+    state.telegramData = errData;
+    renderTelegram(errData);
+    return errData;
+  }
+}
+
+function filterTelegram(channel, btn) {
+  state.telegramFilter = channel || 'all';
+  const filterRow = $('telegramFilterRow');
+  if (filterRow) {
+    filterRow.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  }
+  if (btn) {
+    btn.classList.add('active');
+  }
+  renderTelegram(state.telegramData);
+}
+
+function renderTelegram(telegramData) {
+  const list = $('telegramList');
+  const meta = $('telegramMeta');
+  const badge = $('telegramBadge');
+  const summaryText = $('telegramSummaryText');
+
+  if (!list) return;
+
+  if (!telegramData) {
+    list.innerHTML = '<div class="empty-state">Loading Telegram public feed...</div>';
+    if (meta) meta.textContent = 'OFFICIAL API · READ-ONLY';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+
+  // 1. NOT CONFIGURED State
+  if (telegramData.status === 'NOT_CONFIGURED') {
+    list.innerHTML = `
+      <div class="empty-state telegram-state-card not-configured">
+        <div class="state-icon">📱</div>
+        <div class="state-title">TELEGRAM API NOT CONFIGURED</div>
+        <div class="state-desc">${escHtml(telegramData.message || 'Set TELEGRAM_API_ID & TELEGRAM_API_HASH (or TELEGRAM_BOT_TOKEN) in your environment.')}</div>
+        <div class="telegram-config-hint">
+          <code>TELEGRAM_API_ID=...</code><br/>
+          <code>TELEGRAM_API_HASH=...</code><br/>
+          <code>TELEGRAM_CHANNELS=koridorsrb,srpskinat,istokinfo</code>
+        </div>
+      </div>`;
+    if (meta) meta.textContent = 'NOT CONFIGURED';
+    if (badge) badge.style.display = 'none';
+    if (summaryText) summaryText.textContent = 'CREDENTIALS REQUIRED (ENV)';
+    return;
+  }
+
+  // 2. UNAVAILABLE State
+  if (telegramData.status === 'UNAVAILABLE' || telegramData.error) {
+    list.innerHTML = `
+      <div class="error-state telegram-state-card unavailable">
+        <div class="state-icon">⚠️</div>
+        <div class="state-title">TELEGRAM FEED UNAVAILABLE</div>
+        <div class="state-desc">${escHtml(telegramData.message || telegramData.error || 'Unable to reach Telegram official services.')}</div>
+      </div>`;
+    if (meta) meta.textContent = 'UNAVAILABLE';
+    if (badge) badge.style.display = 'none';
+    if (summaryText) summaryText.textContent = 'SERVICE UNREACHABLE';
+    return;
+  }
+
+  // 3. INVALID_DATA State
+  if (telegramData.status === 'INVALID_DATA') {
+    list.innerHTML = `
+      <div class="error-state telegram-state-card invalid">
+        <div class="state-icon">❌</div>
+        <div class="state-title">INVALID CHANNEL DATA</div>
+        <div class="state-desc">${escHtml(telegramData.message || telegramData.error || 'Configured channels could not be resolved.')}</div>
+      </div>`;
+    if (meta) meta.textContent = 'INVALID DATA';
+    if (badge) badge.style.display = 'none';
+    if (summaryText) summaryText.textContent = 'CHANNEL ERROR';
+    return;
+  }
+
+  const posts = Array.isArray(telegramData.posts) ? telegramData.posts : [];
+  const currentFilter = state.telegramFilter || 'all';
+
+  const filtered = posts.filter(p => {
+    if (currentFilter === 'all') return true;
+    const ch = (p.channelUsername || p.channel || '').replace(/^@/, '').toLowerCase();
+    return ch === currentFilter.toLowerCase();
+  });
+
+  if (meta) {
+    meta.textContent = `LIVE · ${formatTimeAgo(telegramData.updatedAt)}`;
+  }
+
+  if (badge) {
+    if (posts.length > 0) {
+      badge.style.display = '';
+      badge.className = 'panel-badge badge-primary';
+      badge.textContent = `${posts.length} POSTS`;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (summaryText) {
+    const chList = (telegramData.channels || ['koridorsrb', 'srpskinat', 'istokinfo']).map(c => `@${c.replace(/^@/, '')}`).join(' · ');
+    summaryText.textContent = `PUBLIC CHANNELS: ${chList}`;
+  }
+
+  // 4. NO_POSTS State (or filter empty)
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state telegram-state-card">
+        <div class="state-icon">📭</div>
+        <div class="state-title">NO POSTS FOUND</div>
+        <div class="state-desc">${currentFilter === 'all' ? (telegramData.message || 'No recent messages in the configured channel window.') : `No recent messages for @${escHtml(currentFilter)}.`}</div>
+      </div>`;
+    return;
+  }
+
+  // 5. LIVE_DATA list render
+  list.innerHTML = filtered.map(p => {
+    const chName = p.channelTitle || p.channel || 'Telegram Channel';
+    const chHandle = p.channel || (p.channelUsername ? `@${p.channelUsername}` : '@telegram');
+    const timeStr = formatTimeAgo(p.timestamp);
+    const postUrl = p.url || `https://t.me/${(p.channelUsername || '').replace(/^@/, '')}/${p.messageId || ''}`;
+    const textContent = p.text ? escHtml(p.text).replace(/\n/g, '<br/>') : '<em class="tg-no-text">[Media post / No text]</em>';
+    
+    let mediaHtml = '';
+    if (p.media && p.media.hasMedia) {
+      const mType = (p.media.type || 'attachment').toUpperCase();
+      const mDesc = p.media.description || `${mType} attachment`;
+      const isVideo = p.media.type === 'video' || p.media.type === 'animation';
+      const mIcon = p.media.type === 'photo' ? '🖼️' : isVideo ? '🎬' : p.media.type === 'audio' ? '🎵' : p.media.type === 'webpage' ? '🔗' : '📎';
+      
+      const badgeHtml = `
+        <div class="telegram-media-badge media-${escHtml(p.media.type || 'other')}">
+          <span class="tg-media-icon">${mIcon}</span>
+          <span class="tg-media-label">${escHtml(mDesc)}</span>
+        </div>
+      `;
+
+      if (p.media.hasPreview && p.media.previewUrl) {
+        mediaHtml = `
+          <div class="telegram-media-preview-container">
+            <a href="${escHtml(postUrl)}" target="_blank" rel="noopener noreferrer" class="telegram-media-preview-link" title="Open on Telegram">
+              <img class="telegram-media-img" src="${escHtml(p.media.previewUrl)}" loading="lazy" alt="${escHtml(mDesc)}" onerror="const c = this.closest('.telegram-media-preview-container'); if(c) c.style.display='none'; const b = this.closest('.telegram-post-body')?.querySelector('.telegram-media-fallback-badge'); if(b) b.style.display='inline-flex';" />
+              ${isVideo ? '<div class="telegram-video-play-overlay"><span class="telegram-play-icon">▶</span><span class="telegram-video-badge">VIDEO</span></div>' : ''}
+            </a>
+          </div>
+          <div class="telegram-media-fallback-badge" style="display:none;">
+            ${badgeHtml}
+          </div>
+        `;
+      } else {
+        mediaHtml = badgeHtml;
+      }
+    }
+
+    let statsHtml = '';
+    if (typeof p.views === 'number' || typeof p.forwards === 'number') {
+      statsHtml = `
+        <div class="telegram-post-stats">
+          ${typeof p.views === 'number' ? `<span class="tg-stat" title="Views">👁️ ${p.views.toLocaleString()}</span>` : ''}
+          ${typeof p.forwards === 'number' ? `<span class="tg-stat" title="Forwards">🔄 ${p.forwards.toLocaleString()}</span>` : ''}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="telegram-post-card">
+        <div class="telegram-post-header">
+          <div class="telegram-channel-info">
+            <span class="telegram-channel-title">${escHtml(chName)}</span>
+            <span class="telegram-channel-handle">${escHtml(chHandle)}</span>
+          </div>
+          <span class="telegram-post-time" title="${escHtml(p.timestamp)}">${escHtml(timeStr)}</span>
+        </div>
+        <div class="telegram-post-body">
+          <div class="telegram-post-text">${textContent}</div>
+          ${mediaHtml}
+        </div>
+        <div class="telegram-post-footer">
+          ${statsHtml}
+          <a class="telegram-post-link" href="${escHtml(postUrl)}" target="_blank" rel="noopener noreferrer">
+            <span>View on Telegram</span> ↗
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── BORDER CROSSING MONITOR MODULE ───────────────────────────────────────────
+async function fetchBorder(forceRefresh = false) {
+  const list = $('borderList');
+  const badge = $('borderBadge');
+  const meta = $('borderMeta');
+  const summaryText = $('borderSummaryText');
+
+  state.borderLoading = true;
+  if (!state.borderData && list) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="state-icon">🔄</div>
+        <div class="state-title">CONNECTING TO QKMK...</div>
+        <div class="state-desc">Querying National Center for Border Management</div>
+      </div>`;
+  }
+
+  try {
+    const url = `/api/borders${forceRefresh ? '?forceRefresh=true' : ''}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    state.borderData = data;
+    renderBorder(data);
+    if (state.activeMapModule === 'border') {
+      renderBorderMapMarkers(data);
+    }
+    aggregateAndRenderAlerts(state.data, data, state.telegramData);
+  } catch (err) {
+    console.error('[app] Failed to fetch border intelligence:', err);
+    state.borderData = {
+      skill: 'border-monitor',
+      status: 'UNAVAILABLE',
+      source: 'QKMK',
+      count: 0,
+      crossings: [],
+      error: 'Official border data source could not be reached.',
+      message: 'Official border data source could not be reached.'
+    };
+    renderBorder(state.borderData);
+    if (state.activeMapModule === 'border') {
+      renderBorderMapMarkers(state.borderData);
+    }
+  } finally {
+    state.borderLoading = false;
+  }
+}
+
+function renderBorder(borderData) {
+  const list = $('borderList');
+  const badge = $('borderBadge');
+  const meta = $('borderMeta');
+  const summaryText = $('borderSummaryText');
+  if (!list) return;
+
+  if (!borderData) {
+    list.innerHTML = `<div class="empty-state">No border data available.</div>`;
+    return;
+  }
+
+  const { status, crossings = [], source, sourceUrl, updatedAt, message, error } = borderData;
+
+  // 1. Badge & Meta Header
+  if (badge) {
+    if (status === 'LIVE_DATA' && crossings.length > 0) {
+      badge.style.display = '';
+      badge.className = source === 'NAKORDONI' ? 'panel-badge badge-warning' : 'panel-badge badge-primary';
+      badge.textContent = source === 'NAKORDONI' ? `${crossings.length} CROSSINGS (NAKORDONI)` : `${crossings.length} CROSSINGS`;
+    } else if (status === 'UNAVAILABLE') {
+      badge.style.display = '';
+      badge.className = 'panel-badge badge-critical';
+      badge.textContent = 'UNAVAILABLE';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (meta) {
+    const timeAgoStr = updatedAt ? formatTimeAgo(updatedAt) : 'Live';
+    if (source === 'NAKORDONI') {
+      meta.textContent = `SECONDARY SOURCE · NAKORDONI API · UPDATED ${timeAgoStr.toUpperCase()}`;
+    } else {
+      meta.textContent = status === 'LIVE_DATA' ? `QKMK · UPDATED ${timeAgoStr.toUpperCase()}` : 'OFFICIAL API · READ-ONLY';
+    }
+  }
+
+  if (summaryText) {
+    if (status === 'LIVE_DATA') {
+      if (source === 'NAKORDONI') {
+        summaryText.innerHTML = `LIVE QUEUES · ${crossings.length} BORDER CROSSINGS · POWERED BY <a href="https://nakordoni.eu/" target="_blank" rel="noopener noreferrer" style="color:var(--cyan);text-decoration:underline;">NAKORDONI.EU</a>`;
+      } else {
+        summaryText.textContent = `LIVE QUEUES · ${crossings.length} BORDER CROSSINGS MONITORED`;
+      }
+    } else {
+      summaryText.textContent = 'NATIONAL CENTER FOR BORDER MANAGEMENT';
+    }
+  }
+
+  // 2. UNAVAILABLE State
+  if (status === 'UNAVAILABLE') {
+    list.innerHTML = `
+      <div class="border-state-card unavailable">
+        <div class="state-icon">⚠️</div>
+        <div class="state-title">UNAVAILABLE</div>
+        <div class="state-desc">${escHtml(error || message || 'Official and secondary border data sources could not be reached.')}</div>
+        <div class="border-source-link-box">
+          <a href="https://mpb.rks-gov.net/?culture=sr-latn-rs" target="_blank" rel="noopener noreferrer" class="border-ext-link">
+            Open Official MPB / QKMK Portal ↗
+          </a>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // 3. NO_DATA / NOT_CONFIGURED State
+  if (status === 'NO_DATA' || crossings.length === 0) {
+    list.innerHTML = `
+      <div class="border-state-card not-configured">
+        <div class="state-icon">📭</div>
+        <div class="state-title">NO BORDER DATA</div>
+        <div class="state-desc">${escHtml(message || 'No active border crossing wait times currently reported.')}</div>
+      </div>`;
+    return;
+  }
+
+  // 4. LIVE_DATA Render
+  list.innerHTML = crossings.map(c => {
+    const entry = c.direction?.entry || {};
+    const exit = c.direction?.exit || {};
+    const trucks = c.trucks || {};
+    const truckEntry = trucks.entry || {};
+    const truckExit = trucks.exit || {};
+
+    const entryWait = entry.waitingMinutesText || (entry.waitingMinutes != null ? `${entry.waitingMinutes} min` : 'N/A');
+    const entryQueue = entry.queueLengthText || (entry.queueLengthMeters != null ? `${entry.queueLengthMeters} m` : 'N/A');
+
+    const exitWait = exit.waitingMinutesText || (exit.waitingMinutes != null ? `${exit.waitingMinutes} min` : 'N/A');
+    const exitQueue = exit.queueLengthText || (exit.queueLengthMeters != null ? `${exit.queueLengthMeters} m` : 'N/A');
+
+    // Severity level for color badge
+    const maxWait = Math.max(entry.waitingMinutes || 0, exit.waitingMinutes || 0);
+    const maxQueue = Math.max(entry.queueLengthMeters || 0, exit.queueLengthMeters || 0);
+
+    let delayClass = 'delay-low';
+    let delayLabel = 'NORMAL FLOW';
+    if (maxWait >= 60 || maxQueue >= 500) {
+      delayClass = 'delay-critical';
+      delayLabel = 'HEAVY DELAY';
+    } else if (maxWait >= 30 || maxQueue >= 200) {
+      delayClass = 'delay-high';
+      delayLabel = 'MODERATE DELAY';
+    } else if (maxWait >= 15 || maxQueue >= 50) {
+      delayClass = 'delay-elevated';
+      delayLabel = 'SLIGHT DELAY';
+    }
+
+    const timeAgoStr = c.updatedAt ? formatTimeAgo(c.updatedAt) : 'Recent';
+
+    // Truck row if available
+    let trucksHtml = '';
+    if (c.trucks) {
+      const trEntryWait = truckEntry.waitingMinutesText || (truckEntry.waitingMinutes != null ? `${truckEntry.waitingMinutes} min` : '03-05 min');
+      const trExitWait = truckExit.waitingMinutesText || (truckExit.waitingMinutes != null ? `${truckExit.waitingMinutes} min` : '03-05 min');
+      const trEntryQueue = truckEntry.queueLengthText || (truckEntry.queueLengthMeters != null ? `${truckEntry.queueLengthMeters} m` : '0 m');
+      const trExitQueue = truckExit.queueLengthText || (truckExit.queueLengthMeters != null ? `${truckExit.queueLengthMeters} m` : '0 m');
+
+      trucksHtml = `
+        <div class="border-trucks-row">
+          <span class="truck-tag">🚛 TRUCKS</span>
+          <span class="truck-metric">Entry: <strong>${escHtml(trEntryWait)}</strong> (${escHtml(trEntryQueue)})</span>
+          <span class="truck-divider">·</span>
+          <span class="truck-metric">Exit: <strong>${escHtml(trExitWait)}</strong> (${escHtml(trExitQueue)})</span>
+        </div>
+      `;
+    }
+
+    const sourceLabel = c.source === 'NAKORDONI' ? 'NAKORDONI (SECONDARY)' : (c.source || 'QKMK');
+    const sourceLink = c.source === 'NAKORDONI' ? 'https://nakordoni.eu/en/country/kosovo' : (c.sourceUrl || 'https://mpb.rks-gov.net/?culture=sr-latn-rs');
+    const linkText = c.source === 'NAKORDONI' ? 'Nakordoni ↗' : 'Official Source ↗';
+
+    return `
+      <div class="border-card ${delayClass}" data-crossing-id="${escHtml(c.id)}" onclick="focusBorderCrossing('${escHtml(c.id)}')">
+        <div class="border-card-header">
+          <div class="border-name-info">
+            <span class="border-crossing-name">${escHtml(c.name)}</span>
+            <span class="border-neighbor-name">↔ ${escHtml(c.neighborCountry || 'Border')}</span>
+          </div>
+          <div class="border-status-pill ${delayClass}">
+            ${delayLabel}
+          </div>
+        </div>
+
+        <div class="border-flow-grid">
+          <!-- Entry Box -->
+          <div class="border-flow-box entry-box">
+            <div class="flow-box-title">
+              <span class="flow-arrow">⬇</span> CARS ENTRY (INTO KOSOVO)
+            </div>
+            <div class="flow-metric-row">
+              <div class="flow-metric">
+                <span class="metric-label">WAIT TIME</span>
+                <span class="metric-value ${entry.waitingMinutes >= 30 ? 'text-warning' : 'text-primary'}">${escHtml(entryWait)}</span>
+              </div>
+              <div class="flow-metric">
+                <span class="metric-label">QUEUE</span>
+                <span class="metric-value">${escHtml(entryQueue)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Exit Box -->
+          <div class="border-flow-box exit-box">
+            <div class="flow-box-title">
+              <span class="flow-arrow">⬆</span> CARS EXIT (OUT OF KOSOVO)
+            </div>
+            <div class="flow-metric-row">
+              <div class="flow-metric">
+                <span class="metric-label">WAIT TIME</span>
+                <span class="metric-value ${exit.waitingMinutes >= 30 ? 'text-warning' : 'text-primary'}">${escHtml(exitWait)}</span>
+              </div>
+              <div class="flow-metric">
+                <span class="metric-label">QUEUE</span>
+                <span class="metric-value">${escHtml(exitQueue)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        ${trucksHtml}
+
+        <div class="border-card-footer">
+          <span class="border-time-tag">UPDATED ${escHtml(timeAgoStr.toUpperCase())} · SOURCE ${escHtml(sourceLabel)}</span>
+          <a href="${escHtml(sourceLink)}" target="_blank" rel="noopener noreferrer" class="border-link-btn" onclick="event.stopPropagation()">
+            ${escHtml(linkText)}
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderBorderMapMarkers(borderData) {
+  if (!state.map || state.activeMapModule !== 'border') return;
+  clearMarkerList(moduleLayers.border.markers);
+
+  const data = borderData || state.borderData;
+  if (!data || !Array.isArray(data.crossings)) {
+    updateMapBadgeAndMeta();
+    return;
+  }
+
+  data.crossings.forEach(c => {
+    const coords = c.coordinates;
+    if (!coords || typeof coords.lat !== 'number' || typeof coords.lon !== 'number') return;
+
+    const entry = c.direction?.entry || {};
+    const exit = c.direction?.exit || {};
+    const maxWait = Math.max(entry.waitingMinutes || 0, exit.waitingMinutes || 0);
+    const maxQueue = Math.max(entry.queueLengthMeters || 0, exit.queueLengthMeters || 0);
+
+    let color = '#34d399'; // Green (low/normal)
+    let statusText = 'NORMAL FLOW';
+    if (maxWait >= 60 || maxQueue >= 500) {
+      color = '#f87171'; // Red (critical)
+      statusText = 'HEAVY DELAY';
+    } else if (maxWait >= 30 || maxQueue >= 200) {
+      color = '#fb923c'; // Orange (high)
+      statusText = 'MODERATE DELAY';
+    } else if (maxWait >= 15 || maxQueue >= 50) {
+      color = '#fbbf24'; // Yellow (elevated)
+      statusText = 'SLIGHT DELAY';
+    }
+
+    const markerEl = createBorderMarkerElement(color, c.shortName || c.name);
+
+    const timeAgoStr = c.updatedAt ? formatTimeAgo(c.updatedAt) : 'Recent';
+    const entryWaitStr = entry.waitingMinutesText || (entry.waitingMinutes != null ? `${entry.waitingMinutes} min` : 'N/A');
+    const entryQueueStr = entry.queueLengthText || (entry.queueLengthMeters != null ? `${entry.queueLengthMeters} m` : 'None');
+    const exitWaitStr = exit.waitingMinutesText || (exit.waitingMinutes != null ? `${exit.waitingMinutes} min` : 'N/A');
+    const exitQueueStr = exit.queueLengthText || (exit.queueLengthMeters != null ? `${exit.queueLengthMeters} m` : 'None');
+
+    let truckPopupHtml = '';
+    if (c.trucks) {
+      const trEntryWait = c.trucks.entry?.waitingMinutesText || (c.trucks.entry?.waitingMinutes != null ? `${c.trucks.entry.waitingMinutes} min` : '03-05 min');
+      const trExitWait = c.trucks.exit?.waitingMinutesText || (c.trucks.exit?.waitingMinutes != null ? `${c.trucks.exit.waitingMinutes} min` : '03-05 min');
+      truckPopupHtml = `
+        <div style="margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.08); font-size:9px; color:var(--text-dim); font-family:var(--font-mono);">
+          <strong style="color:#f59e0b;">🚛 TRUCKS:</strong> Entry ${escHtml(trEntryWait)} · Exit ${escHtml(trExitWait)}
+        </div>
+      `;
+    }
+
+    const sourceLabel = c.source === 'NAKORDONI' ? 'NAKORDONI (nakordoni.eu)' : (c.source || 'QKMK');
+
+    const popupHtml = buildMapPopupHtml({
+      icon: '🛂',
+      title: c.name,
+      source: sourceLabel,
+      badge: { text: `${c.status || 'OPEN'} (${statusText})`, color },
+      stats: [
+        { label: 'Entry Wait', val: entryWaitStr },
+        { label: 'Entry Queue', val: entryQueueStr },
+        { label: 'Exit Wait', val: exitWaitStr },
+        { label: 'Exit Queue', val: exitQueueStr }
+      ],
+      sections: truckPopupHtml,
+      footer: `UPDATED: ${escHtml(timeAgoStr)}`
+    });
+
+    const marker = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
+      .setLngLat([coords.lon, coords.lat])
+      .setPopup(createMapPopup(popupHtml, { className: 'border-map-popup' }))
+      .addTo(state.map);
+
+    marker._module = 'border';
+    marker._crossingId = c.id;
+    moduleLayers.border.markers.push(marker);
+  });
+
+  updateMapBadgeAndMeta();
+}
+
+function createBorderMarkerElement(color, label) {
+  const el = document.createElement('div');
+  el.className = 'border-custom-marker';
+  el.innerHTML = `
+    <div class="border-marker-pin" style="background:${color}; box-shadow: 0 0 10px ${color}88;">
+      <span class="border-pin-icon">🛂</span>
+    </div>
+    <div class="border-marker-label">${escHtml(label)}</div>
+  `;
+  return el;
+}
+
+function focusBorderCrossing(crossingId) {
+  const marker = moduleLayers.border.markers.find(m => m._crossingId === crossingId);
+  if (marker && state.map) {
+    const lngLat = marker.getLngLat();
+    state.map.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 12, speed: 1.2 });
+    marker.togglePopup();
+  }
+}
+
 window.toggleModule = toggleModule;
 window.startMonitor = startMonitor;
 window.toggleMap = toggleMap;
@@ -2272,3 +4066,39 @@ window.markAllRead = markAllRead;
 window.filterWildfire = filterWildfire;
 window.openCCTVModule = openCCTVModule;
 window.closeCCTVModule = closeCCTVModule;
+window.filterTelegram = filterTelegram;
+window.fetchTelegram = fetchTelegram;
+window.fetchBorder = fetchBorder;
+window.focusBorderCrossing = focusBorderCrossing;
+window.buildAlerts = buildAlerts;
+window.aggregateAndRenderAlerts = aggregateAndRenderAlerts;
+window.renderAlertLog = renderAlertLog;
+window.handleAlertClick = handleAlertClick;
+window.loadAlertHistory = loadAlertHistory;
+window.fetchAndRender = fetchAndRender;
+window.ALERT_THRESHOLDS = ALERT_THRESHOLDS;
+window.renderNews = renderNews;
+window.filterNewsItems = filterNewsItems;
+window.sortNewsByChronological = sortNewsByChronological;
+window.getArticlePubTime = getArticlePubTime;
+window.KOSOVO_WEATHER_CITIES = KOSOVO_WEATHER_CITIES;
+window.selectWeatherCity = selectWeatherCity;
+window.fetchCityWeather = fetchCityWeather;
+window.renderWeather = renderWeather;
+window.renderWeatherMapMarkers = renderWeatherMapMarkers;
+window.createWeatherMarkerElement = createWeatherMarkerElement;
+window.openWeatherPopup = openWeatherPopup;
+window.closeWeatherPopup = closeWeatherPopup;
+window.buildWeatherPopupHtml = buildWeatherPopupHtml;
+window.buildMapPopupHtml = buildMapPopupHtml;
+window.createMapPopup = createMapPopup;
+window.openMapPopup = openMapPopup;
+window.closeMapPopup = closeMapPopup;
+window.renderTrafficMapMarkers = renderTrafficMapMarkers;
+window.renderRadiationMapMarkers = renderRadiationMapMarkers;
+window.renderEarthquakeMapMarkers = renderEarthquakeMapMarkers;
+window.renderNewsMapMarkers = renderNewsMapMarkers;
+window.renderAqiMapMarkers = renderAqiMapMarkers;
+window.renderAviationMapMarkers = renderAviationMapMarkers;
+window.renderBorderMapMarkers = renderBorderMapMarkers;
+window.state = state;
