@@ -1,9 +1,15 @@
 'use strict';
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
+const fs = require('fs');
+const path = require('path');
+const readline = require('readline');
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const axios = require('axios');
+
+const SESSION_FILE = path.join(__dirname, '.telegram_session');
+const ENV_FILE = path.join(__dirname, '../../.env');
 
 // Default public channels if not configured
 const DEFAULT_CHANNELS = ['koridorsrb', 'srpskinat', 'istokinfo'];
@@ -16,6 +22,75 @@ const DEFAULT_CACHE_TTL_MS = parseInt(process.env.TELEGRAM_CACHE_TTL_MS || '6000
 // Singleton Telegram client instance to reuse connection
 let activeClient = null;
 let clientConnecting = null;
+
+/**
+ * Retrieve saved StringSession from environment or local session store
+ */
+function getSavedSession() {
+  const envSession = process.env.TELEGRAM_SESSION || process.env.TELEGRAM_STRING_SESSION;
+  if (envSession && envSession.trim()) {
+    return envSession.trim();
+  }
+  if (fs.existsSync(SESSION_FILE)) {
+    try {
+      const fileSession = fs.readFileSync(SESSION_FILE, 'utf8').trim();
+      if (fileSession) return fileSession;
+    } catch (e) {}
+  }
+  return '';
+}
+
+/**
+ * Persist StringSession locally into .env and .telegram_session
+ */
+function persistSession(sessionString) {
+  if (!sessionString || typeof sessionString !== 'string') return;
+  const trimmed = sessionString.trim();
+
+  // 1. Save to local .telegram_session file
+  try {
+    fs.writeFileSync(SESSION_FILE, trimmed, { encoding: 'utf8', mode: 0o600 });
+  } catch (err) {
+    console.warn('[telegram-auth] Could not write to .telegram_session file:', err.message);
+  }
+
+  // 2. Update or append TELEGRAM_SESSION in .env file
+  try {
+    let envContent = '';
+    if (fs.existsSync(ENV_FILE)) {
+      envContent = fs.readFileSync(ENV_FILE, 'utf8');
+    }
+
+    if (/^TELEGRAM_SESSION=.*$/m.test(envContent)) {
+      envContent = envContent.replace(/^TELEGRAM_SESSION=.*$/m, `TELEGRAM_SESSION=${trimmed}`);
+    } else if (envContent.includes('TELEGRAM_SESSION=')) {
+      envContent = envContent.replace(/TELEGRAM_SESSION=.*/, `TELEGRAM_SESSION=${trimmed}`);
+    } else {
+      envContent = envContent ? `${envContent.trimEnd()}\nTELEGRAM_SESSION=${trimmed}\n` : `TELEGRAM_SESSION=${trimmed}\n`;
+    }
+    fs.writeFileSync(ENV_FILE, envContent, { encoding: 'utf8' });
+  } catch (err) {
+    console.warn('[telegram-auth] Could not update .env file:', err.message);
+  }
+
+  process.env.TELEGRAM_SESSION = trimmed;
+}
+
+/**
+ * Prompt user in CLI via readline
+ */
+function askQuestion(promptText) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  return new Promise(resolve => {
+    rl.question(promptText, answer => {
+      rl.close();
+      resolve(answer ? answer.trim() : '');
+    });
+  });
+}
 
 /**
  * Clean and normalize channel usernames
@@ -169,7 +244,7 @@ function extractMediaInfo(msg, channelUsername = '') {
 async function getTelegramClient() {
   const apiIdStr = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
   const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
-  const sessionStr = process.env.TELEGRAM_SESSION || process.env.TELEGRAM_STRING_SESSION || '';
+  const sessionStr = getSavedSession();
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!apiIdStr || !apiHash) {
@@ -205,6 +280,19 @@ async function getTelegramClient() {
         });
       } else {
         await client.connect();
+
+        if (!sessionStr) {
+          console.warn('[telegram-monitor] No saved session string. Run "node skills/telegram-monitor/skill.js --auth" to authenticate.');
+          activeClient = null;
+          return null;
+        }
+
+        const isAuth = await client.checkAuthorization();
+        if (!isAuth) {
+          console.warn('[telegram-monitor] Telegram session is not authorized. Run "node skills/telegram-monitor/skill.js --auth" to log in.');
+          activeClient = null;
+          return null;
+        }
       }
 
       activeClient = client;
@@ -219,6 +307,102 @@ async function getTelegramClient() {
   })();
 
   return clientConnecting;
+}
+
+/**
+ * Interactive one-time login flow for Telegram user accounts
+ */
+async function authenticateInteractive() {
+  const apiIdStr = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
+  const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
+
+  if (!apiIdStr || !apiHash) {
+    console.error('\n❌ Error: TELEGRAM_API_ID and TELEGRAM_API_HASH must be configured in .env before running --auth.');
+    process.exit(1);
+  }
+
+  const apiId = parseInt(apiIdStr, 10);
+  if (isNaN(apiId) || apiId <= 0) {
+    console.error('\n❌ Error: TELEGRAM_API_ID must be a valid positive integer.');
+    process.exit(1);
+  }
+
+  console.log('\n🔐 Telegram MTProto One-Time Authentication');
+  console.log('─────────────────────────────────────────────');
+
+  const existingSession = getSavedSession();
+  const stringSession = new StringSession(existingSession);
+
+  const client = new TelegramClient(stringSession, apiId, apiHash, {
+    connectionRetries: 3,
+    timeout: 15,
+    autoReconnect: true,
+    useWSS: false
+  });
+
+  try {
+    await client.connect();
+
+    // Check if existing session is already authorized
+    const isAuthorized = await client.checkAuthorization();
+    if (isAuthorized) {
+      console.log('✅ Existing session is already authenticated and active!');
+      try {
+        const me = await client.getMe();
+        if (me) {
+          console.log(`👤 Connected as: ${me.firstName || ''} ${me.lastName || ''} (@${me.username || me.phone || 'user'})`);
+        }
+      } catch (e) {}
+      const savedStr = client.session.save();
+      persistSession(savedStr);
+      console.log('💾 Session verified and saved locally.');
+      await client.disconnect();
+      return;
+    }
+
+    console.log('Initiating Telegram authentication with official MTProto servers...\n');
+
+    await client.start({
+      phoneNumber: async () => {
+        return await askQuestion('📱 Enter your Telegram phone number (international format, e.g. +383... / +381...): ');
+      },
+      password: async (hint) => {
+        const hintText = hint ? ` (hint: ${hint})` : '';
+        return await askQuestion(`🔒 Enter your 2FA Two-Step Password${hintText}: `);
+      },
+      phoneCode: async (isCodeViaApp) => {
+        const via = isCodeViaApp ? 'Telegram app' : 'SMS';
+        return await askQuestion(`📨 Enter the login code received via ${via}: `);
+      },
+      onError: (err) => {
+        console.error('⚠️  Authentication note:', err.message || err);
+      }
+    });
+
+    const isNowAuthorized = await client.checkAuthorization();
+    if (!isNowAuthorized) {
+      throw new Error('Authentication completed but session authorization check failed.');
+    }
+
+    console.log('\n🎉 Authentication successful!');
+    try {
+      const me = await client.getMe();
+      if (me) {
+        console.log(`👤 Logged in as: ${me.firstName || ''} ${me.lastName || ''} (@${me.username || me.phone || 'user'})`);
+      }
+    } catch (e) {}
+
+    const savedSessionString = client.session.save();
+    persistSession(savedSessionString);
+    console.log('💾 Session saved to .env and local session store.');
+    console.log('✨ You can now run "node skills/telegram-monitor/skill.js" or start SENTINEL without logging in again.\n');
+
+    await client.disconnect();
+  } catch (err) {
+    console.error('\n❌ Authentication failed:', err.message || err);
+    try { await client.disconnect(); } catch (e) {}
+    process.exit(1);
+  }
 }
 
 /**
@@ -549,6 +733,7 @@ async function fetchTelegram({
   const apiId = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
   const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const sessionStr = getSavedSession();
 
   if ((!apiId || !apiHash) && !botToken) {
     return {
@@ -560,6 +745,20 @@ async function fetchTelegram({
       count: 0,
       posts: [],
       message: 'Telegram API is not configured. Set TELEGRAM_API_ID and TELEGRAM_API_HASH (or TELEGRAM_BOT_TOKEN) in environment variables.',
+      isCached: false
+    };
+  }
+
+  if (apiId && apiHash && !sessionStr && !botToken) {
+    return {
+      skill: 'telegram-monitor',
+      status: 'NOT_CONFIGURED',
+      source: 'Telegram Official API',
+      updatedAt: new Date().toISOString(),
+      channels: targetChannels,
+      count: 0,
+      posts: [],
+      message: 'Telegram API credentials configured, but session is not authenticated. Run "node skills/telegram-monitor/skill.js --auth" to log in.',
       isCached: false
     };
   }
@@ -576,6 +775,8 @@ async function fetchTelegram({
           const result = await fetchViaMTProto(client, targetChannels, limit);
           posts = result.posts;
           fetchErrors = result.errors;
+        } else if (!botToken) {
+          fetchErrors.push({ general: 'Session not authenticated. Run "node skills/telegram-monitor/skill.js --auth" to authenticate.' });
         }
       } catch (clientErr) {
         console.warn('[telegram-monitor] MTProto fetch failed:', clientErr.message);
@@ -604,6 +805,8 @@ async function fetchTelegram({
       if (fetchErrors.length >= targetChannels.length && targetChannels.length > 0) {
         const allInvalid = fetchErrors.every(e => (e.error || '').includes('USERNAME_INVALID') || (e.error || '').includes('CHANNEL_PRIVATE'));
         status = allInvalid ? 'INVALID_DATA' : 'UNAVAILABLE';
+      } else if (fetchErrors.length > 0) {
+        status = 'UNAVAILABLE';
       } else {
         status = 'NO_POSTS';
       }
@@ -617,8 +820,8 @@ async function fetchTelegram({
       channels: targetChannels,
       count: posts.length,
       posts,
-      error: status === 'UNAVAILABLE' || status === 'INVALID_DATA' ? (fetchErrors[0]?.error || 'Failed to fetch messages') : null,
-      message: status === 'NO_POSTS' ? 'No recent posts found in configured public channels.' : null,
+      error: status === 'UNAVAILABLE' || status === 'INVALID_DATA' ? (fetchErrors[0]?.error || fetchErrors[0]?.general || 'Failed to fetch messages') : null,
+      message: status === 'NO_POSTS' ? 'No recent posts found in configured public channels.' : (status === 'UNAVAILABLE' ? (fetchErrors[0]?.general || 'Telegram service unreachable') : null),
       isCached: false
     };
 
@@ -652,20 +855,29 @@ module.exports = {
   normalizeChannelName,
   extractMediaInfo,
   getConfiguredChannels,
+  authenticateInteractive,
+  getSavedSession,
+  persistSession,
   DEFAULT_CHANNELS
 };
 
 if (require.main === module) {
+  const isAuth = process.argv.includes('--auth') || process.argv.includes('-a');
   const isTest = process.argv.includes('--test');
-  fetchTelegram({ useDemo: isTest }).then(res => {
-    console.log('Status:', res.status);
-    console.log('Source:', res.source);
-    console.log('Channels:', res.channels);
-    console.log('Total Posts:', res.count);
-    if (res.posts && res.posts.length > 0) {
-      console.log('Sample Post:\n', JSON.stringify(res.posts[0], null, 2));
-    } else {
-      console.log('Message:', res.message || res.error || 'No posts');
-    }
-  }).catch(console.error);
+
+  if (isAuth) {
+    authenticateInteractive();
+  } else {
+    fetchTelegram({ useDemo: isTest }).then(res => {
+      console.log('Status:', res.status);
+      console.log('Source:', res.source);
+      console.log('Channels:', res.channels);
+      console.log('Total Posts:', res.count);
+      if (res.posts && res.posts.length > 0) {
+        console.log('Sample Post:\n', JSON.stringify(res.posts[0], null, 2));
+      } else {
+        console.log('Message:', res.message || res.error || 'No posts');
+      }
+    }).catch(console.error);
+  }
 }

@@ -20,9 +20,14 @@ A lightweight, read-only situational feed skill for SENTINEL that monitors recen
 | `TELEGRAM_LIMIT_PER_CHANNEL` | Integer | Recent post window per channel | `10` |
 | `TELEGRAM_CACHE_TTL_MS` | Integer | In-memory cache time-to-live in ms | `60000` |
 
-## Standalone Testing
+## Standalone Testing & Authentication
 
-Test without keys (verifies `NOT_CONFIGURED` status):
+One-time interactive login (creates and persists `TELEGRAM_SESSION`):
+```bash
+node skills/telegram-monitor/skill.js --auth
+```
+
+Normal run (uses saved session without re-prompting):
 ```bash
 node skills/telegram-monitor/skill.js
 ```

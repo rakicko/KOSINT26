@@ -201,10 +201,10 @@ const OSM_STYLE = {
     },
     'satellite-tiles': {
       type: 'raster',
-      tiles: ['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/2022-08-17/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg'],
+      tiles: ['https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
       tileSize: 256,
-      maxzoom: 9,
-      attribution: 'NASA GIBS'
+      maxzoom: 19,
+      attribution: '© Esri Clarity Archive'
     },
     'wildfire-source': {
       type: 'geojson',
@@ -250,23 +250,22 @@ const OSM_STYLE = {
       }
     }
   ],
-  attribution: '© OpenStreetMap contributors, NASA GIBS, NASA FIRMS'
+  attribution: '© OpenStreetMap contributors, Esri Clarity, NASA GIBS, NASA FIRMS'
 };
 
 class BasemapControl {
   onAdd(map) {
     this._map = map;
     const container = document.createElement('div');
-    container.className = 'mapboxgl-ctrl maplibregl-control maplibregl-control-corner basemap-control-container';
+    container.className = 'mapboxgl-ctrl maplibregl-control osiris-map-ctrl-pill basemap-control-container';
     container.innerHTML = `
-      <button class="basemap-btn" data-basemap="dark">MAP</button>
-      <button class="basemap-btn" data-basemap="satellite">SATELLITE</button>
+      <button class="basemap-btn active" data-basemap="dark"><span class="ctrl-icon">🗺️</span> Map</button>
+      <button class="basemap-btn" data-basemap="satellite"><span class="ctrl-icon">🛰️</span> Satellite</button>
     `;
     const btnMap = container.querySelector('.basemap-btn[data-basemap="dark"]');
     const btnSat = container.querySelector('.basemap-btn[data-basemap="satellite"]');
-    if (btnMap) btnMap.classList.add('active');
-    btnMap.addEventListener('click', () => switchBasemap('dark'));
-    btnSat.addEventListener('click', () => switchBasemap('satellite'));
+    if (btnMap) btnMap.addEventListener('click', () => switchBasemap('dark'));
+    if (btnSat) btnSat.addEventListener('click', () => switchBasemap('satellite'));
     this._container = container;
     return container;
   }
@@ -279,25 +278,17 @@ class BasemapControl {
 function switchBasemap(basemapId) {
   if (!state.map) return;
   const map = state.map;
+  
   if (basemapId === 'dark') {
-    if (map.getLayer('osm-basemap')) {
-      map.setLayoutProperty('osm-basemap', 'visibility', 'visible');
-    }
-    if (map.getLayer('satellite-basemap')) {
-      map.setLayoutProperty('satellite-basemap', 'visibility', 'none');
-    }
-    const buttons = document.querySelectorAll('.basemap-btn');
-    buttons.forEach(btn => btn.classList.toggle('active', btn.dataset.basemap === 'dark'));
+    if (map.getLayer('osm-basemap')) map.setLayoutProperty('osm-basemap', 'visibility', 'visible');
+    if (map.getLayer('satellite-basemap')) map.setLayoutProperty('satellite-basemap', 'visibility', 'none');
   } else if (basemapId === 'satellite') {
-    if (map.getLayer('satellite-basemap')) {
-      map.setLayoutProperty('satellite-basemap', 'visibility', 'visible');
-    }
-    if (map.getLayer('osm-basemap')) {
-      map.setLayoutProperty('osm-basemap', 'visibility', 'none');
-    }
-    const buttons = document.querySelectorAll('.basemap-btn');
-    buttons.forEach(btn => btn.classList.toggle('active', btn.dataset.basemap === 'satellite'));
+    if (map.getLayer('satellite-basemap')) map.setLayoutProperty('satellite-basemap', 'visibility', 'visible');
+    if (map.getLayer('osm-basemap')) map.setLayoutProperty('osm-basemap', 'visibility', 'none');
   }
+
+  const buttons = document.querySelectorAll('.basemap-btn');
+  buttons.forEach(btn => btn.classList.toggle('active', btn.dataset.basemap === basemapId));
 }
 
 window.setBasemapMode = switchBasemap;
@@ -306,9 +297,9 @@ class MapModeControl {
   onAdd(map) {
     this._map = map;
     const container = document.createElement('div');
-    container.className = 'mapboxgl-ctrl maplibregl-control maplibregl-control-corner map-mode-control-container';
+    container.className = 'mapboxgl-ctrl maplibregl-control osiris-map-ctrl-pill map-mode-control-container';
     container.innerHTML = `
-      <button class="map-mode-btn" data-mode="2d">2D</button>
+      <button class="map-mode-btn active" data-mode="2d">2D</button>
       <button class="map-mode-btn" data-mode="3d">3D</button>
     `;
     const btn2d = container.querySelector('.map-mode-btn[data-mode="2d"]');
@@ -334,6 +325,22 @@ const KOSOVO_WEATHER_CITIES = [
   { id: 'gjakove',   name: 'Gjakovë',   lat: 42.3803, lon: 20.4308 }
 ];
 
+const BORDER_CROSSING_LOCATIONS = {
+  'border-merdare': { lat: 42.9439, lon: 21.2464, name: 'Merdarë / Merdare', shortName: 'Merdarë', neighbor: 'Serbia' },
+  'border-jarinje': { lat: 43.2181, lon: 20.6975, name: 'Jarinjë / Jarinje', shortName: 'Jarinjë', neighbor: 'Serbia' },
+  'border-bernjak': { lat: 42.9753, lon: 20.5519, name: 'Bërnjak / Brnjak', shortName: 'Bërnjak', neighbor: 'Serbia' },
+  'border-dheu-i-bardhe': { lat: 42.4844, lon: 21.6547, name: 'Dheu i Bardhë / Bela Zemlja', shortName: 'Dheu i Bardhë', neighbor: 'Serbia' },
+  'border-mutivode': { lat: 42.7561, lon: 21.4686, name: 'Mutivodë / Mutivode', shortName: 'Mutivodë', neighbor: 'Serbia' },
+  'border-mucibabe': { lat: 42.3883, lon: 21.5583, name: 'Muçibabë / Mučibaba', shortName: 'Muçibabë', neighbor: 'Serbia' },
+  'border-hani-i-elezit': { lat: 42.1469, lon: 21.2981, name: 'Hani i Elezit', shortName: 'Hani i Elezit', neighbor: 'North Macedonia' },
+  'border-gllobocice': { lat: 42.1644, lon: 21.0967, name: 'Glloboçicë / Globočica', shortName: 'Glloboçicë', neighbor: 'North Macedonia' },
+  'border-stanciq': { lat: 42.2778, lon: 21.5278, name: 'Stançiq / Staničić', shortName: 'Stançiq', neighbor: 'North Macedonia' },
+  'border-kulle': { lat: 42.7933, lon: 20.2789, name: 'Kullë / Kula', shortName: 'Kullë', neighbor: 'Montenegro' },
+  'border-vermice': { lat: 42.1583, lon: 20.5486, name: 'Vërmicë / Vrbnica / Morinë', shortName: 'Vërmicë', neighbor: 'Albania' },
+  'border-qafe-e-prushit': { lat: 42.3014, lon: 20.3553, name: 'Qafë e Prushit', shortName: 'Qafë e Prushit', neighbor: 'Albania' },
+  'border-qafe-e-morines': { lat: 42.4106, lon: 20.2528, name: 'Qafë e Morinës', shortName: 'Qafë e Morinës', neighbor: 'Albania' }
+};
+
 const state = {
   currentLocation: DEFAULT_LOCATION,
   currentTimeline: '24h',
@@ -347,22 +354,32 @@ const state = {
   map: null,
   mapInitialized: false,
   mapVisible: true,
-  activeMapModule: null, // Authoritative single active map module: null | 'news' | 'weather' | 'traffic' | 'radiation' | 'aqi' | 'earthquake' | 'wildfire' | 'aviation' | 'cctv'
+  activeMapModule: null, // Authoritative single active map module: null | 'news' | 'weather' | 'traffic' | 'radiation' | 'aqi' | 'earthquake' | 'wildfire' | 'aviation' | 'cctv' | 'border'
   activeModule: null,
   mapMode: '2d',
   aviationFilter: 'all',
   telegramFilter: 'all',
   telegramData: null,
+  borderData: null,
+  borderLoading: false,
   selectedWeatherCityId: null,
+  selectedNewsItemId: null,
+  selectedBorderCrossingId: null,
   weatherCache: {},
   weatherPopup: null,
+  borderPopup: null,
   activeMapPopup: null,
 };
 
 function clearMarkerList(markerList) {
   if (Array.isArray(markerList)) {
     markerList.forEach(m => {
-      try { m.remove(); } catch(e) {}
+      try {
+        if (m.getPopup && m.getPopup()) {
+          m.getPopup().remove();
+        }
+        m.remove();
+      } catch(e) {}
     });
     markerList.length = 0;
   }
@@ -372,61 +389,100 @@ const moduleLayers = {
   news: {
     markers: [],
     render: (data) => renderNewsMapMarkers(data?.news || state.data?.news),
-    clear: () => clearMarkerList(moduleLayers.news.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.news.markers);
+      closeNewsPopup();
+    }
   },
   weather: {
     markers: [],
     render: (data) => renderWeatherMapMarkers(data?.weather || state.data?.weather),
-    clear: () => clearMarkerList(moduleLayers.weather.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.weather.markers);
+      closeWeatherPopup();
+    }
   },
   traffic: {
     markers: [],
     render: (data) => renderTrafficMapMarkers(data?.traffic || state.data?.traffic),
-    clear: () => clearMarkerList(moduleLayers.traffic.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.traffic.markers);
+      closeMapPopup();
+    }
   },
   radiation: {
     markers: [],
     render: (data) => renderRadiationMapMarkers(data?.radiation || state.data?.radiation),
-    clear: () => clearMarkerList(moduleLayers.radiation.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.radiation.markers);
+      closeMapPopup();
+    }
   },
   aqi: {
     markers: [],
     render: (data) => renderAqiMapMarkers(data?.aqi || state.data?.aqi),
-    clear: () => clearMarkerList(moduleLayers.aqi.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.aqi.markers);
+      closeMapPopup();
+    }
   },
   earthquake: {
     markers: [],
     render: (data) => renderEarthquakeMapMarkers(data?.earthquakes || state.data?.earthquakes),
-    clear: () => clearMarkerList(moduleLayers.earthquake.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.earthquake.markers);
+      closeMapPopup();
+    }
   },
   wildfire: {
     markers: [],
     render: (data) => renderWildfireMapLayer(data?.wildfire || state.data?.wildfire),
-    clear: () => clearWildfireMapLayer()
+    clear: () => {
+      clearWildfireMapLayer();
+      closeMapPopup();
+    }
   },
   aviation: {
     markers: [],
     render: (data) => renderAviationMapMarkers(data?.aviation || state.data?.aviation),
-    clear: () => clearMarkerList(moduleLayers.aviation.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.aviation.markers);
+      closeMapPopup();
+    }
   },
   telegram: {
     markers: [],
     render: () => {},
-    clear: () => {}
+    clear: () => closeMapPopup()
   },
   border: {
     markers: [],
     render: (data) => renderBorderMapMarkers(data || state.borderData),
-    clear: () => clearMarkerList(moduleLayers.border.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.border.markers);
+      closeBorderPopup();
+    }
   },
   cctv: {
     markers: [],
     render: () => renderCCTVMapMarkers(),
-    clear: () => clearMarkerList(moduleLayers.cctv.markers)
+    clear: () => {
+      clearMarkerList(moduleLayers.cctv.markers);
+      closeMapPopup();
+    }
+  },
+  route: {
+    markers: [],
+    render: () => {},
+    clear: () => {
+      clearRoute(false);
+      closeMapPopup();
+    }
   }
 };
 
 function clearAllModuleLayers() {
+  closeMapPopup();
   Object.keys(moduleLayers).forEach(mod => {
     try {
       moduleLayers[mod].clear();
@@ -664,13 +720,20 @@ function updatePollInterval() {
 function renderThreatLevel(tl) {
   if (!tl) return;
   const widget = $('threatWidget');
+  if (!widget) return;
   widget.style.display = 'flex';
-  $('threatFill').style.width = `${tl.score}%`;
-  $('threatFill').style.background = tl.color;
+  const fill = $('threatFill');
+  if (fill) {
+    fill.style.width = `${tl.score}%`;
+    fill.style.background = tl.color;
+  }
   const text = $('threatText');
-  text.textContent = `${tl.level}  ${tl.score}`;
-  text.style.color = tl.color;
-  document.querySelector('.header').style.borderBottomColor = tl.score >= 80 ? tl.color : '';
+  if (text) {
+    text.textContent = `${tl.level}  ${tl.score}`;
+    text.style.color = tl.color;
+  }
+  const header = document.querySelector('.header');
+  if (header) header.style.borderBottomColor = tl.score >= 80 ? tl.color : '';
 }
 
 function renderNews(news) {
@@ -805,30 +868,17 @@ function filterNews(cat, btn) {
 }
 
 function renderWeather(weather, explicitCityName) {
-  const selectedCity = KOSOVO_WEATHER_CITIES.find(c => c.id === state.selectedWeatherCityId);
-  const cityName = explicitCityName || weather?.location || selectedCity?.name || 'Prishtinë';
-  const city = KOSOVO_WEATHER_CITIES.find(c => c.name.toLowerCase() === cityName.toLowerCase()) || selectedCity;
+  if (!weather || weather.error) return;
 
-  if (weather && !weather.error && city) {
+  const locName = (explicitCityName || weather.location || '').toLowerCase();
+  const city = KOSOVO_WEATHER_CITIES.find(c => c.name.toLowerCase() === locName || c.id === locName);
+
+  if (city) {
     if (!state.weatherCache) state.weatherCache = {};
     state.weatherCache[city.id] = { data: weather, fetchedAt: Date.now() };
 
-    // Update marker temp display if rendered
-    if (moduleLayers.weather?.markers) {
-      const marker = moduleLayers.weather.markers.find(m => m._cityId === city.id);
-      if (marker && typeof weather.current?.temp === 'number') {
-        const el = marker.getElement ? marker.getElement() : marker._element;
-        if (el) {
-          let tempEl = el.querySelector('.weather-marker-temp');
-          if (!tempEl) {
-            tempEl = document.createElement('span');
-            tempEl.className = 'weather-marker-temp';
-            el.appendChild(tempEl);
-          }
-          tempEl.textContent = `${weather.current.temp}°`;
-        }
-      }
-    }
+    // Update ONLY this specific city's marker
+    updateWeatherCityMarker(city.id, weather);
 
     // Update open popup if currently displayed for this city
     if (state.weatherPopup && state.selectedWeatherCityId === city.id) {
@@ -837,23 +887,33 @@ function renderWeather(weather, explicitCityName) {
   }
 }
 
-/* ── Unified Map Popup System (Design System Reference: Weather Popup) ─────── */
+/* ── Standardized Map Popup System (OSIRIS Dark Glass Architecture) ───────── */
 function buildMapPopupHtml({
   icon = '📍',
   title = '',
+  subtitle = '',
   source = '',
-  badge = null, // { text: 'HIGH', color: '#f87171' }
+  badge = null, // { text: 'HIGH', color: '#f87171' } or string
   primary = null, // { val: '35°C', sub: 'Clear sky', secondary: 'Feels like 32°C' }
   stats = [], // [ { label: 'Humidity', val: '21%' }, ... ]
   description = '',
   contentHtml = '', // direct custom body html
   sections = '', // raw custom html like hourly forecast
-  footer = '' // raw footer html or text
+  footer = '', // raw footer html or text
+  linkUrl = ''
 }) {
-  const badgeHtml = badge ? `
-    <span class="map-popup-badge" style="background:${badge.color || 'var(--cyan)'}20; color:${badge.color || 'var(--cyan)'}; border:1px solid ${badge.color || 'var(--cyan)'}40;">
-      ${escHtml(badge.text)}
+  const badgeObj = typeof badge === 'string' ? { text: badge, color: 'var(--cyan)' } : badge;
+  const badgeHtml = badgeObj ? `
+    <span class="map-popup-badge" style="background:${badgeObj.color || 'var(--cyan)'}20; color:${badgeObj.color || 'var(--cyan)'}; border:1px solid ${badgeObj.color || 'var(--cyan)'}40;">
+      ${escHtml(badgeObj.text)}
     </span>
+  ` : '';
+
+  const subHtml = (subtitle || source) ? `
+    <div class="map-popup-header-sub">
+      ${subtitle ? `<span class="map-popup-subtitle">${escHtml(subtitle)}</span>` : ''}
+      ${source ? `<span class="map-popup-source">via ${escHtml(source)}</span>` : ''}
+    </div>
   ` : '';
 
   const primaryHtml = primary ? `
@@ -881,15 +941,31 @@ function buildMapPopupHtml({
     <div class="map-popup-desc-text">${escHtml(description)}</div>
   ` : '';
 
+  const linkHtml = linkUrl ? `
+    <div class="map-popup-link-row">
+      <a href="${escHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" class="map-popup-link-btn" onclick="event.stopPropagation()">
+        OPEN SOURCE REPORT ↗
+      </a>
+    </div>
+  ` : '';
+
+  const footerHtml = footer ? `
+    <div class="map-popup-footer">
+      ${typeof footer === 'string' && footer.includes('<span') ? footer : `<span>${escHtml(footer)}</span>`}
+    </div>
+  ` : '';
+
   return `
-    <div class="map-popup">
+    <div class="map-popup map-popup-container">
       <div class="map-popup-header">
-        <div class="map-popup-title">
-          <span class="map-popup-icon">${icon}</span>
-          <span class="map-popup-title-text">${escHtml(title.toUpperCase())}</span>
+        <div class="map-popup-header-top">
+          <div class="map-popup-title">
+            <span class="map-popup-icon">${icon}</span>
+            <span class="map-popup-title-text">${escHtml(title.toUpperCase())}</span>
+          </div>
           ${badgeHtml}
         </div>
-        ${source ? `<div class="map-popup-source">via ${escHtml(source)}</div>` : ''}
+        ${subHtml}
       </div>
       <div class="map-popup-body">
         ${primaryHtml}
@@ -897,8 +973,9 @@ function buildMapPopupHtml({
         ${statsHtml}
         ${contentHtml}
         ${sections || ''}
+        ${linkHtml}
       </div>
-      ${footer ? `<div class="map-popup-footer">${footer}</div>` : ''}
+      ${footerHtml}
     </div>
   `;
 }
@@ -920,11 +997,26 @@ function openMapPopup(coords, html, onClose, opts = {}) {
     .setLngLat(coords);
 
   popup.on('close', () => {
-    if (state.activeMapPopup === popup) {
+    if (state.activeMapPopup === popup || state.weatherPopup === popup || state.borderPopup === popup) {
       state.activeMapPopup = null;
       state.weatherPopup = null;
+      state.borderPopup = null;
       state.selectedWeatherCityId = null;
+      state.selectedNewsItemId = null;
+      state.selectedBorderCrossingId = null;
       state.selectedMarkerId = null;
+      if (moduleLayers.weather?.markers) {
+        moduleLayers.weather.markers.forEach(m => {
+          const el = m.getElement ? m.getElement() : m._element;
+          if (el) el.classList.remove('active');
+        });
+      }
+      if (moduleLayers.border?.markers) {
+        moduleLayers.border.markers.forEach(m => {
+          const el = m.getElement ? m.getElement() : m._element;
+          if (el) el.classList.remove('active');
+        });
+      }
     }
     if (typeof onClose === 'function') onClose();
     updateMapBadgeAndMeta();
@@ -932,17 +1024,50 @@ function openMapPopup(coords, html, onClose, opts = {}) {
 
   popup.addTo(state.map);
   state.activeMapPopup = popup;
-  state.weatherPopup = popup;
   return popup;
 }
 
 function closeMapPopup() {
+  const p = state.activeMapPopup || state.weatherPopup || state.borderPopup;
   if (state.activeMapPopup) {
-    const p = state.activeMapPopup;
+    try { state.activeMapPopup.remove(); } catch(e) {}
     state.activeMapPopup = null;
+  }
+  if (state.weatherPopup) {
+    try { state.weatherPopup.remove(); } catch(e) {}
     state.weatherPopup = null;
+  }
+  if (state.borderPopup) {
+    try { state.borderPopup.remove(); } catch(e) {}
+    state.borderPopup = null;
+  }
+  if (p) {
     try { p.remove(); } catch(e) {}
   }
+  if (typeof document !== 'undefined' && document.querySelectorAll) {
+    try {
+      const openPopups = document.querySelectorAll('.maplibregl-popup, .mapboxgl-popup');
+      openPopups.forEach(pop => {
+        if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+      });
+    } catch(e) {}
+  }
+  state.selectedWeatherCityId = null;
+  state.selectedNewsItemId = null;
+  state.selectedBorderCrossingId = null;
+  state.selectedMarkerId = null;
+
+  Object.keys(moduleLayers).forEach(mod => {
+    if (moduleLayers[mod]?.markers) {
+      moduleLayers[mod].markers.forEach(m => {
+        const el = m.getElement ? m.getElement() : m._element;
+        if (el) el.classList.remove('active');
+        if (m.getPopup && m.getPopup()) {
+          try { m.getPopup().remove(); } catch(e) {}
+        }
+      });
+    }
+  });
 }
 
 function buildWeatherPopupHtml(city, weatherData) {
@@ -976,6 +1101,7 @@ function buildWeatherPopupHtml(city, weatherData) {
   return buildMapPopupHtml({
     icon: '🌤',
     title: city.name,
+    subtitle: `${weatherIcon(c.weatherCode)} ${escHtml(c.description || 'Current Weather')}`,
     source: sourceLabel,
     primary: {
       val: `${c.temp ?? 'N/A'}°C`,
@@ -985,10 +1111,11 @@ function buildWeatherPopupHtml(city, weatherData) {
     stats: [
       { label: 'Humidity', val: `${c.humidity ?? 'N/A'}%` },
       { label: 'Wind', val: `${c.windSpeed ?? 'N/A'} km/h` },
-      { label: 'Precip.', val: `${c.precipitation ?? 0} mm` },
+      { label: 'Precipitation', val: `${c.precipitation ?? 0} mm` },
       { label: 'Visibility', val: `${c.visibility ?? 'N/A'} km` }
     ],
-    sections: forecastHtml
+    sections: forecastHtml,
+    footer: `UPDATED: JUST NOW · SOURCE: ${escHtml(sourceLabel.toUpperCase())}`
   });
 }
 
@@ -1044,6 +1171,29 @@ function openWeatherPopup(city, weatherData) {
   state.weatherPopup = popup;
 }
 
+function updateWeatherCityMarker(cityId, weatherData) {
+  if (!moduleLayers.weather?.markers) return;
+  const marker = moduleLayers.weather.markers.find(m => m._cityId === cityId);
+  if (!marker) return;
+
+  const el = marker.getElement ? marker.getElement() : marker._element;
+  if (!el) return;
+
+  const hasTemp = weatherData && typeof weatherData.current?.temp === 'number';
+  const iconText = hasTemp ? weatherIcon(weatherData.current.weatherCode) : '🌤️';
+  const tempText = hasTemp ? `${weatherData.current.temp}°C` : '—';
+
+  const iconEl = el.querySelector('.weather-marker-icon');
+  if (iconEl) iconEl.textContent = iconText;
+
+  const tempEl = el.querySelector('.weather-marker-temp');
+  if (tempEl) {
+    tempEl.textContent = tempText;
+    if (hasTemp) tempEl.classList.remove('loading');
+    else tempEl.classList.add('loading');
+  }
+}
+
 async function fetchCityWeather(cityId, forceRefresh = false, showPopup = true) {
   const city = KOSOVO_WEATHER_CITIES.find(c => c.id === cityId) || KOSOVO_WEATHER_CITIES[0];
   if (!city) return null;
@@ -1058,7 +1208,7 @@ async function fetchCityWeather(cityId, forceRefresh = false, showPopup = true) 
     if (showPopup && state.selectedWeatherCityId === city.id) {
       openWeatherPopup(city, cached.data);
     }
-    renderWeather(cached.data, city.name);
+    updateWeatherCityMarker(city.id, cached.data);
     return cached.data;
   }
 
@@ -1069,27 +1219,12 @@ async function fetchCityWeather(cityId, forceRefresh = false, showPopup = true) 
     const data = await res.json();
     state.weatherCache[city.id] = { data, fetchedAt: now };
     
+    // Update ONLY this specific city's marker
+    updateWeatherCityMarker(city.id, data);
+
     // Only open popup if this city is STILL currently selected (prevents race condition)
     if (showPopup && state.selectedWeatherCityId === city.id) {
       openWeatherPopup(city, data);
-    }
-    renderWeather(data, city.name);
-
-    // Update marker temp display if rendered
-    if (moduleLayers.weather?.markers) {
-      const marker = moduleLayers.weather.markers.find(m => m._cityId === city.id);
-      if (marker) {
-        const el = marker.getElement ? marker.getElement() : marker._element;
-        if (el && typeof data?.current?.temp === 'number') {
-          let tempEl = el.querySelector('.weather-marker-temp');
-          if (!tempEl) {
-            tempEl = document.createElement('span');
-            tempEl.className = 'weather-marker-temp';
-            el.appendChild(tempEl);
-          }
-          tempEl.textContent = `${data.current.temp}°`;
-        }
-      }
     }
 
     return data;
@@ -1099,13 +1234,16 @@ async function fetchCityWeather(cityId, forceRefresh = false, showPopup = true) 
     if (showPopup && state.selectedWeatherCityId === city.id) {
       openWeatherPopup(city, cached?.data || errData);
     }
-    if (cached && cached.data) {
-      renderWeather(cached.data, city.name);
-      return cached.data;
-    }
-    renderWeather(errData, city.name);
-    return null;
+    updateWeatherCityMarker(city.id, cached?.data || null);
+    return cached?.data || null;
   }
+}
+
+async function fetchAllWeatherCities(forceRefresh = false) {
+  const promises = KOSOVO_WEATHER_CITIES.map(city => {
+    return fetchCityWeather(city.id, forceRefresh, false);
+  });
+  return Promise.allSettled(promises);
 }
 
 function selectWeatherCity(cityId, showPopup = true) {
@@ -1141,6 +1279,108 @@ function selectWeatherCity(cityId, showPopup = true) {
   updateMapBadgeAndMeta();
 }
 
+/**
+ * Authoritative Albanian (sq) and Serbian (sr) Traffic Incident Lexicon
+ */
+const TRAFFIC_RELEVANCE_TERMS = {
+  sq: {
+    accident: [
+      'aksident', 'aksidente', 'aksidenti', 'aksidentuar', 'përplasje', 'përplasur', 'u përplasën',
+      'ndeshje automjetesh', 'ndeshje trafiku', 'rrokullisje e automjetit', 'rrokullisur vetura',
+      'goditje e këmbësorit', 'veturë e aksidentuar', 'aksident trafiku', 'aksident komunikacioni'
+    ],
+    closure_blockage: [
+      'rrugë e mbyllur', 'rruga e mbyllur', 'mbyllet rruga', 'mbyllje e rrugës', 'bllokohet rruga',
+      'rrugë e bllokuar', 'rruga e bllokuar', 'bllokim i rrugës', 'bllokimi i rrugës',
+      'ndërprerje e qarkullimit', 'ndërprerë qarkullimi', 'ndërprerje e trafikut',
+      'bllokadë policore', 'bllokim nga policia', 'e pakalueshme', 'ndalim qarkullimi'
+    ],
+    congestion: [
+      'kolonë automjetesh', 'kolona të gjata', 'kolonë kilometrike', 'kolonë e gjatë',
+      'dendësi trafiku', 'trafik i rënduar', 'fluks i madh i automjeteve', 'vonesa në trafik',
+      'ngarkesë në trafik', 'radhë të gjata automjetesh'
+    ],
+    roadworks: [
+      'punime në rrugë', 'punimet në rrugë', 'punime në aksin', 'mbyllje e korsisë',
+      'korsi e bllokuar', 'devijim i trafikut', 'riorientim i qarkullimit', 'asfaltim i rrugës',
+      'rindërtim i rrugës', 'sinjalistikë rrugore'
+    ],
+    hazard_weather: [
+      'rrëshqitje dheu', 'rrëshqitje e dheut', 'rënie gurësh në rrugë', 'shembje dheu',
+      'vërshime në rrugë', 'ujë në rrugë', 'përmbytje e rrugës', 'vërshuar rruga',
+      'akull në rrugë', 'ngrica në rrugë', 'borë në rrugë', 'rrugë me borë', 'ngricë në rrugë',
+      'dëmtim i rrugës', 'dëmtim i urës', 'shembje e urës', 'gropa në rrugë', 'shembje e rrugës'
+    ]
+  },
+  sr: {
+    accident: [
+      'saobraćajna nezgoda', 'saobraćajne nezgode', 'saobraćajnoj nezgodi', 'saobraćajnih nezgoda',
+      'saobraćajna nesreća', 'saobraćajne nesreće', 'saobraćajnoj nesreći', 'saobraćajnih nesreća',
+      'sudar', 'sudara', 'sudarili', 'sudaru', 'lančani sudar',
+      'udes', 'udesa', 'udesu', 'prevrtanje vozila', 'sletanje sa puta', 'obaranje pešaka'
+    ],
+    closure_blockage: [
+      'zatvoren put', 'zatvorena ulica', 'zatvoreni putevi', 'zatvaranje puta',
+      'blokiran put', 'blokirana ulica', 'blokada puta', 'blokiran saobraćaj',
+      'obustava saobraćaja', 'obustavljen saobraćaj', 'prekid saobraćaja',
+      'neprohodan put', 'neprohodno za saobraćaj', 'policijska blokada', 'policijska blokada puta'
+    ],
+    congestion: [
+      'saobraćajni zastoj', 'zastoji u saobraćaju', 'zastoj', 'saobraćajna gužva',
+      'gužva u saobraćaju', 'gužve u saobraćaju', 'kolona vozila', 'kolone vozila',
+      'duge kolone', 'otežan saobraćaj', 'usporen saobraćaj', 'kilometarska kolona'
+    ],
+    roadworks: [
+      'radovi na putu', 'radovi na kolovozu', 'radovi na deonici', 'zatvaranje trake',
+      'zatvorena traka', 'preusmeravanje saobraćaja', 'rekonstrukcija puta', 'asfaltiranje puta',
+      'popravka kolovoza'
+    ],
+    hazard_weather: [
+      'odron na putu', 'odron kamena', 'odroni na putu', 'odroni', 'klizište', 'klizišta na putu',
+      'poplava na putu', 'voda na kolovozu', 'bujica na putu', 'poledica na putu', 'poledica',
+      'led na putu', 'sneg na putu', 'snežni nanosi', 'oštećenje puta',
+      'oštećenje mosta', 'rupa na kolovozu', 'urušavanje mosta', 'oštećen most'
+    ]
+  }
+};
+
+function classifyTrafficIncident(title, description) {
+  const text = `${title || ''} ${description || ''}`.toLowerCase();
+  
+  for (const lang of ['sq', 'sr']) {
+    const terms = TRAFFIC_RELEVANCE_TERMS[lang];
+    if (!terms) continue;
+
+    for (const term of terms.closure_blockage) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'road_closure', label: 'Road Closure / Blockade' };
+      }
+    }
+    for (const term of terms.accident) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'accident', label: 'Traffic Accident' };
+      }
+    }
+    for (const term of terms.hazard_weather) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'hazard', label: 'Road Hazard / Weather' };
+      }
+    }
+    for (const term of terms.roadworks) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'roadworks', label: 'Roadworks / Lane Closure' };
+      }
+    }
+    for (const term of terms.congestion) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'congestion', label: 'Traffic Congestion' };
+      }
+    }
+  }
+
+  return { isTraffic: false, type: null, label: null };
+}
+
 const KOSOVO_TRAFFIC_LOCATIONS = [
   { city: 'Vushtrri', lat: 42.8250, lon: 20.9660, keywords: ['smrekonic', 'smrekovnic', 'vushtrr', 'vučitrn', 'vucitrn'] },
   { city: 'Drenas', lat: 42.6250, lon: 20.8920, keywords: ['komoran', 'drenas', 'gllogoc', 'glogovac'] },
@@ -1167,7 +1407,7 @@ const KOSOVO_TRAFFIC_LOCATIONS = [
   { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica'] },
   { city: 'Malishevë', lat: 42.4820, lon: 20.7450, keywords: ['malishev', 'mališevo', 'malisevo'] },
   { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['dardan', 'kamenic', 'kamenica'] },
-  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['kllokot', 'klokot', 'viti', 'vitina'] },
+  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['kllokot', 'klokot', 'viti', 'vitina'] }
 ];
 
 function extractTrafficLocation(title, description) {
@@ -1198,28 +1438,40 @@ function ensureTrafficIncidentLocations(traffic) {
 
 function renderTraffic(traffic) {
   ensureTrafficIncidentLocations(traffic);
-  if (!traffic || traffic.error) { $('incidentList').innerHTML = `<div class="error-state">Traffic data unavailable</div>`; return; }
-  if (traffic.source === 'none') {
-    $('trafficMeta').textContent = 'via news RSS';
-    $('trafficAnomaly').style.display = 'none';
-    $('trafficAnomalyBanner').style.display = 'none';
-    $('incidentList').innerHTML = '<div class="empty-state">No current traffic incidents reported</div>';
+  if (!traffic || traffic.error) {
+    $('incidentList').innerHTML = `<div class="error-state">Traffic data unavailable</div>`;
     return;
   }
   
-  $('trafficMeta').textContent = `via news RSS`;
+  $('trafficMeta').textContent = `via intelligence RSS feeds`;
   $('trafficAnomaly').style.display = traffic.anomalyDetected ? '' : 'none';
   $('trafficAnomalyBanner').style.display = traffic.anomalyDetected ? '' : 'none';
   if (traffic.anomalyDetected) $('trafficAnomalyBanner').textContent = `🚨 ${traffic.anomalySummary}`;
-  $('incidentList').innerHTML = (traffic.incidents||[]).length
-    ? (traffic.incidents||[]).map(inc => `<div class="incident-item ${inc.anomaly?'anomaly':''}">
+
+  const incidents = traffic.incidents || [];
+  if (incidents.length === 0) {
+    $('incidentList').innerHTML = '<div class="empty-state">No active traffic incidents reported</div>';
+    return;
+  }
+
+  $('incidentList').innerHTML = incidents.map(inc => {
+    const typeLabel = inc.typeLabel || (inc.type ? inc.type.replace(/_/g, ' ').toUpperCase() : 'TRAFFIC INCIDENT');
+    return `
+      <div class="incident-item ${inc.anomaly ? 'anomaly' : ''}">
         <div class="incident-body">
-          <div class="incident-type">${escHtml(inc.type.replace(/_/g,' '))}${inc.location?.city ? ` <span class="incident-road">📍 ${escHtml(inc.location.city)}</span>` : ''}${inc.anomaly?`<span class="incident-anomaly-tag">⚠ ${inc.anomalyType}</span>`:''}</div>
+          <div class="incident-type">
+            <span class="incident-badge">${escHtml(typeLabel)}</span>
+            ${inc.location?.city ? ` <span class="incident-road">📍 ${escHtml(inc.location.city)}</span>` : ''}
+            ${inc.anomaly ? `<span class="incident-anomaly-tag">⚠ ${escHtml(inc.anomalyType || 'ANOMALY')}</span>` : ''}
+          </div>
+          <div class="incident-title" style="font-weight:600;font-size:12px;margin:4px 0 2px;color:#f1f5f9;">${escHtml(inc.title)}</div>
           <div class="incident-desc">${escHtml(inc.description)}</div>
           <div class="incident-source">📰 ${escHtml(inc.source)} · ${formatTimeAgo(inc.publishedAt)}</div>
-          ${inc.url && inc.url !== '#' ? `<div class="incident-link"><a href="${escHtml(inc.url)}" target="_blank">Read article</a></div>` : ''}
-        </div></div>`).join('')
-    : '<div class="empty-state">No current traffic incidents reported</div>';
+          ${inc.url && inc.url !== '#' ? `<div class="incident-link"><a href="${escHtml(inc.url)}" target="_blank" rel="noopener noreferrer">Read source article ↗</a></div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderTrafficMarkers(trafficData) {
@@ -1237,24 +1489,37 @@ function renderTrafficMapMarkers(trafficData) {
   }
 
   ensureTrafficIncidentLocations(data);
-  data.incidents.forEach(inc => {
-    if (!inc.location?.lat || !inc.location?.lon) return;
-    const color = inc.anomaly ? '#fb923c' : '#fbbf24';
+
+  // Strictly filter for incidents with VALID geographic coordinates (NO FAKE MARKERS)
+  const geoIncidents = data.incidents.filter(inc => inc.location && typeof inc.location.lat === 'number' && typeof inc.location.lon === 'number');
+
+  geoIncidents.forEach(inc => {
+    const isCritical = inc.type === 'road_closure' || inc.anomaly;
+    const color = isCritical ? '#f87171' : (inc.type === 'accident' ? '#fb923c' : '#fbbf24');
+    const typeLabel = inc.typeLabel || (inc.type ? inc.type.replace(/_/g, ' ') : 'Traffic Event');
+
     const popupHtml = buildMapPopupHtml({
       icon: '🚦',
-      title: inc.type ? inc.type.replace(/_/g, ' ') : 'Traffic Event',
-      source: 'Traffic Intelligence',
-      badge: inc.anomaly ? { text: 'ANOMALY', color: '#fb923c' } : { text: 'MONITORED', color: '#34d399' },
-      description: inc.description || 'Live traffic telemetry point',
+      title: typeLabel,
+      subtitle: inc.location.city || 'Kosovo Road',
+      source: inc.source || 'Traffic Intelligence',
+      badge: inc.anomaly ? { text: 'ANOMALY', color: '#f87171' } : { text: 'ACTIVE', color: '#fb923c' },
+      description: inc.title + (inc.description && inc.description !== inc.title ? ` — ${inc.description}` : ''),
       stats: [
         { label: 'Location', val: inc.location.city || 'Kosovo Road' },
-        { label: 'Delay', val: inc.delay > 0 ? `+${inc.delay} min` : 'None', color: inc.delay > 0 ? '#fb923c' : '#34d399' },
-        { label: 'Speed', val: inc.avgSpeed ? `${inc.avgSpeed} km/h` : 'Normal' },
-        { label: 'Status', val: inc.status || 'Active' }
-      ]
+        { label: 'Type', val: typeLabel },
+        { label: 'Reported', val: formatTimeAgo(inc.publishedAt) }
+      ],
+      linkUrl: inc.url && inc.url !== '#' ? inc.url : undefined,
+      footer: `REPORTED: ${formatTimeAgo(inc.publishedAt).toUpperCase()} · SOURCE: ${escHtml((inc.source || 'TRAFFIC INTEL').toUpperCase())}`
     });
 
-    const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, inc.anomaly ? 14 : 12, 2) })
+    const markerEl = createMapMarkerElement(color, isCritical ? 14 : 12, 2);
+    if (isCritical) {
+      markerEl.classList.add('threat-pulse-critical');
+    }
+
+    const marker = new maplibregl.Marker({ element: markerEl })
       .setLngLat([inc.location.lon, inc.location.lat])
       .setPopup(createMapPopup(popupHtml))
       .addTo(state.map);
@@ -1262,6 +1527,7 @@ function renderTrafficMapMarkers(trafficData) {
     marker._module = 'traffic';
     moduleLayers.traffic.markers.push(marker);
   });
+
   updateMapBadgeAndMeta();
 }
 
@@ -1311,6 +1577,7 @@ function renderRadiationMapMarkers(radData) {
     const popupHtml = buildMapPopupHtml({
       icon: '☢️',
       title: n.name || 'Radiation Sensor',
+      subtitle: 'EURDEP Sensor Station',
       source: data.source || 'EURDEP Sensor Network',
       badge: { text: (n.status || 'NORMAL').toUpperCase(), color },
       primary: {
@@ -1323,7 +1590,8 @@ function renderRadiationMapMarkers(radData) {
         { label: 'Distance', val: n.distanceKm ? `${n.distanceKm} km` : 'Local' },
         { label: 'Data Quality', val: (data.dataQuality || 'Verified').toUpperCase() },
         { label: 'Unit', val: 'µSv/h' }
-      ]
+      ],
+      footer: `STATUS: ${(n.status || 'NORMAL').toUpperCase()} · SOURCE: EURDEP NETWORK`
     });
 
     const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 12, 2) })
@@ -1480,19 +1748,21 @@ function renderEarthquakeMapMarkers(eqData) {
     const popupHtml = buildMapPopupHtml({
       icon: '🌊',
       title: 'Seismic Event',
+      subtitle: eq.place || 'Regional Event',
       source: data.source || 'USGS / EMSC',
-      badge: { text: `M${eq.magnitude.toFixed(1)}`, color },
+      badge: { text: `M${eq.magnitude.toFixed(1)} · ${(eq.label || 'Earthquake').toUpperCase()}`, color },
       primary: {
-        val: `M${eq.magnitude.toFixed(1)} ${eq.label || 'Earthquake'}`,
-        sub: eq.place || 'Regional Event',
-        secondary: formatTimeAgo(eq.time)
+        val: `M${eq.magnitude.toFixed(1)}`,
+        sub: eq.label || 'Earthquake',
+        secondary: `${eq.place} (${eq.distanceKm} km away)`
       },
       stats: [
         { label: 'Depth', val: `${eq.depth} km` },
         { label: 'Magnitude', val: eq.magnitude.toFixed(1), color },
-        { label: 'Location', val: eq.place || 'Regional' },
+        { label: 'Distance', val: `${eq.distanceKm} km` },
         { label: 'Time', val: formatHour(eq.time) || 'Recent' }
-      ]
+      ],
+      footer: `REPORTED: ${formatTimeAgo(eq.time).toUpperCase()} · SOURCE: USGS / EMSC`
     });
 
     const marker = new maplibregl.Marker({ element })
@@ -1506,6 +1776,86 @@ function renderEarthquakeMapMarkers(eqData) {
   updateMapBadgeAndMeta();
 }
 
+function buildNewsPopupHtml(item) {
+  if (!item) return '';
+  const s = item.intensityScore || 5;
+  const sev = (item.severity ? item.severity.toUpperCase() : (s >= 9 ? 'CRITICAL' : (s >= 7 ? 'HIGH' : (s >= 5 ? 'MEDIUM' : 'LOW'))));
+  const color = sev === 'CRITICAL' ? '#f87171' : sev === 'HIGH' ? '#fb923c' : sev === 'MEDIUM' ? '#fbbf24' : '#34d399';
+
+  const titleText = item.title || 'News Intelligence';
+  const rawUrl = item.url ? item.url.trim() : '';
+  const url = isValidArticleUrl(rawUrl) ? rawUrl : (rawUrl && rawUrl !== '#' && !rawUrl.startsWith('#') ? rawUrl : '');
+
+  const headlineHtml = url ? `
+    <a class="news-popup-headline-link" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open article on source website">
+      ${escHtml(titleText)}
+    </a>
+  ` : `
+    <div class="news-popup-headline">${escHtml(titleText)}</div>
+  `;
+
+  return buildMapPopupHtml({
+    icon: '📰',
+    title: 'NEWS INTELLIGENCE',
+    source: item.source || 'News Feed',
+    badge: { text: sev, color },
+    contentHtml: headlineHtml,
+    stats: []
+  });
+}
+
+function closeNewsPopup() {
+  closeMapPopup();
+  state.selectedNewsItemId = null;
+  if (moduleLayers.news?.markers) {
+    moduleLayers.news.markers.forEach(m => {
+      const el = m.getElement ? m.getElement() : m._element;
+      if (el) el.classList.remove('active');
+    });
+  }
+}
+
+function openNewsPopup(item, coords, markerEl = null) {
+  if (!state.map) return null;
+
+  closeMapPopup();
+  const itemId = item.id || item.url || item.title;
+  state.selectedNewsItemId = itemId;
+
+  // Synchronize active class on all news markers
+  if (moduleLayers.news?.markers) {
+    moduleLayers.news.markers.forEach(m => {
+      const el = m.getElement ? m.getElement() : m._element;
+      if (el) {
+        if (m._newsItemId === itemId) el.classList.add('active');
+        else el.classList.remove('active');
+      }
+    });
+  }
+
+  const html = buildNewsPopupHtml(item);
+  const popup = createMapPopup(html, { className: 'news-map-popup' })
+    .setLngLat(coords);
+
+  popup.on('close', () => {
+    if (state.activeMapPopup === popup) {
+      state.activeMapPopup = null;
+      state.selectedNewsItemId = null;
+      if (moduleLayers.news?.markers) {
+        moduleLayers.news.markers.forEach(m => {
+          const el = m.getElement ? m.getElement() : m._element;
+          if (el) el.classList.remove('active');
+        });
+      }
+    }
+    updateMapBadgeAndMeta();
+  });
+
+  popup.addTo(state.map);
+  state.activeMapPopup = popup;
+  return popup;
+}
+
 function renderNewsMapMarkers(newsData) {
   if (!state.map || state.activeMapModule !== 'news') return;
   clearMarkerList(moduleLayers.news.markers);
@@ -1516,62 +1866,91 @@ function renderNewsMapMarkers(newsData) {
     return;
   }
 
-  data.items.forEach(item => {
+  const itemsWithCoords = [];
+  data.items.forEach((item, idx) => {
     const loc = extractTrafficLocation(item.title, item.description);
     if (loc && typeof loc.lat === 'number' && typeof loc.lon === 'number') {
       const s = item.intensityScore || 5;
-      const color = s >= 9 ? '#f87171' : s >= 7 ? '#fb923c' : '#fbbf24';
-      const sevLabel = s >= 9 ? 'CRITICAL' : (s >= 7 ? 'HIGH' : (s >= 5 ? 'MEDIUM' : 'LOW'));
-      const timeStr = item.publishedAt ? formatTimeAgo(item.publishedAt) : 'Recently';
+      const sev = (item.severity ? item.severity.toUpperCase() : (s >= 9 ? 'CRITICAL' : (s >= 7 ? 'HIGH' : (s >= 5 ? 'MEDIUM' : 'LOW'))));
+      const color = sev === 'CRITICAL' ? '#f87171' : sev === 'HIGH' ? '#fb923c' : sev === 'MEDIUM' ? '#fbbf24' : '#34d399';
+      const itemId = item.id || item.url || `news-${idx}-${loc.city}`;
+      itemsWithCoords.push({ item, loc, sev, color, itemId, coords: [loc.lon, loc.lat] });
+    }
+  });
 
-      const popupHtml = buildMapPopupHtml({
-        icon: '📰',
-        title: 'News Intelligence',
-        source: item.source || 'News Feed',
-        badge: { text: sevLabel, color },
-        description: item.title,
-        stats: [
-          { label: 'Location', val: loc.city },
-          { label: 'Threat Score', val: `${s}/10`, color },
-          { label: 'Published', val: timeStr },
-          { label: 'Category', val: (item.category || 'general').toUpperCase() }
-        ]
+  const clusters = clusterGeoItems(itemsWithCoords, d => d.coords);
+
+  clusters.forEach(c => {
+    if (c.isCluster) {
+      const hasCritical = c.items.some(i => i.sev === 'CRITICAL');
+      const hasHigh = c.items.some(i => i.sev === 'HIGH');
+      const highestSev = hasCritical ? 'CRITICAL' : (hasHigh ? 'HIGH' : 'NORMAL');
+      const markerEl = createClusterMarkerElement(c, '📰', highestSev);
+      const marker = new maplibregl.Marker({ element: markerEl })
+        .setLngLat([c.lng, c.lat])
+        .addTo(state.map);
+      marker._module = 'news';
+      moduleLayers.news.markers.push(marker);
+    } else {
+      const { item, color, itemId, coords, sev } = c.item;
+      const el = createMapMarkerElement(color, 12, 2, sev);
+      el.dataset.newsId = itemId;
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        if (state.selectedNewsItemId === itemId && state.activeMapPopup) {
+          closeNewsPopup();
+          updateMapBadgeAndMeta();
+          return;
+        }
+
+        openNewsPopup(item, coords, el);
       });
 
-      const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 12, 2) })
-        .setLngLat([loc.lon, loc.lat])
-        .setPopup(createMapPopup(popupHtml))
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat(coords)
         .addTo(state.map);
 
       marker._module = 'news';
+      marker._newsItemId = itemId;
       moduleLayers.news.markers.push(marker);
     }
   });
+
   updateMapBadgeAndMeta();
 }
 
-function createWeatherMarkerElement(city, isActive = false, temp = null) {
+function createWeatherMarkerElement(city, weatherData = null, isActive = false) {
   const container = document.createElement('div');
-  container.className = `weather-marker-container ${isActive ? 'active' : ''}`;
+  container.className = `weather-custom-marker ${isActive ? 'active' : ''}`;
   container.dataset.cityId = city.id;
-  container.setAttribute('title', `Weather for ${city.name}`);
+  container.setAttribute('title', `Weather for ${city.name} — Click for details`);
 
-  const icon = document.createElement('span');
-  icon.className = 'weather-marker-icon';
-  icon.textContent = '🌤';
-  container.appendChild(icon);
+  const hasTemp = weatherData && typeof weatherData.current?.temp === 'number';
+  const iconText = hasTemp ? weatherIcon(weatherData.current.weatherCode) : '🌤️';
+  const tempText = hasTemp ? `${weatherData.current.temp}°C` : '—';
 
-  const name = document.createElement('span');
-  name.className = 'weather-marker-name';
-  name.textContent = city.name;
-  container.appendChild(name);
+  const pill = document.createElement('div');
+  pill.className = 'weather-marker-pill';
 
-  if (typeof temp === 'number') {
-    const tempEl = document.createElement('span');
-    tempEl.className = 'weather-marker-temp';
-    tempEl.textContent = `${temp}°`;
-    container.appendChild(tempEl);
-  }
+  const iconEl = document.createElement('span');
+  iconEl.className = 'weather-marker-icon';
+  iconEl.textContent = iconText;
+  pill.appendChild(iconEl);
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'weather-marker-name';
+  nameEl.textContent = city.name;
+  pill.appendChild(nameEl);
+
+  const tempEl = document.createElement('span');
+  tempEl.className = `weather-marker-temp ${hasTemp ? '' : 'loading'}`;
+  tempEl.textContent = tempText;
+  pill.appendChild(tempEl);
+
+  container.appendChild(pill);
 
   container.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1582,18 +1961,28 @@ function createWeatherMarkerElement(city, isActive = false, temp = null) {
   return container;
 }
 
-function renderWeatherMapMarkers(weatherData) {
+function renderWeatherMapMarkers(initialWeatherData = null) {
   if (!state.map || state.activeMapModule !== 'weather') return;
   clearMarkerList(moduleLayers.weather.markers);
+
+  if (!state.weatherCache) state.weatherCache = {};
+
+  // If initial status weather arrived for a specific city, seed that specific city's cache
+  if (initialWeatherData && typeof initialWeatherData.current?.temp === 'number') {
+    const loc = (initialWeatherData.location || '').toLowerCase();
+    const matchedCity = KOSOVO_WEATHER_CITIES.find(c => c.name.toLowerCase() === loc || c.id === loc) || KOSOVO_WEATHER_CITIES[0];
+    if (matchedCity && (!state.weatherCache[matchedCity.id] || !state.weatherCache[matchedCity.id].data)) {
+      state.weatherCache[matchedCity.id] = { data: initialWeatherData, fetchedAt: Date.now() };
+    }
+  }
 
   const selectedId = state.selectedWeatherCityId;
 
   KOSOVO_WEATHER_CITIES.forEach(city => {
     const isActive = (city.id === selectedId) && (state.weatherPopup !== null);
-    const cached = state.weatherCache?.[city.id]?.data;
-    const temp = cached?.current?.temp ?? (city.id === 'prishtine' && weatherData?.current?.temp ? weatherData.current.temp : null);
+    const cachedData = state.weatherCache[city.id]?.data || null;
 
-    const el = createWeatherMarkerElement(city, isActive, temp);
+    const el = createWeatherMarkerElement(city, cachedData, isActive);
     const marker = new maplibregl.Marker({ element: el })
       .setLngLat([city.lon, city.lat])
       .addTo(state.map);
@@ -1604,6 +1993,9 @@ function renderWeatherMapMarkers(weatherData) {
   });
 
   updateMapBadgeAndMeta();
+
+  // Asynchronously fetch weather for all cities immediately to populate temperatures without clicking
+  fetchAllWeatherCities();
 }
 
 function renderAqiMapMarkers(aqiData) {
@@ -1621,6 +2013,7 @@ function renderAqiMapMarkers(aqiData) {
   const popupHtml = buildMapPopupHtml({
     icon: '🌍',
     title: 'Air Quality Index',
+    subtitle: 'European Air Quality (EAQI)',
     source: data.source || 'Open-Meteo',
     badge: { text: c?.category?.label || 'Good', color },
     primary: {
@@ -1633,7 +2026,8 @@ function renderAqiMapMarkers(aqiData) {
       { label: 'PM10', val: c?.pollutants?.pm10 ? `${c.pollutants.pm10.value} µg/m³` : 'N/A' },
       { label: 'NO2', val: c?.pollutants?.no2 ? `${c.pollutants.no2.value} µg/m³` : 'N/A' },
       { label: 'O3', val: c?.pollutants?.o3 ? `${c.pollutants.o3.value} µg/m³` : 'N/A' }
-    ]
+    ],
+    footer: `DOMINANT: ${(c?.dominantPollutant || 'PM2.5').toUpperCase()} · SOURCE: OPEN-METEO`
   });
 
   const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 14, 3) })
@@ -1900,8 +2294,9 @@ function renderAviationMapMarkers(aviationData) {
     const popupHtml = buildMapPopupHtml({
       icon: '✈️',
       title: callsignStr,
+      subtitle: ac.registration ? `Reg: ${ac.registration}` : (ac.operator || 'Aircraft In Flight'),
       source: 'OpenSky Network',
-      badge: { text: ac.category.replace('_', ' '), color: catColor },
+      badge: { text: ac.category.replace(/_/g, ' ').toUpperCase(), color: catColor },
       primary: {
         val: callsignStr,
         sub: `ICAO: ${ac.icao24.toUpperCase()}`,
@@ -1912,7 +2307,8 @@ function renderAviationMapMarkers(aviationData) {
         { label: 'Speed', val: spdStr },
         { label: 'Heading', val: hdgStr },
         { label: 'Type', val: typeStr }
-      ]
+      ],
+      footer: `ICAO: ${ac.icao24.toUpperCase()} · OPEN SKY BALKAN AIRSPACE`
     });
 
     const marker = new maplibregl.Marker({ element: el })
@@ -2185,8 +2581,43 @@ function toggleModule(panelId) {
       overlay.classList.remove('active');
       overlay.setAttribute('aria-hidden', 'true');
     }
-    document.querySelectorAll('.module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === 'weatherPanel'));
+    const cctvPanel = $('cctvIntelligencePanel');
+    if (cctvPanel) {
+      cctvPanel.style.display = 'none';
+      closeCCTVViewer();
+    }
+    document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === 'weatherPanel'));
     setActiveMapModule('weather', state.data);
+    return;
+  }
+
+  // Border Crossing is purely map-based: toggle border markers on map without overlay panel
+  if (panelId === 'borderPanel') {
+    if (state.activeMapModule === 'border') {
+      closeModulePanel();
+      return;
+    }
+    ensureMapVisible();
+    if (overlay) {
+      overlay.querySelectorAll('.overlay-panel').forEach(p => { p.style.display = 'none'; });
+      overlay.classList.remove('active');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    const cctvPanel = $('cctvIntelligencePanel');
+    if (cctvPanel) {
+      cctvPanel.style.display = 'none';
+      closeCCTVViewer();
+    }
+    document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === 'borderPanel'));
+    
+    if (!state.borderData) {
+      fetchBorder().then(() => {
+        if (state.activeMapModule === 'border') {
+          setActiveMapModule('border', state.borderData);
+        }
+      });
+    }
+    setActiveMapModule('border', state.borderData);
     return;
   }
 
@@ -2195,6 +2626,7 @@ function toggleModule(panelId) {
 
   const panelToModule = {
     'newsPanel': 'news',
+    'weatherPanel': 'weather',
     'trafficPanel': 'traffic',
     'radiationPanel': 'radiation',
     'aqiPanel': 'aqi',
@@ -2203,7 +2635,10 @@ function toggleModule(panelId) {
     'aviationPanel': 'aviation',
     'telegramPanel': 'telegram',
     'borderPanel': 'border',
-    'cctvIntelligencePanel': 'cctv'
+    'cctvIntelligencePanel': 'cctv',
+    'routePanel': 'route',
+    'alertPanel': 'alert',
+    'settingsPanel': 'settings'
   };
 
   const targetModule = panelToModule[panelId] || null;
@@ -2227,7 +2662,7 @@ function toggleModule(panelId) {
     const cctvName = $('cctvName');
     if (cctvName) cctvName.textContent = 'CCTV Surveillance';
 
-    document.querySelectorAll('.module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === panelId));
+    document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === panelId));
     setActiveMapModule('cctv', state.data);
     renderCCTVCameraList();
     if (CCTV_CAMERAS.length > 0) {
@@ -2249,7 +2684,7 @@ function toggleModule(panelId) {
       if (titleEl) titleEl.textContent = panel.dataset.panelTitle || 'Module';
       overlay.setAttribute('aria-hidden', 'false');
     }
-    document.querySelectorAll('.module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === panelId));
+    document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === panelId));
 
     // Atomic module switch
     setActiveMapModule(targetModule, state.data);
@@ -2305,13 +2740,25 @@ function closeModulePanel() {
 
   setActiveMapModule(null);
   
-  document.querySelectorAll('.module-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.remove('active'));
   if (state.map) {
     setTimeout(() => state.map.resize(), 200);
   }
 }
 
-function createMapMarkerElement(color, size = 16, border = 3) {
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const overlay = $('moduleOverlay');
+    const cctvPanel = $('cctvIntelligencePanel');
+    const isOverlayOpen = overlay && overlay.classList.contains('active');
+    const isCctvOpen = cctvPanel && cctvPanel.style.display !== 'none';
+    if (isOverlayOpen || isCctvOpen || state.activeMapModule) {
+      closeModulePanel();
+    }
+  }
+});
+
+function createMapMarkerElement(color, size = 16, border = 3, severity = null) {
   const marker = document.createElement('div');
   marker.className = 'mapbox-marker';
   marker.style.width = `${size}px`;
@@ -2321,7 +2768,106 @@ function createMapMarkerElement(color, size = 16, border = 3) {
   marker.style.backgroundColor = color;
   marker.style.boxShadow = `0 0 14px ${color}`;
   marker.style.cursor = 'pointer';
+  marker.style.position = 'relative';
+
+  const sev = String(severity || '').toUpperCase();
+  if (sev === 'CRITICAL') {
+    marker.classList.add('threat-pulse-critical');
+    const radar = document.createElement('div');
+    radar.className = 'radar-ring critical';
+    marker.appendChild(radar);
+  } else if (sev === 'HIGH') {
+    marker.classList.add('threat-pulse-high');
+  }
+
   return marker;
+}
+
+/**
+ * Spatial clustering utility for MapLibre markers.
+ * Groups nearby points within screen pixel radius when zoomed out.
+ */
+function clusterGeoItems(items, getLngLat, radiusPixels = 38) {
+  if (!state.map || !Array.isArray(items) || items.length === 0) return [];
+  const zoom = state.map.getZoom();
+  
+  // When zoomed in sufficiently close (zoom >= 11.5), render individual markers with full popups
+  if (zoom >= 11.5) {
+    return items.map(item => ({ isCluster: false, item }));
+  }
+
+  const clusters = [];
+  items.forEach(item => {
+    const coords = getLngLat(item);
+    if (!coords || typeof coords[0] !== 'number' || typeof coords[1] !== 'number') return;
+
+    const point = state.map.project(coords);
+    let matchedCluster = null;
+
+    for (const c of clusters) {
+      const dist = Math.hypot(c.point.x - point.x, c.point.y - point.y);
+      if (dist <= radiusPixels) {
+        matchedCluster = c;
+        break;
+      }
+    }
+
+    if (matchedCluster) {
+      matchedCluster.items.push(item);
+      const count = matchedCluster.items.length;
+      matchedCluster.lng = (matchedCluster.lng * (count - 1) + coords[0]) / count;
+      matchedCluster.lat = (matchedCluster.lat * (count - 1) + coords[1]) / count;
+      matchedCluster.point = state.map.project([matchedCluster.lng, matchedCluster.lat]);
+    } else {
+      clusters.push({
+        isCluster: false,
+        lng: coords[0],
+        lat: coords[1],
+        point,
+        items: [item],
+        item
+      });
+    }
+  });
+
+  return clusters.map(c => {
+    if (c.items.length > 1) {
+      c.isCluster = true;
+    }
+    return c;
+  });
+}
+
+function createClusterMarkerElement(cluster, icon = '📍', highestSeverity = 'normal') {
+  const el = document.createElement('div');
+  const sevUpper = String(highestSeverity || '').toUpperCase();
+  const sevClass = sevUpper === 'CRITICAL' ? 'cluster-critical' : (sevUpper === 'HIGH' ? 'cluster-high' : '');
+  
+  el.className = `map-cluster-marker ${sevClass}`;
+  el.innerHTML = `
+    <span class="map-cluster-icon">${icon}</span>
+    <span class="map-cluster-count">${cluster.items.length}</span>
+  `;
+
+  if (sevUpper === 'CRITICAL') {
+    const radar = document.createElement('div');
+    radar.className = 'radar-ring critical';
+    el.appendChild(radar);
+  }
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    if (state.map) {
+      state.map.flyTo({
+        center: [cluster.lng, cluster.lat],
+        zoom: Math.min(14, state.map.getZoom() + 2.2),
+        duration: 650
+      });
+    }
+  });
+
+  return el;
 }
 
 function createCCTVMarkerElement(camera, map) {
@@ -2391,6 +2937,24 @@ function highlightActiveCCTV(camera) {
   });
 }
 
+function getCCTVEmbedUrl(camera) {
+  if (!camera) return '';
+  if (camera.embedUrl) return camera.embedUrl;
+  if (!camera.pageUrl) return '';
+
+  const url = camera.pageUrl.trim();
+  if (url.includes('/embed/')) return url;
+
+  if (url.includes('video.gjirafa.com/')) {
+    const slug = url.split('video.gjirafa.com/')[1].split('?')[0].replace(/^\/+|\/+$/g, '');
+    if (slug) {
+      return `https://video.gjirafa.com/embed/${slug}?autoplay=true&am=true`;
+    }
+  }
+
+  return url;
+}
+
 function openCCTVViewer(camera) {
   currentCCTVCamera = camera;
   
@@ -2405,13 +2969,17 @@ function openCCTVViewer(camera) {
     panel.style.display = 'flex';
     
     if (nameEl) {
-      nameEl.textContent = camera.name || 'CAMERA';
+      nameEl.textContent = camera.location || camera.name || 'CAMERA';
     }
     
     const isLive = (camera.status || '').toLowerCase() === 'live';
     if (statusEl) {
       statusEl.textContent = isLive ? '● LIVE' : `● ${(camera.status || 'UNKNOWN').toUpperCase()}`;
       statusEl.className = `cctv-status-indicator ${isLive ? 'live' : ''}`;
+    }
+
+    if (openLink) {
+      openLink.href = camera.pageUrl || '#';
     }
 
     const metadataEl = panel.querySelector('.cctv-intelligence-metadata');
@@ -2444,19 +3012,18 @@ function openCCTVViewer(camera) {
       `;
     }
     
-    if (videoUnavailable) {
-      videoUnavailable.style.display = 'flex';
-      videoUnavailable.innerHTML = `
-        <div class="cctv-unavailable-icon">📹</div>
-        <div class="cctv-unavailable-title" style="font-weight:600; color:var(--text-primary); font-size:13px; text-align:center;">${escHtml(camera.location || camera.name)}</div>
-        <div class="cctv-unavailable-text" style="font-size:11px; color:var(--text-dim); text-align:center;">External live feed via ${escHtml(camera.provider || 'provider')}</div>
-        <a id="cctvOpenFeed" class="cctv-open-feed-btn" href="${escHtml(camera.pageUrl || '#')}" target="_blank" rel="noopener noreferrer" style="margin-top:4px;">↗ OPEN LIVE FEED</a>
-      `;
-    }
-    
+    const embedUrl = getCCTVEmbedUrl(camera);
+
+    // Embed ONLY the dedicated camera player - no external website UI
     if (videoFrame) {
       videoFrame.style.display = 'block';
-      videoFrame.src = camera.pageUrl || '';
+      if (embedUrl && videoFrame.src !== embedUrl) {
+        videoFrame.src = embedUrl;
+      }
+    }
+
+    if (videoUnavailable) {
+      videoUnavailable.style.display = embedUrl ? 'none' : 'flex';
     }
 
     highlightActiveCCTV(camera);
@@ -2490,9 +3057,29 @@ function centerMapOnCCTV(camera) {
   });
 }
 
+function toggleCCTVFullscreen() {
+  const container = $('cctvVideoContainer') || $('cctvVideoFrame');
+  if (!container) return;
+
+  if (!document.fullscreenElement) {
+    if (container.requestFullscreen) {
+      container.requestFullscreen();
+    } else if (container.webkitRequestFullscreen) {
+      container.webkitRequestFullscreen();
+    } else if (container.msRequestFullscreen) {
+      container.msRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    }
+  }
+}
+
 window.openCCTVViewer = openCCTVViewer;
 window.closeCCTVViewer = closeCCTVViewer;
 window.centerMapOnCCTV = centerMapOnCCTV;
+window.toggleCCTVFullscreen = toggleCCTVFullscreen;
 
 function openCCTVModule() {
   toggleModule('cctvIntelligencePanel');
@@ -2542,11 +3129,12 @@ function initMap() {
     zoom: DEFAULT_MAP_ZOOM,
     pitch: 35,
     projection: 'mercator',
+    attributionControl: false
   });
 
-  state.map.addControl(new maplibregl.NavigationControl());
   state.map.addControl(new BasemapControl(), 'top-right');
-  state.map.addControl(new MapModeControl(), 'bottom-right');
+  state.map.addControl(new MapModeControl(), 'top-right');
+  state.map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'bottom-right');
 
   state.map.on('load', () => {
     if (state.data) updateMap(state.data);
@@ -2558,6 +3146,7 @@ function initMap() {
         const popupHtml = buildMapPopupHtml({
           icon: '🔥',
           title: 'Wildfire Detection',
+          subtitle: 'Thermal Anomaly Detection',
           source: 'NASA FIRMS / EONET',
           badge: { text: `${props.confidence || 'HIGH'}% CONF`, color: '#f87171' },
           primary: {
@@ -2571,7 +3160,7 @@ function initMap() {
             { label: 'Acq. Date', val: props.acq_date || 'Live' },
             { label: 'Acq. Time', val: props.acq_time ? formatHour(props.acq_time) : 'UTC' }
           ],
-          footer: `COORDINATES: ${Number(props.lat)?.toFixed(4)}, ${Number(props.lon)?.toFixed(4)}`
+          footer: `COORDINATES: ${Number(props.lat)?.toFixed(4)}, ${Number(props.lon)?.toFixed(4)} · NASA FIRMS`
         });
         openMapPopup(e.lngLat, popupHtml);
       }
@@ -2591,6 +3180,7 @@ function initMap() {
         const popupHtml = buildMapPopupHtml({
           icon: '☢️',
           title: props.name || 'Radiation Station',
+          subtitle: 'EURDEP Sensor Station',
           source: 'EURDEP Sensor Network',
           badge: { text: (props.status || 'NORMAL').toUpperCase(), color },
           primary: {
@@ -2601,7 +3191,8 @@ function initMap() {
             { label: 'Station', val: props.name },
             { label: 'Status', val: (props.status || 'NORMAL').toUpperCase(), color },
             { label: 'Radiation', val: `${props.usvh} µSv/h` }
-          ]
+          ],
+          footer: `STATUS: ${(props.status || 'NORMAL').toUpperCase()} · SOURCE: EURDEP NETWORK`
         });
         openMapPopup(e.lngLat, popupHtml);
       }
@@ -2623,6 +3214,48 @@ function initMap() {
       20, 10,
       100, 16
     ]);
+
+    if (!state.map.getSource('route-source')) {
+      state.map.addSource('route-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      state.map.addLayer({
+        id: 'route-line-glow',
+        type: 'line',
+        source: 'route-source',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#38bdf8',
+          'line-width': 9,
+          'line-opacity': 0.45,
+          'line-blur': 3
+        }
+      });
+      state.map.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route-source',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#0284c7',
+          'line-width': 4,
+          'line-opacity': 0.95
+        }
+      });
+    }
+  });
+
+  state.map.on('zoomend', () => {
+    if (state.activeMapModule && moduleLayers[state.activeMapModule]) {
+      if (['news', 'aviation', 'earthquake', 'traffic', 'radiation'].includes(state.activeMapModule)) {
+        try {
+          moduleLayers[state.activeMapModule].render(state.data);
+        } catch (e) {
+          console.warn('Re-clustering error on zoomend:', e);
+        }
+      }
+    }
   });
 
   state.map.on('idle', () => {
@@ -3953,18 +4586,203 @@ function renderBorder(borderData) {
   }).join('');
 }
 
+function buildBorderPopupHtml(c) {
+  if (!c) return '';
+  const entry = c.direction?.entry || {};
+  const exit = c.direction?.exit || {};
+  const maxWait = Math.max(entry.waitingMinutes || 0, exit.waitingMinutes || 0);
+  const maxQueue = Math.max(entry.queueLengthMeters || 0, exit.queueLengthMeters || 0);
+
+  let color = '#34d399'; // Green (low/normal)
+  let statusText = 'NORMAL FLOW';
+  if (maxWait >= 60 || maxQueue >= 500) {
+    color = '#f87171'; // Red (critical)
+    statusText = 'HEAVY DELAY';
+  } else if (maxWait >= 30 || maxQueue >= 200) {
+    color = '#fb923c'; // Orange (high)
+    statusText = 'MODERATE DELAY';
+  } else if (maxWait >= 15 || maxQueue >= 50) {
+    color = '#fbbf24'; // Yellow (elevated)
+    statusText = 'SLIGHT DELAY';
+  }
+
+  const timeAgoStr = c.updatedAt ? formatTimeAgo(c.updatedAt) : 'Recent';
+  const entryWaitStr = entry.waitingMinutesText || (entry.waitingMinutes != null ? `${entry.waitingMinutes} min` : '03-05 min');
+  const entryQueueStr = entry.queueLengthText || (entry.queueLengthMeters != null ? `${entry.queueLengthMeters} m` : '0 m');
+  const exitWaitStr = exit.waitingMinutesText || (exit.waitingMinutes != null ? `${exit.waitingMinutes} min` : '03-05 min');
+  const exitQueueStr = exit.queueLengthText || (exit.queueLengthMeters != null ? `${exit.queueLengthMeters} m` : '0 m');
+
+  const neighbor = c.neighborCountry ? `Kosovo ↔ ${c.neighborCountry}` : 'Border Crossing';
+  const sourceLabel = c.source === 'NAKORDONI' ? 'Nakordoni' : (c.source || 'QKMK');
+  const statusLabel = `${(c.status || 'OPEN').toUpperCase()} · ${statusText}`;
+  const icon = '🛂';
+
+  let truckPopupHtml = '';
+  if (c.trucks) {
+    const trEntryWait = c.trucks.entry?.waitingMinutesText || (c.trucks.entry?.waitingMinutes != null ? `${c.trucks.entry.waitingMinutes} min` : '03-05 min');
+    const trExitWait = c.trucks.exit?.waitingMinutesText || (c.trucks.exit?.waitingMinutes != null ? `${c.trucks.exit.waitingMinutes} min` : '03-05 min');
+    const trEntryQueue = c.trucks.entry?.queueLengthText || (c.trucks.entry?.queueLengthMeters != null ? `${c.trucks.entry.queueLengthMeters} m` : '0 m');
+    const trExitQueue = c.trucks.exit?.queueLengthText || (c.trucks.exit?.queueLengthMeters != null ? `${c.trucks.exit.queueLengthMeters} m` : '0 m');
+
+    truckPopupHtml = `
+      <div class="border-popup-trucks-box border-popup-trucks-row">
+        <div class="border-trucks-title">
+          <span class="truck-tag">🚛 TRUCKS</span>
+        </div>
+        <div class="border-trucks-grid">
+          <div class="border-truck-col">
+            <span class="border-flow-sublabel">ENTRY</span>
+            <span class="border-flow-val">${escHtml(trEntryWait)} · ${escHtml(trEntryQueue)}</span>
+          </div>
+          <div class="border-truck-col">
+            <span class="border-flow-sublabel">EXIT</span>
+            <span class="border-flow-val">${escHtml(trExitWait)} · ${escHtml(trExitQueue)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const carsGridHtml = `
+    <div class="border-popup-cars-section">
+      <div class="border-popup-section-title">🚗 CARS & PASSENGERS</div>
+      <div class="border-popup-metrics-grid">
+        <div class="border-metric-card">
+          <span class="border-metric-label">Cars Entry Wait</span>
+          <span class="border-metric-val ${entry.waitingMinutes >= 30 ? 'text-warning' : ''}">${escHtml(entryWaitStr)}</span>
+          <span class="border-metric-sublabel">Entry Queue</span>
+          <span class="border-metric-subval">${escHtml(entryQueueStr)}</span>
+        </div>
+        <div class="border-metric-card">
+          <span class="border-metric-label">Cars Exit Wait</span>
+          <span class="border-metric-val ${exit.waitingMinutes >= 30 ? 'text-warning' : ''}">${escHtml(exitWaitStr)}</span>
+          <span class="border-metric-sublabel">Exit Queue</span>
+          <span class="border-metric-subval">${escHtml(exitQueueStr)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="map-popup border-popup-container">
+      <div class="map-popup-header border-popup-header">
+        <div class="border-header-top">
+          <div class="map-popup-title">
+            <span class="map-popup-icon">🛂</span>
+            <span class="border-popup-title-text">${escHtml((c.name || 'BORDER CROSSING').toUpperCase())}</span>
+          </div>
+          <span class="map-popup-badge" style="background:${color}20; color:${color}; border:1px solid ${color}40;">
+            ${escHtml(statusLabel)}
+          </span>
+        </div>
+        <div class="border-header-sub">
+          <span class="border-country-pair">${escHtml(neighbor)}</span>
+          <span class="map-popup-source">via ${escHtml(sourceLabel)}</span>
+        </div>
+      </div>
+      <div class="map-popup-body border-popup-body">
+        ${carsGridHtml}
+        ${truckPopupHtml}
+      </div>
+      <div class="map-popup-footer border-popup-footer">
+        <span>UPDATED: ${escHtml(timeAgoStr.toUpperCase())}</span>
+        <span>SOURCE: ${escHtml(sourceLabel.toUpperCase())}</span>
+      </div>
+    </div>
+  `;
+}
+
+function openBorderPopup(crossing) {
+  if (!state.map || !crossing) return;
+  const coords = crossing.coordinates || BORDER_CROSSING_LOCATIONS[crossing.id] || BORDER_CROSSING_LOCATIONS[`border-${crossing.id}`];
+  if (!coords || typeof coords.lat !== 'number' || typeof coords.lon !== 'number') return;
+
+  closeMapPopup();
+  state.selectedBorderCrossingId = crossing.id;
+
+  // Synchronize active class on all border markers
+  if (moduleLayers.border?.markers) {
+    moduleLayers.border.markers.forEach(m => {
+      const el = m.getElement ? m.getElement() : m._element;
+      if (el) {
+        if (m._crossingId === crossing.id) el.classList.add('active');
+        else el.classList.remove('active');
+      }
+    });
+  }
+
+  const html = buildBorderPopupHtml(crossing);
+  const popup = createMapPopup(html, { className: 'border-map-popup' })
+    .setLngLat([coords.lon, coords.lat]);
+
+  popup.on('close', () => {
+    if (state.activeMapPopup === popup || state.borderPopup === popup) {
+      state.activeMapPopup = null;
+      state.borderPopup = null;
+      state.selectedBorderCrossingId = null;
+      if (moduleLayers.border?.markers) {
+        moduleLayers.border.markers.forEach(m => {
+          const el = m.getElement ? m.getElement() : m._element;
+          if (el) el.classList.remove('active');
+        });
+      }
+    }
+    updateMapBadgeAndMeta();
+  });
+
+  popup.addTo(state.map);
+  state.activeMapPopup = popup;
+  state.borderPopup = popup;
+}
+
+function closeBorderPopup() {
+  closeMapPopup();
+  state.selectedBorderCrossingId = null;
+  state.borderPopup = null;
+  if (moduleLayers.border?.markers) {
+    moduleLayers.border.markers.forEach(m => {
+      const el = m.getElement ? m.getElement() : m._element;
+      if (el) el.classList.remove('active');
+    });
+  }
+}
+
+function selectBorderCrossing(crossingId) {
+  const crossing = (state.borderData?.crossings || []).find(c => c.id === crossingId) ||
+    Object.values(BORDER_CROSSING_LOCATIONS).find(b => b.id === crossingId || b.id === `border-${crossingId}`);
+  if (!crossing) return;
+
+  // Toggle behavior: If user clicks the currently active marker whose popup is open, close it!
+  if (state.selectedBorderCrossingId === crossing.id && (state.borderPopup || state.activeMapPopup)) {
+    closeBorderPopup();
+    updateMapBadgeAndMeta();
+    return;
+  }
+
+  openBorderPopup(crossing);
+  updateMapBadgeAndMeta();
+}
+
 function renderBorderMapMarkers(borderData) {
   if (!state.map || state.activeMapModule !== 'border') return;
   clearMarkerList(moduleLayers.border.markers);
 
   const data = borderData || state.borderData;
-  if (!data || !Array.isArray(data.crossings)) {
-    updateMapBadgeAndMeta();
-    return;
-  }
+  const crossings = (data && Array.isArray(data.crossings) && data.crossings.length > 0)
+    ? data.crossings
+    : Object.entries(BORDER_CROSSING_LOCATIONS).map(([id, meta]) => ({
+        id,
+        name: meta.name,
+        shortName: meta.shortName,
+        neighborCountry: meta.neighbor,
+        coordinates: { lat: meta.lat, lon: meta.lon },
+        status: 'OPEN',
+        direction: { entry: { waitingMinutes: 5, queueLengthMeters: 0 }, exit: { waitingMinutes: 5, queueLengthMeters: 0 } },
+        source: 'QKMK'
+      }));
 
-  data.crossings.forEach(c => {
-    const coords = c.coordinates;
+  crossings.forEach(c => {
+    const coords = c.coordinates || BORDER_CROSSING_LOCATIONS[c.id] || BORDER_CROSSING_LOCATIONS[`border-${c.id}`];
     if (!coords || typeof coords.lat !== 'number' || typeof coords.lon !== 'number') return;
 
     const entry = c.direction?.entry || {};
@@ -3973,57 +4791,31 @@ function renderBorderMapMarkers(borderData) {
     const maxQueue = Math.max(entry.queueLengthMeters || 0, exit.queueLengthMeters || 0);
 
     let color = '#34d399'; // Green (low/normal)
-    let statusText = 'NORMAL FLOW';
+    let delayClass = 'delay-low';
     if (maxWait >= 60 || maxQueue >= 500) {
       color = '#f87171'; // Red (critical)
-      statusText = 'HEAVY DELAY';
+      delayClass = 'delay-critical';
     } else if (maxWait >= 30 || maxQueue >= 200) {
       color = '#fb923c'; // Orange (high)
-      statusText = 'MODERATE DELAY';
+      delayClass = 'delay-high';
     } else if (maxWait >= 15 || maxQueue >= 50) {
       color = '#fbbf24'; // Yellow (elevated)
-      statusText = 'SLIGHT DELAY';
+      delayClass = 'delay-elevated';
     }
 
-    const markerEl = createBorderMarkerElement(color, c.shortName || c.name);
-
-    const timeAgoStr = c.updatedAt ? formatTimeAgo(c.updatedAt) : 'Recent';
-    const entryWaitStr = entry.waitingMinutesText || (entry.waitingMinutes != null ? `${entry.waitingMinutes} min` : 'N/A');
-    const entryQueueStr = entry.queueLengthText || (entry.queueLengthMeters != null ? `${entry.queueLengthMeters} m` : 'None');
-    const exitWaitStr = exit.waitingMinutesText || (exit.waitingMinutes != null ? `${exit.waitingMinutes} min` : 'N/A');
-    const exitQueueStr = exit.queueLengthText || (exit.queueLengthMeters != null ? `${exit.queueLengthMeters} m` : 'None');
-
-    let truckPopupHtml = '';
-    if (c.trucks) {
-      const trEntryWait = c.trucks.entry?.waitingMinutesText || (c.trucks.entry?.waitingMinutes != null ? `${c.trucks.entry.waitingMinutes} min` : '03-05 min');
-      const trExitWait = c.trucks.exit?.waitingMinutesText || (c.trucks.exit?.waitingMinutes != null ? `${c.trucks.exit.waitingMinutes} min` : '03-05 min');
-      truckPopupHtml = `
-        <div style="margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.08); font-size:9px; color:var(--text-dim); font-family:var(--font-mono);">
-          <strong style="color:#f59e0b;">🚛 TRUCKS:</strong> Entry ${escHtml(trEntryWait)} · Exit ${escHtml(trExitWait)}
-        </div>
-      `;
+    const markerEl = createBorderMarkerElement(color, c.shortName || c.name, c.id, delayClass);
+    if (state.selectedBorderCrossingId === c.id) {
+      markerEl.classList.add('active');
     }
 
-    const sourceLabel = c.source === 'NAKORDONI' ? 'NAKORDONI (nakordoni.eu)' : (c.source || 'QKMK');
-
-    const popupHtml = buildMapPopupHtml({
-      icon: '🛂',
-      title: c.name,
-      source: sourceLabel,
-      badge: { text: `${c.status || 'OPEN'} (${statusText})`, color },
-      stats: [
-        { label: 'Entry Wait', val: entryWaitStr },
-        { label: 'Entry Queue', val: entryQueueStr },
-        { label: 'Exit Wait', val: exitWaitStr },
-        { label: 'Exit Queue', val: exitQueueStr }
-      ],
-      sections: truckPopupHtml,
-      footer: `UPDATED: ${escHtml(timeAgoStr)}`
+    // Toggle popup on marker click
+    markerEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectBorderCrossing(c.id);
     });
 
     const marker = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
       .setLngLat([coords.lon, coords.lat])
-      .setPopup(createMapPopup(popupHtml, { className: 'border-map-popup' }))
       .addTo(state.map);
 
     marker._module = 'border';
@@ -4034,12 +4826,19 @@ function renderBorderMapMarkers(borderData) {
   updateMapBadgeAndMeta();
 }
 
-function createBorderMarkerElement(color, label) {
+function createBorderMarkerElement(color, label, crossingId = '', delayClass = '') {
   const el = document.createElement('div');
   el.className = 'border-custom-marker';
+  if (crossingId) el.setAttribute('data-crossing-id', crossingId);
+
+  const isCritical = delayClass === 'delay-critical';
+  const isHigh = delayClass === 'delay-high';
+  const pulseClass = isCritical ? 'threat-pulse-critical' : (isHigh ? 'threat-pulse-high' : '');
+
   el.innerHTML = `
-    <div class="border-marker-pin" style="background:${color}; box-shadow: 0 0 10px ${color}88;">
+    <div class="border-marker-pin ${pulseClass}" style="background:${color}; box-shadow: 0 0 10px ${color}88; position: relative;">
       <span class="border-pin-icon">🛂</span>
+      ${isCritical ? '<div class="radar-ring critical"></div>' : ''}
     </div>
     <div class="border-marker-label">${escHtml(label)}</div>
   `;
@@ -4047,11 +4846,303 @@ function createBorderMarkerElement(color, label) {
 }
 
 function focusBorderCrossing(crossingId) {
-  const marker = moduleLayers.border.markers.find(m => m._crossingId === crossingId);
-  if (marker && state.map) {
-    const lngLat = marker.getLngLat();
-    state.map.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 12, speed: 1.2 });
-    marker.togglePopup();
+  const crossing = (state.borderData?.crossings || []).find(c => c.id === crossingId);
+  const coords = crossing?.coordinates || BORDER_CROSSING_LOCATIONS[crossingId] || BORDER_CROSSING_LOCATIONS[`border-${crossingId}`];
+  
+  if (coords && state.map) {
+    state.map.flyTo({ center: [coords.lon, coords.lat], zoom: 12, speed: 1.2 });
+    if (crossing) {
+      openBorderPopup(crossing);
+    }
+  }
+}
+
+// ── ROUTE INTELLIGENCE & THREAT CORRIDOR ANALYSIS ─────────────────────────────
+
+const KOSOVO_LOCATIONS_GEOCODE = {
+  'prishtinë': { name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
+  'prishtine': { name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
+  'pristina': { name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
+  'mitrovicë': { name: 'Mitrovicë', lat: 42.8914, lon: 20.8660 },
+  'mitrovice': { name: 'Mitrovicë', lat: 42.8914, lon: 20.8660 },
+  'mitrovica': { name: 'Mitrovicë', lat: 42.8914, lon: 20.8660 },
+  'prizren': { name: 'Prizren', lat: 42.2153, lon: 20.7415 },
+  'pejë': { name: 'Pejë', lat: 42.6593, lon: 20.2887 },
+  'peje': { name: 'Pejë', lat: 42.6593, lon: 20.2887 },
+  'pec': { name: 'Pejë', lat: 42.6593, lon: 20.2887 },
+  'gjilan': { name: 'Gjilan', lat: 42.4635, lon: 21.4694 },
+  'gnjilane': { name: 'Gjilan', lat: 42.4635, lon: 21.4694 },
+  'ferizaj': { name: 'Ferizaj', lat: 42.3705, lon: 21.1530 },
+  'urosevac': { name: 'Ferizaj', lat: 42.3705, lon: 21.1530 },
+  'gjakovë': { name: 'Gjakovë', lat: 42.3810, lon: 20.4320 },
+  'gjakove': { name: 'Gjakovë', lat: 42.3810, lon: 20.4320 },
+  'djakovica': { name: 'Gjakovë', lat: 42.3810, lon: 20.4320 },
+  'podujevë': { name: 'Podujevë', lat: 42.9110, lon: 21.1967 },
+  'podujeve': { name: 'Podujevë', lat: 42.9110, lon: 21.1967 },
+  'vushtrri': { name: 'Vushtrri', lat: 42.8231, lon: 20.9678 },
+  'leposavić': { name: 'Leposavić', lat: 43.1039, lon: 20.8028 },
+  'leposavic': { name: 'Leposavić', lat: 43.1039, lon: 20.8028 },
+  'zvečan': { name: 'Zvečan', lat: 42.9064, lon: 20.8403 },
+  'zvecan': { name: 'Zvečan', lat: 42.9064, lon: 20.8403 },
+  'zubin potok': { name: 'Zubin Potok', lat: 42.9144, lon: 20.6908 },
+  'jarinje': { name: 'Jarinje (Border)', lat: 43.2185, lon: 20.6980 },
+  'brnjak': { name: 'Brnjak (Border)', lat: 42.9644, lon: 20.5528 },
+  'merdarë': { name: 'Merdarë (Border)', lat: 42.9360, lon: 21.2460 },
+  'merdare': { name: 'Merdarë (Border)', lat: 42.9360, lon: 21.2460 },
+  'dheu i bardhë': { name: 'Dheu i Bardhë (Border)', lat: 42.4490, lon: 21.6560 },
+  'dheu i bardhe': { name: 'Dheu i Bardhë (Border)', lat: 42.4490, lon: 21.6560 },
+  'hani i elezit': { name: 'Hani i Elezit (Border)', lat: 42.1490, lon: 21.2980 },
+  'vërmicë': { name: 'Vërmicë (Border)', lat: 42.1580, lon: 20.5500 },
+  'vermice': { name: 'Vërmicë (Border)', lat: 42.1580, lon: 20.5500 },
+  'kullë': { name: 'Kullë / Kula (Border)', lat: 42.7830, lon: 20.3080 },
+  'kulle': { name: 'Kullë / Kula (Border)', lat: 42.7830, lon: 20.3080 },
+  'kula': { name: 'Kullë / Kula (Border)', lat: 42.7830, lon: 20.3080 },
+  'morinë': { name: 'Morinë (Border)', lat: 42.3550, lon: 20.4050 },
+  'morine': { name: 'Morinë (Border)', lat: 42.3550, lon: 20.4050 }
+};
+
+function resolveLocationCoordinates(query) {
+  if (!query || typeof query !== 'string') return null;
+  const q = query.trim().toLowerCase();
+
+  const coordsMatch = q.match(/^([-+]?\d{1,2}(?:\.\d+)?)[,\s]+([-+]?\d{1,3}(?:\.\d+)?)$/);
+  if (coordsMatch) {
+    const lat = parseFloat(coordsMatch[1]);
+    const lon = parseFloat(coordsMatch[2]);
+    if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+      return { name: `${lat.toFixed(4)}, ${lon.toFixed(4)}`, lat, lon };
+    }
+  }
+
+  const cleanQ = q.replace(/\s*\([^)]*\)/g, '').trim();
+  if (KOSOVO_LOCATIONS_GEOCODE[cleanQ]) {
+    return KOSOVO_LOCATIONS_GEOCODE[cleanQ];
+  }
+
+  for (const [key, val] of Object.entries(KOSOVO_LOCATIONS_GEOCODE)) {
+    if (cleanQ.includes(key) || key.includes(cleanQ)) {
+      return val;
+    }
+  }
+
+  for (const [id, b] of Object.entries(BORDER_CROSSING_LOCATIONS)) {
+    if (cleanQ.includes(id.toLowerCase()) || cleanQ.includes(b.name.toLowerCase()) || cleanQ.includes(b.shortName.toLowerCase())) {
+      return { name: b.name, lat: b.lat, lon: b.lon };
+    }
+  }
+
+  return null;
+}
+
+async function calculateRoute() {
+  const startQuery = $('routeStartInput')?.value.trim();
+  const endQuery = $('routeEndInput')?.value.trim();
+  if (!startQuery || !endQuery) {
+    alert('Please enter both a start point and destination.');
+    return;
+  }
+
+  const startCoords = resolveLocationCoordinates(startQuery);
+  const endCoords = resolveLocationCoordinates(endQuery);
+
+  if (!startCoords || !endCoords) {
+    alert(`Could not resolve coordinates for "${!startCoords ? startQuery : endQuery}". Please enter a valid city name, border crossing, or coordinates (lat, lon).`);
+    return;
+  }
+
+  const calcBtn = $('routeCalcBtn');
+  if (calcBtn) {
+    calcBtn.disabled = true;
+    calcBtn.innerHTML = '<span class="btn-icon">⏳</span> ROUTING...';
+  }
+
+  const resultsCard = $('routeResultsCard');
+  const distEl = $('routeDistanceVal');
+  const durEl = $('routeDurationVal');
+  const statusBadge = $('routeStatusBadge');
+  const waypointsSummary = $('routeWaypointsSummary');
+
+  try {
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startCoords.lon},${startCoords.lat};${endCoords.lon},${endCoords.lat}?overview=full&geometries=geojson`;
+
+    let routeGeoJson = null;
+    let distanceKm = null;
+    let durationMin = null;
+
+    try {
+      const res = await fetch(osrmUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.routes && data.routes.length > 0) {
+          const r = data.routes[0];
+          if (r.geometry && Array.isArray(r.geometry.coordinates) && r.geometry.coordinates.length > 0) {
+            routeGeoJson = {
+              type: 'Feature',
+              geometry: r.geometry,
+              properties: {}
+            };
+            distanceKm = (r.distance / 1000).toFixed(1);
+            durationMin = Math.round(r.duration / 60);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('OSRM routing request failed:', e.message);
+    }
+
+    if (!routeGeoJson) {
+      // Clear route line & markers when real routing is unavailable
+      state.currentRoute = null;
+      if (state.map) {
+        const source = state.map.getSource('route-source');
+        if (source) source.setData({ type: 'FeatureCollection', features: [] });
+      }
+      if (state.routeMarkers) {
+        state.routeMarkers.forEach(m => { try { m.remove(); } catch(e) {} });
+        state.routeMarkers = [];
+      }
+
+      if (distEl) distEl.textContent = '--';
+      if (durEl) durEl.textContent = '--';
+      if (statusBadge) {
+        statusBadge.textContent = '⚠ ROUTING SERVICE UNAVAILABLE';
+        statusBadge.className = 'metric-status-badge status-unavailable';
+      }
+      if (waypointsSummary) {
+        waypointsSummary.textContent = `${startCoords.name} → ${endCoords.name} · DRIVE (UNAVAILABLE)`;
+      }
+      if (resultsCard) {
+        resultsCard.style.display = 'flex';
+      }
+      return;
+    }
+
+    // Real route received
+    state.currentRoute = {
+      start: startCoords,
+      end: endCoords,
+      geoJson: routeGeoJson,
+      distanceKm,
+      durationMin
+    };
+
+    if (distEl) distEl.textContent = `${distanceKm} km`;
+    if (durEl) {
+      const hours = Math.floor(durationMin / 60);
+      const mins = durationMin % 60;
+      durEl.textContent = hours > 0 ? `${hours}h ${mins}m` : `${mins} min`;
+    }
+    if (statusBadge) {
+      statusBadge.textContent = 'ROUTE CALCULATED';
+      statusBadge.className = 'metric-status-badge status-normal';
+    }
+    if (waypointsSummary) {
+      waypointsSummary.textContent = `${startCoords.name} → ${endCoords.name} · DRIVE`;
+    }
+
+    if (resultsCard) {
+      resultsCard.style.display = 'flex';
+    }
+
+    renderRouteOnMap(routeGeoJson, startCoords, endCoords);
+
+  } catch (err) {
+    console.error('Route calculation error:', err);
+    if (statusBadge) {
+      statusBadge.textContent = '⚠ ROUTING SERVICE UNAVAILABLE';
+      statusBadge.className = 'metric-status-badge status-unavailable';
+    }
+  } finally {
+    if (calcBtn) {
+      calcBtn.disabled = false;
+      calcBtn.innerHTML = '<span class="btn-icon">📍</span> CALCULATE ROUTE';
+    }
+  }
+}
+
+function renderRouteOnMap(routeGeoJson, startCoords, endCoords) {
+  if (!state.map) return;
+
+  let source = state.map.getSource('route-source');
+  if (!source) {
+    state.map.addSource('route-source', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [routeGeoJson] }
+    });
+    state.map.addLayer({
+      id: 'route-line-glow',
+      type: 'line',
+      source: 'route-source',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#38bdf8', 'line-width': 9, 'line-opacity': 0.45, 'line-blur': 3 }
+    });
+    state.map.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route-source',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#0284c7', 'line-width': 4, 'line-opacity': 0.95 }
+    });
+  } else {
+    source.setData({ type: 'FeatureCollection', features: [routeGeoJson] });
+  }
+
+  if (state.routeMarkers) {
+    state.routeMarkers.forEach(m => { try { m.remove(); } catch(e) {} });
+    state.routeMarkers = [];
+  } else {
+    state.routeMarkers = [];
+  }
+
+  const elA = document.createElement('div');
+  elA.className = 'route-pin-marker route-pin-a';
+  elA.textContent = 'A';
+  elA.title = `Start: ${startCoords.name || 'Origin'}`;
+  const markerA = new maplibregl.Marker({ element: elA })
+    .setLngLat([startCoords.lon, startCoords.lat])
+    .addTo(state.map);
+  state.routeMarkers.push(markerA);
+
+  const elB = document.createElement('div');
+  elB.className = 'route-pin-marker route-pin-b';
+  elB.textContent = 'B';
+  elB.title = `Destination: ${endCoords.name || 'Destination'}`;
+  const markerB = new maplibregl.Marker({ element: elB })
+    .setLngLat([endCoords.lon, endCoords.lat])
+    .addTo(state.map);
+  state.routeMarkers.push(markerB);
+
+  const coordinates = routeGeoJson.geometry.coordinates;
+  const bounds = coordinates.reduce((b, coord) => {
+    return b.extend(coord);
+  }, new maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
+
+  state.map.fitBounds(bounds, { padding: 80, duration: 800 });
+}
+
+function clearRoute(resetInputs = true) {
+  state.currentRoute = null;
+
+  if (state.map) {
+    const source = state.map.getSource('route-source');
+    if (source) {
+      source.setData({ type: 'FeatureCollection', features: [] });
+    }
+  }
+
+  if (state.routeMarkers) {
+    state.routeMarkers.forEach(m => { try { m.remove(); } catch(e) {} });
+    state.routeMarkers = [];
+  }
+
+  const resultsCard = $('routeResultsCard');
+  if (resultsCard) resultsCard.style.display = 'none';
+
+  if (resetInputs) {
+    const startInput = $('routeStartInput');
+    const endInput = $('routeEndInput');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
   }
 }
 
@@ -4084,6 +5175,8 @@ window.getArticlePubTime = getArticlePubTime;
 window.KOSOVO_WEATHER_CITIES = KOSOVO_WEATHER_CITIES;
 window.selectWeatherCity = selectWeatherCity;
 window.fetchCityWeather = fetchCityWeather;
+window.fetchAllWeatherCities = fetchAllWeatherCities;
+window.updateWeatherCityMarker = updateWeatherCityMarker;
 window.renderWeather = renderWeather;
 window.renderWeatherMapMarkers = renderWeatherMapMarkers;
 window.createWeatherMarkerElement = createWeatherMarkerElement;
@@ -4094,11 +5187,30 @@ window.buildMapPopupHtml = buildMapPopupHtml;
 window.createMapPopup = createMapPopup;
 window.openMapPopup = openMapPopup;
 window.closeMapPopup = closeMapPopup;
+window.renderTraffic = renderTraffic;
+window.renderTrafficMarkers = renderTrafficMarkers;
 window.renderTrafficMapMarkers = renderTrafficMapMarkers;
+window.classifyTrafficIncident = classifyTrafficIncident;
+window.TRAFFIC_RELEVANCE_TERMS = TRAFFIC_RELEVANCE_TERMS;
 window.renderRadiationMapMarkers = renderRadiationMapMarkers;
 window.renderEarthquakeMapMarkers = renderEarthquakeMapMarkers;
 window.renderNewsMapMarkers = renderNewsMapMarkers;
+window.buildNewsPopupHtml = buildNewsPopupHtml;
+window.openNewsPopup = openNewsPopup;
+window.closeNewsPopup = closeNewsPopup;
 window.renderAqiMapMarkers = renderAqiMapMarkers;
 window.renderAviationMapMarkers = renderAviationMapMarkers;
 window.renderBorderMapMarkers = renderBorderMapMarkers;
+window.buildBorderPopupHtml = buildBorderPopupHtml;
+window.openBorderPopup = openBorderPopup;
+window.closeBorderPopup = closeBorderPopup;
+window.selectBorderCrossing = selectBorderCrossing;
+window.createBorderMarkerElement = createBorderMarkerElement;
+window.BORDER_CROSSING_LOCATIONS = BORDER_CROSSING_LOCATIONS;
+window.getCCTVEmbedUrl = getCCTVEmbedUrl;
+window.clusterGeoItems = clusterGeoItems;
+window.createClusterMarkerElement = createClusterMarkerElement;
+window.calculateRoute = calculateRoute;
+window.clearRoute = clearRoute;
+window.resolveLocationCoordinates = resolveLocationCoordinates;
 window.state = state;

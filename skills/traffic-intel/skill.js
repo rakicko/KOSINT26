@@ -1,56 +1,119 @@
 'use strict';
 
-const TRAFFIC_KEYWORDS = {
-  en: ['accident', 'crash', 'collision', 'traffic accident', 'road closed', 'road closure', 'blocked road', 'traffic disruption', 'roadworks', 'vehicle overturned', 'accident on', 'collision on'],
-  sr: ['saobraćaj', 'saobraćajна nesrećа', 'udes', 'sudar', 'nesrećа', 'nezgoda', 'blokiran put', 'zatворен put', 'obustava saobraćaja', 'gužva', 'zastoj', 'kolona', 'put blokiran', 'uspavljen put', 'saobraćaju', 'saobraćajна nesrećи'],
-  al: ['aksident', 'aksident trafiku', 'përplasje', 'rrugë e bllokuar', 'rrugë e mbyllur', 'trafik', 'kolonë', 'bllokim']
+/**
+ * Authoritative Albanian (sq) and Serbian (sr) Traffic Incident Lexicon
+ * Categorized by incident nature with targeted keyword patterns to avoid false positives.
+ */
+const TRAFFIC_RELEVANCE_TERMS = {
+  sq: {
+    accident: [
+      'aksident', 'aksidente', 'aksidenti', 'aksidentuar', 'përplasje', 'përplasur', 'u përplasën',
+      'ndeshje automjetesh', 'ndeshje trafiku', 'rrokullisje e automjetit', 'rrokullisur vetura',
+      'goditje e këmbësorit', 'veturë e aksidentuar', 'aksident trafiku', 'aksident komunikacioni'
+    ],
+    closure_blockage: [
+      'rrugë e mbyllur', 'rruga e mbyllur', 'mbyllet rruga', 'mbyllje e rrugës', 'bllokohet rruga',
+      'rrugë e bllokuar', 'rruga e bllokuar', 'bllokim i rrugës', 'bllokimi i rrugës',
+      'ndërprerje e qarkullimit', 'ndërprerë qarkullimi', 'ndërprerje e trafikut',
+      'bllokadë policore', 'bllokim nga policia', 'e pakalueshme', 'ndalim qarkullimi'
+    ],
+    congestion: [
+      'kolonë automjetesh', 'kolona të gjata', 'kolonë kilometrike', 'kolonë e gjatë',
+      'dendësi trafiku', 'trafik i rënduar', 'fluks i madh i automjeteve', 'vonesa në trafik',
+      'ngarkesë në trafik', 'radhë të gjata automjetesh'
+    ],
+    roadworks: [
+      'punime në rrugë', 'punimet në rrugë', 'punime në aksin', 'mbyllje e korsisë',
+      'korsi e bllokuar', 'devijim i trafikut', 'riorientim i qarkullimit', 'asfaltim i rrugës',
+      'rindërtim i rrugës', 'sinjalistikë rrugore'
+    ],
+    hazard_weather: [
+      'rrëshqitje dheu', 'rrëshqitje e dheut', 'rënie gurësh në rrugë', 'shembje dheu',
+      'vërshime në rrugë', 'ujë në rrugë', 'përmbytje e rrugës', 'vërshuar rruga',
+      'akull në rrugë', 'ngrica në rrugë', 'borë në rrugë', 'rrugë me borë', 'ngricë në rrugë',
+      'dëmtim i rrugës', 'dëmtim i urës', 'shembje e urës', 'gropa në rrugë', 'shembje e rrugës'
+    ]
+  },
+  sr: {
+    accident: [
+      'saobraćajna nezgoda', 'saobraćajne nezgode', 'saobraćajnoj nezgodi', 'saobraćajnih nezgoda',
+      'saobraćajna nesreća', 'saobraćajne nesreće', 'saobraćajnoj nesreći', 'saobraćajnih nesreća',
+      'sudar', 'sudara', 'sudarili', 'sudaru', 'lančani sudar',
+      'udes', 'udesa', 'udesu', 'prevrtanje vozila', 'sletanje sa puta', 'obaranje pešaka'
+    ],
+    closure_blockage: [
+      'zatvoren put', 'zatvorena ulica', 'zatvoreni putevi', 'zatvaranje puta',
+      'blokiran put', 'blokirana ulica', 'blokada puta', 'blokiran saobraćaj',
+      'obustava saobraćaja', 'obustavljen saobraćaj', 'prekid saobraćaja',
+      'neprohodan put', 'neprohodno za saobraćaj', 'policijska blokada', 'policijska blokada puta'
+    ],
+    congestion: [
+      'saobraćajni zastoj', 'zastoji u saobraćaju', 'zastoj', 'saobraćajna gužva',
+      'gužva u saobraćaju', 'gužve u saobraćaju', 'kolona vozila', 'kolone vozila',
+      'duge kolone', 'otežan saobraćaj', 'usporen saobraćaj', 'kilometarska kolona'
+    ],
+    roadworks: [
+      'radovi na putu', 'radovi na kolovozu', 'radovi na deonici', 'zatvaranje trake',
+      'zatvorena traka', 'preusmeravanje saobraćaja', 'rekonstrukcija puta', 'asfaltiranje puta',
+      'popravka kolovoza'
+    ],
+    hazard_weather: [
+      'odron na putu', 'odron kamena', 'odroni na putu', 'odroni', 'klizište', 'klizišta na putu',
+      'poplava na putu', 'voda na kolovozu', 'bujica na putu', 'poledica na putu', 'poledica',
+      'led na putu', 'sneg na putu', 'snežni nanosi', 'oštećenje puta',
+      'oštećenje mosta', 'rupa na kolovozu', 'urušavanje mosta', 'oštećen most'
+    ]
+  }
 };
+
+function classifyTrafficIncident(title, description) {
+  const text = `${title || ''} ${description || ''}`.toLowerCase();
+  
+  for (const lang of ['sq', 'sr']) {
+    const terms = TRAFFIC_RELEVANCE_TERMS[lang];
+    if (!terms) continue;
+
+    for (const term of terms.closure_blockage) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'road_closure', label: 'Road Closure / Blockade' };
+      }
+    }
+    for (const term of terms.accident) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'accident', label: 'Traffic Accident' };
+      }
+    }
+    for (const term of terms.hazard_weather) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'hazard', label: 'Road Hazard / Weather' };
+      }
+    }
+    for (const term of terms.roadworks) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'roadworks', label: 'Roadworks / Lane Closure' };
+      }
+    }
+    for (const term of terms.congestion) {
+      if (text.includes(term.toLowerCase())) {
+        return { isTraffic: true, type: 'congestion', label: 'Traffic Congestion' };
+      }
+    }
+  }
+
+  return { isTraffic: false, type: null, label: null };
+}
 
 function detectAnomalies(incidents) {
   const closures = incidents.filter(i => i.type === 'road_closure');
   const accidents = incidents.filter(i => i.type === 'accident');
 
   if (closures.length >= 2 && accidents.length === 0) {
-    return { detected: true, type: 'vip_movement', summary: `${closures.length} simultaneous road closures — possible security convoy or security cordon` };
+    return { detected: true, type: 'vip_movement', summary: `${closures.length} simultaneous road closures — possible security convoy or cordon` };
   }
   if (closures.length >= 3) {
-    return { detected: true, type: 'perimeter', summary: 'Multiple closures forming possible security perimeter' };
+    return { detected: true, type: 'perimeter', summary: 'Multiple closures forming potential security perimeter' };
   }
   return { detected: false, type: null, summary: null };
-}
-
-function filterTrafficKeywords(text) {
-  if (!text) return false;
-  const lower = text.toLowerCase();
-  for (const lang of Object.keys(TRAFFIC_KEYWORDS)) {
-    for (const kw of TRAFFIC_KEYWORDS[lang]) {
-      if (lower.includes(kw.toLowerCase())) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function determineIncidentType(title, description) {
-  const text = (title + ' ' + (description || '')).toLowerCase();
-  
-  if (text.includes('closure') || text.includes('zатворен') || text.includes('bllokuar') || text.includes('road closure') || text.includes('blocked road') || text.includes('rrugë e bllokuar') || text.includes('rrugë e mbyllur') || text.includes('put blokiran')) {
-    return 'road_closure';
-  }
-  if (text.includes('congestion') || text.includes('gužva') || text.includes('kolonë')) {
-    return 'congestion';
-  }
-  if (text.includes('roadworks') || text.includes('обуставе') || text.includes('construction') || text.includes('radova')) {
-    return 'roadworks';
-  }
-  if (text.includes('accident') || text.includes('collision') || text.includes('crash') || text.includes('udes') || text.includes('sudar') || text.includes('zjarr') || text.includes('përplasje') || text.includes('aksident') || text.includes('nesrećа') || text.includes('nezgода') || text.includes('saobraćaj') || text.includes('saobraćaju') || text.includes('saobraćajна nesrećа')) {
-    return 'accident';
-  }
-  if (text.includes('blockage') || text.includes('blokada') || text.includes('bllokadë') || text.includes('blokiran put')) {
-    return 'road_block';
-  }
-  return 'other';
 }
 
 const KOSOVO_LOCATIONS = [
@@ -79,7 +142,7 @@ const KOSOVO_LOCATIONS = [
   { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica'] },
   { city: 'Malishevë', lat: 42.4820, lon: 20.7450, keywords: ['malishev', 'mališevo', 'malisevo'] },
   { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['dardan', 'kamenic', 'kamenica'] },
-  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['kllokot', 'klokot', 'viti', 'vitina'] },
+  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['kllokot', 'klokot', 'viti', 'vitina'] }
 ];
 
 function extractLocation(title, description) {
@@ -89,11 +152,7 @@ function extractLocation(title, description) {
   for (const loc of KOSOVO_LOCATIONS) {
     for (const kw of loc.keywords) {
       if (titleLower.includes(kw.toLowerCase())) {
-        return {
-          city: loc.city,
-          lat: loc.lat,
-          lon: loc.lon
-        };
+        return { city: loc.city, lat: loc.lat, lon: loc.lon };
       }
     }
   }
@@ -101,11 +160,7 @@ function extractLocation(title, description) {
   for (const loc of KOSOVO_LOCATIONS) {
     for (const kw of loc.keywords) {
       if (descLower.includes(kw.toLowerCase())) {
-        return {
-          city: loc.city,
-          lat: loc.lat,
-          lon: loc.lon
-        };
+        return { city: loc.city, lat: loc.lat, lon: loc.lon };
       }
     }
   }
@@ -116,24 +171,30 @@ function extractLocation(title, description) {
 function extractTrafficIncidents(newsItems) {
   if (!newsItems || !Array.isArray(newsItems)) return [];
   
-  return newsItems
-    .filter(item => item.title && filterTrafficKeywords(item.title + ' ' + (item.description || '')))
-    .map(item => {
-      const type = determineIncidentType(item.title, item.description);
-      const desc = (item.description || item.title || 'Traffic event').substring(0, 300);
-      const location = extractLocation(item.title, item.description);
-      
-      return {
-        id: `traffic-${item.id}`,
-        type,
-        title: item.title,
-        description: desc,
-        source: item.source || 'news',
-        publishedAt: item.publishedAt || new Date().toISOString(),
-        url: item.url || item.link || '#',
-        location: location || null
-      };
+  const incidents = [];
+  for (const item of newsItems) {
+    if (!item || !item.title) continue;
+
+    const classification = classifyTrafficIncident(item.title, item.description);
+    if (!classification.isTraffic) continue;
+
+    const location = extractLocation(item.title, item.description);
+    const desc = (item.description || item.title || 'Traffic incident').substring(0, 300);
+
+    incidents.push({
+      id: `traffic-${item.id || incidents.length}`,
+      type: classification.type,
+      typeLabel: classification.label,
+      title: item.title,
+      description: desc,
+      source: item.source || 'News Intelligence',
+      publishedAt: item.publishedAt || new Date().toISOString(),
+      url: item.url || item.link || '#',
+      location: location || null
     });
+  }
+
+  return incidents;
 }
 
 async function fetchTraffic({ location, news = null }) {
@@ -166,4 +227,10 @@ async function fetchTraffic({ location, news = null }) {
   };
 }
 
-module.exports = { fetchTraffic, extractLocation, extractTrafficIncidents };
+module.exports = {
+  fetchTraffic,
+  extractLocation,
+  extractTrafficIncidents,
+  classifyTrafficIncident,
+  TRAFFIC_RELEVANCE_TERMS
+};

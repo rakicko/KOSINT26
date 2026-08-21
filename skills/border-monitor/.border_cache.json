@@ -1,84 +1,55 @@
 {
   "skill": "border-monitor",
   "status": "LIVE_DATA",
-  "source": "NAKORDONI",
-  "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-  "sourceAttribution": {
-    "name": "Nakordoni",
-    "url": "https://nakordoni.eu/"
-  },
-  "updatedAt": "2026-08-21T15:40:55.000Z",
-  "count": 8,
+  "source": "QKMK",
+  "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+  "updatedAt": "2026-08-21T23:53:58.000Z",
+  "count": 13,
   "crossings": [
     {
-      "id": "border-merdare",
-      "key": "merdare",
-      "name": "Merdarë / Merdare",
-      "shortName": "Merdare",
+      "id": "border-bernjak",
+      "key": "bernjak",
+      "name": "Bërnjak / Brnjak",
+      "shortName": "Bërnjak",
       "country": "Kosovo",
       "neighborCountry": "Serbia",
       "coordinates": {
-        "lat": 42.9439,
-        "lon": 21.2464
+        "lat": 42.9753,
+        "lon": 20.5519
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 465,
-          "waitingMinutesText": "465 min",
-          "queueLengthMeters": 90,
-          "queueLengthText": "90 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 40,
-          "waitingMinutesText": "40 min",
-          "queueLengthMeters": 5,
-          "queueLengthText": "5 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
-      "trucks": null,
-      "status": "OPEN",
-      "updatedAt": "2026-08-21T15:28:04.000Z",
-      "source": "NAKORDONI",
-      "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-      "sourceAttribution": {
-        "name": "Nakordoni",
-        "url": "https://nakordoni.eu/"
-      }
-    },
-    {
-      "id": "border-jarinje",
-      "key": "jarinje",
-      "name": "Jarinjë / Jarinje",
-      "shortName": "Jarinje",
-      "country": "Kosovo",
-      "neighborCountry": "Serbia",
-      "coordinates": {
-        "lat": 43.2181,
-        "lon": 20.6975
-      },
-      "direction": {
+      "trucks": {
         "entry": {
-          "waitingMinutes": 65,
-          "waitingMinutesText": "65 min",
-          "queueLengthMeters": 10,
-          "queueLengthText": "10 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 165,
-          "waitingMinutesText": "165 min",
-          "queueLengthMeters": 30,
-          "queueLengthText": "30 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
-      "trucks": null,
       "status": "OPEN",
-      "updatedAt": "2026-08-21T15:37:09.000Z",
-      "source": "NAKORDONI",
-      "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-      "sourceAttribution": {
-        "name": "Nakordoni",
-        "url": "https://nakordoni.eu/"
-      }
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
     },
     {
       "id": "border-dheu-i-bardhe",
@@ -93,62 +64,82 @@
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 90,
-          "waitingMinutesText": "90 min",
-          "queueLengthMeters": 15,
-          "queueLengthText": "15 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 315,
-          "waitingMinutesText": "315 min",
-          "queueLengthMeters": 60,
-          "queueLengthText": "60 cars"
+          "waitingMinutes": 40,
+          "waitingMinutesText": "30-40 min",
+          "queueLengthMeters": 350,
+          "queueLengthText": "350 m"
         }
       },
-      "trucks": null,
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T15:36:51.000Z",
-      "source": "NAKORDONI",
-      "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-      "sourceAttribution": {
-        "name": "Nakordoni",
-        "url": "https://nakordoni.eu/"
-      }
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
     },
     {
-      "id": "border-mutivode",
-      "key": "mutivode",
-      "name": "Mutivodë / Mutivode",
-      "shortName": "Mutivodë",
+      "id": "border-gllobocice",
+      "key": "gllobocice",
+      "name": "Glloboçicë / Globočica",
+      "shortName": "Glloboçicë",
       "country": "Kosovo",
-      "neighborCountry": "Serbia",
+      "neighborCountry": "North Macedonia",
       "coordinates": {
-        "lat": 42.7561,
-        "lon": 21.4686
+        "lat": 42.1644,
+        "lon": 21.0967
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 15,
-          "waitingMinutesText": "15 min",
-          "queueLengthMeters": 5,
-          "queueLengthText": "5 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 20,
-          "waitingMinutesText": "20 min",
-          "queueLengthMeters": 5,
-          "queueLengthText": "5 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
-      "trucks": null,
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T15:36:40.000Z",
-      "source": "NAKORDONI",
-      "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-      "sourceAttribution": {
-        "name": "Nakordoni",
-        "url": "https://nakordoni.eu/"
-      }
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
     },
     {
       "id": "border-hani-i-elezit",
@@ -163,62 +154,82 @@
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 25,
-          "waitingMinutesText": "25 min",
-          "queueLengthMeters": 8,
-          "queueLengthText": "8 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 30,
-          "waitingMinutesText": "30 min",
-          "queueLengthMeters": 10,
-          "queueLengthText": "10 cars"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
-      "trucks": null,
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T15:38:20.000Z",
-      "source": "NAKORDONI",
-      "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-      "sourceAttribution": {
-        "name": "Nakordoni",
-        "url": "https://nakordoni.eu/"
-      }
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
     },
     {
-      "id": "border-vermice",
-      "key": "vermice",
-      "name": "Vërmicë / Vrbnica / Morinë",
-      "shortName": "Vërmicë",
+      "id": "border-jarinje",
+      "key": "jarinje",
+      "name": "Jarinjë / Jarinje",
+      "shortName": "Jarinje",
       "country": "Kosovo",
-      "neighborCountry": "Albania",
+      "neighborCountry": "Serbia",
       "coordinates": {
-        "lat": 42.1583,
-        "lon": 20.5486
+        "lat": 43.2181,
+        "lon": 20.6975
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 40,
-          "waitingMinutesText": "40 min",
-          "queueLengthMeters": 15,
-          "queueLengthText": "15 cars"
+          "waitingMinutes": 10,
+          "waitingMinutesText": "05-10 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 35,
-          "waitingMinutesText": "35 min",
-          "queueLengthMeters": 12,
-          "queueLengthText": "12 cars"
+          "waitingMinutes": 10,
+          "waitingMinutesText": "05-10 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
-      "trucks": null,
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T15:35:00.000Z",
-      "source": "NAKORDONI",
-      "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-      "sourceAttribution": {
-        "name": "Nakordoni",
-        "url": "https://nakordoni.eu/"
-      }
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
     },
     {
       "id": "border-kulle",
@@ -233,27 +244,172 @@
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 15,
-          "waitingMinutesText": "15 min",
-          "queueLengthMeters": 4,
-          "queueLengthText": "4 cars"
+          "waitingMinutes": 10,
+          "waitingMinutesText": "05-10 min",
+          "queueLengthMeters": 50,
+          "queueLengthText": "30-50 m"
         },
         "exit": {
           "waitingMinutes": 10,
-          "waitingMinutesText": "10 min",
-          "queueLengthMeters": 3,
-          "queueLengthText": "3 cars"
+          "waitingMinutesText": "05-10 min",
+          "queueLengthMeters": 50,
+          "queueLengthText": "30-50 m"
         }
       },
-      "trucks": null,
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T15:33:20.000Z",
-      "source": "NAKORDONI",
-      "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-      "sourceAttribution": {
-        "name": "Nakordoni",
-        "url": "https://nakordoni.eu/"
-      }
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
+    },
+    {
+      "id": "border-merdare",
+      "key": "merdare",
+      "name": "Merdarë / Merdare",
+      "shortName": "Merdare",
+      "country": "Kosovo",
+      "neighborCountry": "Serbia",
+      "coordinates": {
+        "lat": 42.9439,
+        "lon": 21.2464
+      },
+      "direction": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 80,
+          "waitingMinutesText": "60-80 min",
+          "queueLengthMeters": 800,
+          "queueLengthText": "800 m"
+        }
+      },
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "status": "OPEN",
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
+    },
+    {
+      "id": "border-mucibabe",
+      "key": "mucibabe",
+      "name": "Muçibabë / Mučibaba",
+      "shortName": "Muçibabë",
+      "country": "Kosovo",
+      "neighborCountry": "Serbia",
+      "coordinates": {
+        "lat": 42.3883,
+        "lon": 21.5583
+      },
+      "direction": {
+        "entry": {
+          "waitingMinutes": 10,
+          "waitingMinutesText": "05-10 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 30,
+          "waitingMinutesText": "20-30 min",
+          "queueLengthMeters": 400,
+          "queueLengthText": "400 m"
+        }
+      },
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "status": "OPEN",
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
+    },
+    {
+      "id": "border-mutivode",
+      "key": "mutivode",
+      "name": "Mutivodë / Mutivode",
+      "shortName": "Mutivodë",
+      "country": "Kosovo",
+      "neighborCountry": "Serbia",
+      "coordinates": {
+        "lat": 42.7561,
+        "lon": 21.4686
+      },
+      "direction": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "status": "OPEN",
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
     },
     {
       "id": "border-qafe-e-morines",
@@ -269,26 +425,171 @@
       "direction": {
         "entry": {
           "waitingMinutes": 5,
-          "waitingMinutesText": "5 min",
-          "queueLengthMeters": 2,
-          "queueLengthText": "2 cars"
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         },
         "exit": {
           "waitingMinutes": 5,
-          "waitingMinutesText": "5 min",
-          "queueLengthMeters": 2,
-          "queueLengthText": "2 cars"
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
-      "trucks": null,
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T15:31:40.000Z",
-      "source": "NAKORDONI",
-      "sourceUrl": "https://nakordoni.eu/en/country/kosovo",
-      "sourceAttribution": {
-        "name": "Nakordoni",
-        "url": "https://nakordoni.eu/"
-      }
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
+    },
+    {
+      "id": "border-qafe-e-prushit",
+      "key": "qafe-e-prushit",
+      "name": "Qafë e Prushit / Ćafa Prušit",
+      "shortName": "Qafë e Prushit",
+      "country": "Kosovo",
+      "neighborCountry": "Albania",
+      "coordinates": {
+        "lat": 42.3014,
+        "lon": 20.3553
+      },
+      "direction": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "status": "OPEN",
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
+    },
+    {
+      "id": "border-stanciq",
+      "key": "stanciq",
+      "name": "Stançiq / Staničić",
+      "shortName": "Stançiq",
+      "country": "Kosovo",
+      "neighborCountry": "North Macedonia",
+      "coordinates": {
+        "lat": 42.2778,
+        "lon": 21.5278
+      },
+      "direction": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "status": "OPEN",
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
+    },
+    {
+      "id": "border-vermice",
+      "key": "vermice",
+      "name": "Vërmicë / Vrbnica / Morinë",
+      "shortName": "Vërmicë",
+      "country": "Kosovo",
+      "neighborCountry": "Albania",
+      "coordinates": {
+        "lat": 42.1583,
+        "lon": 20.5486
+      },
+      "direction": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "trucks": {
+        "entry": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        },
+        "exit": {
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
+        }
+      },
+      "status": "OPEN",
+      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "source": "QKMK",
+      "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
+      "sourceAttribution": null
     }
   ],
   "isCached": false

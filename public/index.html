@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SENTINEL — Situational Awareness Dashboard</title>
-  <meta name="description" content="Real-time situational awareness dashboard tracking news, weather, traffic, radiation, AQ, earthquakes, and wildfires for Kosovo and the region." />
+  <title>KOSINT — Open-Source Intelligence Platform</title>
+  <meta name="description" content="KOSINT — Real-time Open-Source Intelligence Platform tracking news, weather, traffic, radiation, AQI, seismic activity, wildfires, aviation, and border crossings." />
+  <link rel="icon" type="image/svg+xml" href="assets/kosint-logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="vendor/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -15,10 +17,49 @@
 <!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <header class="header">
   <div class="header-brand">
-    <div class="brand-icon">🛰️</div>
+    <div class="brand-logo" id="kosintLogo">
+      <svg class="brand-logo-svg" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="kosintGrad1" x1="2" y1="18" x2="34" y2="18" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.6"/>
+            <stop offset="50%" stop-color="#67e8f9"/>
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.6"/>
+          </linearGradient>
+          <linearGradient id="kosintCoreGrad" x1="12" y1="12" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#a5f3fc"/>
+            <stop offset="100%" stop-color="#0284c7"/>
+          </linearGradient>
+          <filter id="kosintGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.5" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        
+        <!-- Outer Geospatial Observation Eye -->
+        <path d="M3 18C7.5 10.5 13.5 6.5 18 6.5C22.5 6.5 28.5 10.5 33 18C28.5 25.5 22.5 29.5 18 29.5C13.5 29.5 7.5 25.5 3 18Z" 
+              stroke="url(#kosintGrad1)" stroke-width="1.8" stroke-linejoin="round" opacity="0.95"/>
+        
+        <!-- Topographic Contour / Radar Rings -->
+        <ellipse cx="18" cy="18" rx="10" ry="8.5" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="2.5 1.5" opacity="0.5"/>
+        <ellipse cx="18" cy="18" rx="6.5" ry="6.5" stroke="url(#kosintGrad1)" stroke-width="1.4" opacity="0.85"/>
+        
+        <!-- Network Coordinate Lines (Intelligence Grid) -->
+        <line x1="18" y1="4" x2="18" y2="9" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+        <line x1="18" y1="27" x2="18" y2="32" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+        <line x1="1" y1="18" x2="6" y2="18" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+        <line x1="30" y1="18" x2="35" y2="18" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+        
+        <!-- Central Glowing Sensor Core / Focal Point -->
+        <circle cx="18" cy="18" r="3" fill="url(#kosintCoreGrad)" filter="url(#kosintGlow)"/>
+        <circle cx="18" cy="18" r="1" fill="#ffffff"/>
+      </svg>
+    </div>
     <div class="brand-text">
-      <span class="brand-name">SENTINEL</span>
-      <span class="brand-sub">Situational Awareness System</span>
+      <span class="brand-name">KOSINT</span>
+      <span class="brand-sub">Open-Source Intelligence Platform</span>
     </div>
   </div>
 
@@ -35,20 +76,9 @@
     <button id="monitorBtn" class="btn-monitor" onclick="startMonitor()">
       <span class="btn-icon">⚡</span> REFRESH
     </button>
-    <button class="btn-secondary" onclick="exportReport()" title="Export situation report">
-      📤 Export
-    </button>
   </div>
 
   <div class="header-status">
-    <!-- Threat Level Widget -->
-    <div class="threat-widget" id="threatWidget" style="display:none">
-      <div class="threat-label">THREAT LEVEL</div>
-      <div class="threat-level-bar">
-        <div class="threat-fill" id="threatFill"></div>
-      </div>
-      <div class="threat-text" id="threatText">—</div>
-    </div>
     <div id="liveIndicator" class="status-indicator offline">
       <span class="status-dot"></span>
       <span class="status-text">OFFLINE</span>
@@ -57,80 +87,123 @@
   </div>
 </header>
 
-<!-- ── Main Layout ──────────────────────────────────────────────────────────── -->
+<!-- ── Main Layout (OSIRIS AI Map-First Canvas) ────────────────────────────── -->
 <main class="main-layout">
-  <aside class="sidebar">
-    <div class="sidebar-section alert-section">
-      <div class="section-header">
-        <span class="section-icon">🔔</span>
-        <span>Alert Log</span>
-        <span class="badge" id="unreadBadge" style="display:none"></span>
-      </div>
-      <div class="alert-log" id="alertLog">
-        <div class="empty-state">No alerts yet</div>
-      </div>
-      <button class="btn-sm alert-mark-read-btn" onclick="markAllRead()" style="margin-top:8px">Mark all read</button>
+  <!-- ── OSIRIS AI Inspired Vertical Navigation Rail ───────────────────────── -->
+  <nav class="osiris-nav-rail" id="moduleNavRail" aria-label="Intelligence Modules">
+    <div class="nav-rail-group">
+      <button class="nav-rail-btn" data-panel="newsPanel" onclick="toggleModule('newsPanel')" aria-label="News Intelligence">
+        <span class="nav-rail-icon">📰</span>
+        <span class="nav-rail-tooltip">News Intelligence</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="weatherPanel" onclick="toggleModule('weatherPanel')" aria-label="Weather Monitor">
+        <span class="nav-rail-icon">🌤️</span>
+        <span class="nav-rail-tooltip">Weather Monitor</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="trafficPanel" onclick="toggleModule('trafficPanel')" aria-label="Traffic Intelligence">
+        <span class="nav-rail-icon">🚦</span>
+        <span class="nav-rail-tooltip">Traffic Intelligence</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="radiationPanel" onclick="toggleModule('radiationPanel')" aria-label="Radiation Monitor">
+        <span class="nav-rail-icon">☢️</span>
+        <span class="nav-rail-tooltip">Radiation Monitor</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="aqiPanel" onclick="toggleModule('aqiPanel')" aria-label="Air Quality Index">
+        <span class="nav-rail-icon">🌍</span>
+        <span class="nav-rail-tooltip">Air Quality Index</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="earthquakePanel" onclick="toggleModule('earthquakePanel')" aria-label="Seismic Activity">
+        <span class="nav-rail-icon">🌊</span>
+        <span class="nav-rail-tooltip">Seismic Activity</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')" aria-label="Wildfire Detection">
+        <span class="nav-rail-icon">🔥</span>
+        <span class="nav-rail-tooltip">Wildfire Detection</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="aviationPanel" onclick="toggleModule('aviationPanel')" aria-label="Aviation Intelligence">
+        <span class="nav-rail-icon">✈️</span>
+        <span class="nav-rail-tooltip">Aviation Intelligence</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="telegramPanel" onclick="toggleModule('telegramPanel')" aria-label="Telegram Public Feed">
+        <span class="nav-rail-icon">📱</span>
+        <span class="nav-rail-tooltip">Telegram Public Feed</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="borderPanel" onclick="toggleModule('borderPanel')" aria-label="Border Crossing Monitor">
+        <span class="nav-rail-icon">🛂</span>
+        <span class="nav-rail-tooltip">Border Crossing Monitor</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="cctvIntelligencePanel" onclick="toggleModule('cctvIntelligencePanel')" aria-label="CCTV Surveillance">
+        <span class="nav-rail-icon">📹</span>
+        <span class="nav-rail-tooltip">CCTV Surveillance</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="routePanel" onclick="toggleModule('routePanel')" aria-label="Route Intelligence">
+        <span class="nav-rail-icon">🛣️</span>
+        <span class="nav-rail-tooltip">Route Intelligence</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
     </div>
 
-    <div class="sidebar-section settings-section">
-      <div class="section-header">
-        <span class="section-icon">⚙️</span>
-        <span>Settings</span>
-      </div>
-      <div class="settings-row">
-        <label class="setting-label">Auto-poll interval</label>
-        <select class="input-field select-field" id="pollInterval" onchange="updatePollInterval()">
-          <option value="60000">1 min</option>
-          <option value="300000" selected>5 min</option>
-          <option value="600000">10 min</option>
-          <option value="0">Manual</option>
-        </select>
-      </div>
-      <div class="settings-row">
-        <label class="setting-label">Map View</label>
-        <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide Map</button>
-      </div>
-    </div>
-  </aside>
+    <div class="nav-rail-divider"></div>
 
+    <div class="nav-rail-group nav-rail-utility">
+      <button class="nav-rail-btn" data-panel="alertPanel" onclick="toggleModule('alertPanel')" aria-label="Alert Log">
+        <span class="nav-rail-icon">🔔</span>
+        <span class="nav-rail-badge" id="unreadBadge" style="display:none"></span>
+        <span class="nav-rail-tooltip">Alert Log</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="settingsPanel" onclick="toggleModule('settingsPanel')" aria-label="System Settings">
+        <span class="nav-rail-icon">⚙️</span>
+        <span class="nav-rail-tooltip">System Settings</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── Full-Viewport Map Stage ────────────────────────────────────────────── -->
   <section class="map-stage">
-    <div class="map-toolbar" id="moduleToolbar">
-      <button class="module-btn" data-panel="newsPanel" onclick="toggleModule('newsPanel')"><span class="module-icon">📰</span> News Intelligence</button>
-      <button class="module-btn" data-panel="weatherPanel" onclick="toggleModule('weatherPanel')"><span class="module-icon">🌤</span> Weather Monitor</button>
-      <button class="module-btn" data-panel="trafficPanel" onclick="toggleModule('trafficPanel')"><span class="module-icon">🚦</span> Traffic Intelligence</button>
-      <button class="module-btn" data-panel="radiationPanel" onclick="toggleModule('radiationPanel')"><span class="module-icon">☢️</span> Radiation Monitor</button>
-      <button class="module-btn" data-panel="aqiPanel" onclick="toggleModule('aqiPanel')"><span class="module-icon">🌍</span> Air Quality Index</button>
-      <button class="module-btn" data-panel="earthquakePanel" onclick="toggleModule('earthquakePanel')"><span class="module-icon">🌊</span> Seismic Activity</button>
-      <button class="module-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')"><span class="module-icon">🔥</span> Wildfire</button>
-      <button class="module-btn" data-panel="aviationPanel" onclick="toggleModule('aviationPanel')"><span class="module-icon">✈️</span> Aviation</button>
-      <button class="module-btn" data-panel="telegramPanel" onclick="toggleModule('telegramPanel')"><span class="module-icon">📱</span> Telegram Feed</button>
-      <button class="module-btn" data-panel="borderPanel" onclick="toggleModule('borderPanel')"><span class="module-icon">🛂</span> Border Monitor</button>
-      <button class="module-btn" data-panel="cctvIntelligencePanel" onclick="toggleModule('cctvIntelligencePanel')"><span class="module-icon">📹</span> CCTV</button>
-    </div>
-
     <div class="map-card">
       <div class="panel map-panel" id="mapPanel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <span class="panel-icon">🗺️</span>
-            <span>Interactive Situation Map</span>
-            <span class="panel-badge" id="mapBadge" style="display:none"></span>
-          </div>
-          <div class="panel-meta" id="mapMeta">Pinch/scroll to zoom</div>
-        </div>
         <div id="leafletMap"></div>
       </div>
 
+      <!-- ── Focused Module Overlay Panel ───────────────────────────────────── -->
       <div class="module-overlay" id="moduleOverlay" aria-hidden="true">
         <div class="overlay-shell">
           <div class="overlay-header">
             <div>
               <div class="overlay-title" id="overlayTitle">Module Panel</div>
-              <div class="overlay-sub">Focus on one feed while keeping the map visible behind it.</div>
+              <div class="overlay-sub">Focused intelligence feed over live map view.</div>
             </div>
             <button class="overlay-close" onclick="closeModulePanel()" aria-label="Close module panel">✕</button>
           </div>
           <div class="overlay-content">
+            <!-- Weather Panel (Map-Based & Station Overview) -->
+            <div class="panel overlay-panel" id="weatherPanel" data-panel-title="Weather Monitor" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">🌤️</span>
+                  <span>Weather Monitor</span>
+                  <span class="panel-badge" id="weatherBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="weatherMeta">KOSOVO STATIONS · OPEN-METEO LIVE</div>
+              </div>
+              <div class="weather-station-overview" id="weatherStationOverview">
+                <div class="empty-state">Interactive weather stations active on map. Click any station pin to inspect real-time forecasts.</div>
+              </div>
+            </div>
+
             <!-- News Panel -->
             <div class="panel overlay-panel" id="newsPanel" data-panel-title="News Intelligence" style="display:none">
               <div class="panel-header">
@@ -297,55 +370,185 @@
                 <div class="empty-state">Loading border crossings...</div>
               </div>
             </div>
+
+            <!-- Route Intelligence Panel -->
+            <div class="panel overlay-panel" id="routePanel" data-panel-title="Route Intelligence" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">🛣️</span>
+                  <span>Route Intelligence</span>
+                </div>
+                <div class="panel-meta">TACTICAL ROUTING & THREAT CORRIDOR</div>
+              </div>
+              <div class="route-content-wrap">
+                <div class="route-inputs-group">
+                  <div class="route-input-row">
+                    <label class="route-input-label">START</label>
+                    <div class="route-input-field-wrap">
+                      <span class="route-input-icon">🟢</span>
+                      <input type="text" id="routeStartInput" class="input-field route-input" placeholder="Start location or lat,lon (e.g. Prishtinë)" list="routeLocationsList" value="Prishtinë" />
+                    </div>
+                  </div>
+                  <div class="route-input-row">
+                    <label class="route-input-label">DESTINATION</label>
+                    <div class="route-input-field-wrap">
+                      <span class="route-input-icon">🔴</span>
+                      <input type="text" id="routeEndInput" class="input-field route-input" placeholder="Destination or lat,lon (e.g. Mitrovicë)" list="routeLocationsList" value="Mitrovicë" />
+                    </div>
+                  </div>
+                  <datalist id="routeLocationsList">
+                    <option value="Prishtinë">
+                    <option value="Mitrovicë">
+                    <option value="Prizren">
+                    <option value="Pejë">
+                    <option value="Gjilan">
+                    <option value="Ferizaj">
+                    <option value="Gjakovë">
+                    <option value="Podujevë">
+                    <option value="Vushtrri">
+                    <option value="Leposavić">
+                    <option value="Zvečan">
+                    <option value="Zubin Potok">
+                    <option value="Jarinje (Border)">
+                    <option value="Brnjak (Border)">
+                    <option value="Merdarë (Border)">
+                    <option value="Dheu i Bardhë (Border)">
+                    <option value="Hani i Elezit (Border)">
+                    <option value="Vërmicë (Border)">
+                    <option value="Kullë (Border)">
+                    <option value="Morinë (Border)">
+                  </datalist>
+                  <div class="route-mode-row">
+                    <label class="route-input-label">MODE</label>
+                    <div class="route-mode-badge">
+                      <span>🚗</span> DRIVE
+                    </div>
+                  </div>
+                  <div class="route-action-buttons">
+                    <button class="btn-monitor route-calc-btn" id="routeCalcBtn" onclick="calculateRoute()">
+                      <span class="btn-icon">📍</span> CALCULATE ROUTE
+                    </button>
+                    <button class="btn-secondary route-clear-btn" onclick="clearRoute()">
+                      CLEAR
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Route Telemetry Card -->
+                <div id="routeResultsCard" class="route-results-card" style="display:none;">
+                  <div class="route-metrics-grid">
+                    <div class="route-metric-box">
+                      <span class="metric-label">DISTANCE</span>
+                      <span class="metric-val" id="routeDistanceVal">--</span>
+                    </div>
+                    <div class="route-metric-box">
+                      <span class="metric-label">ESTIMATED TIME</span>
+                      <span class="metric-val" id="routeDurationVal">--</span>
+                    </div>
+                    <div class="route-metric-box full-width">
+                      <span class="metric-label">ROUTE STATUS</span>
+                      <span class="metric-status-badge status-normal" id="routeStatusBadge">ROUTE CALCULATED</span>
+                    </div>
+                  </div>
+
+                  <div class="route-waypoints-summary" id="routeWaypointsSummary"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alert Log Panel -->
+            <div class="panel overlay-panel" id="alertPanel" data-panel-title="Alert Log & Notifications" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">🔔</span>
+                  <span>Alert Log</span>
+                  <span class="panel-badge" id="alertLogBadge" style="display:none"></span>
+                </div>
+                <div class="panel-meta" id="alertLogMeta">REAL-TIME INTELLIGENCE ALERTS</div>
+              </div>
+              <div class="alert-log-actions">
+                <button class="btn-sm alert-mark-read-btn" onclick="markAllRead()">Mark all read</button>
+              </div>
+              <div class="alert-log" id="alertLog">
+                <div class="empty-state">No alerts yet</div>
+              </div>
+            </div>
+
+            <!-- Settings Panel -->
+            <div class="panel overlay-panel" id="settingsPanel" data-panel-title="System Settings" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">⚙️</span>
+                  <span>System Settings</span>
+                </div>
+                <div class="panel-meta">POLLING & DISPLAY PREFERENCES</div>
+              </div>
+              <div class="settings-content-wrap">
+                <div class="settings-row">
+                  <label class="setting-label">Auto-poll interval</label>
+                  <select class="input-field select-field" id="pollInterval" onchange="updatePollInterval()">
+                    <option value="60000">1 min</option>
+                    <option value="300000" selected>5 min</option>
+                    <option value="600000">10 min</option>
+                    <option value="0">Manual</option>
+                  </select>
+                </div>
+                <div class="settings-row">
+                  <label class="setting-label">Map View</label>
+                  <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide Map</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-</div>
-    </section>
+    </div>
+  </section>
 
-  <!-- CCTV Intelligence Panel - serves as both module panel and camera detail view -->
+  <!-- CCTV Intelligence Panel - 50% split-screen / Unobstructed Camera Feed -->
   <div class="cctv-intelligence-panel" id="cctvIntelligencePanel" style="display: none;">
     <div class="cctv-intelligence-header">
       <div class="cctv-intelligence-title">
         <span class="cctv-icon">📹</span>
         <span id="cctvName">CAMERA</span>
       </div>
-      <button id="cctvClose" class="cctv-close-btn cctv-btn" title="Close">✕</button>
+      <div class="cctv-header-right">
+        <span id="cctvStatus" class="cctv-status-indicator">● LIVE</span>
+        <a id="cctvOpenFeed" class="cctv-header-link-btn" href="#" target="_blank" rel="noopener noreferrer" title="Open live feed in new tab">
+          ↗ Open feed
+        </a>
+        <button id="cctvFullscreenBtn" class="cctv-header-icon-btn" onclick="toggleCCTVFullscreen()" title="Toggle Fullscreen">
+          ⛶
+        </button>
+        <button id="cctvClose" class="cctv-close-btn" title="Close">✕</button>
+      </div>
     </div>
-    <div class="cctv-intelligence-video">
-      <div class="cctv-video-unavailable" id="cctvVideoUnavailable">
+    <div class="cctv-intelligence-video" id="cctvVideoContainer">
+      <iframe id="cctvVideoFrame" class="cctv-video-frame" src="" loading="lazy" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+      <div class="cctv-video-unavailable" id="cctvVideoUnavailable" style="display: none;">
         <div class="cctv-unavailable-icon">📹</div>
-        <div class="cctv-unavailable-text">Live video cannot be embedded</div>
-        <a id="cctvOpenFeed" class="cctv-open-feed-btn" href="#" target="_blank" rel="noopener noreferrer">OPEN IN GJIRAFAVIDEO</a>
-      </div>
-      <iframe id="cctvVideoFrame" class="cctv-video-frame" src="" loading="lazy" allow="autoplay; fullscreen"></iframe>
-    </div>
-    <div class="cctv-intelligence-status">
-      <span id="cctvStatus" class="cctv-status-indicator">● STATUS UNKNOWN</span>
-    </div>
-    <div class="cctv-intelligence-metadata">
-      <div class="cctv-metadata-row">
-        <span class="cctv-metadata-label">FEED TYPE</span>
-        <span id="cctvFeedType" class="cctv-metadata-value">N/A</span>
-      </div>
-      <div class="cctv-metadata-row">
-        <span class="cctv-metadata-label">STATUS</span>
-        <span id="cctvFeedStatus" class="cctv-metadata-value">N/A</span>
-      </div>
-      <div class="cctv-metadata-row">
-        <span class="cctv-metadata-label">RECORDING</span>
-        <span id="cctvRecording" class="cctv-metadata-value">N/A</span>
+        <div class="cctv-unavailable-text">No stream available for this camera</div>
       </div>
     </div>
-    <div class="cctv-intelligence-actions">
-      <button id="cctvRawFeed" class="cctv-action-btn" style="flex: 1;">RAW FEED</button>
-      <button id="cctvMapTargetBtn" class="cctv-action-btn" style="flex: 1;">MAP TARGET</button>
-    </div>
-    <div class="cctv-camera-list-section">
-      <div class="cctv-camera-list-header">
-        <span>CAMERAS (16)</span>
+    <div class="cctv-intelligence-body">
+      <div class="cctv-intelligence-metadata">
+        <div class="cctv-metadata-row">
+          <span class="cctv-metadata-label">FEED TYPE</span>
+          <span id="cctvFeedType" class="cctv-metadata-value">N/A</span>
+        </div>
+        <div class="cctv-metadata-row">
+          <span class="cctv-metadata-label">STATUS</span>
+          <span id="cctvFeedStatus" class="cctv-metadata-value">N/A</span>
+        </div>
+        <div class="cctv-metadata-row">
+          <span class="cctv-metadata-label">RECORDING</span>
+          <span id="cctvRecording" class="cctv-metadata-value">N/A</span>
+        </div>
       </div>
-      <div class="cctv-camera-list" id="cctvCameraList"></div>
+      <div class="cctv-intelligence-actions">
+        <button id="cctvRawFeed" class="cctv-action-btn" style="flex: 1;">RAW FEED</button>
+        <button id="cctvMapTargetBtn" class="cctv-action-btn" style="flex: 1;">MAP TARGET</button>
+      </div>
     </div>
   </div>
 </main>
