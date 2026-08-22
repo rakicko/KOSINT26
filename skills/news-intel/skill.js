@@ -514,6 +514,784 @@ async function fetchRSS(source) {
 }
 
 // ─────────────────────────────────────
+// Multilingual Entity & Location Resolver
+// ─────────────────────────────────────
+
+const MULTILINGUAL_ENTITIES = {
+  // People
+  'person:albin_kurti': [/albin\s*kurti/i, /албин\s*курти/i, /kurti/i, /kurti-t/i, /kurtit/i],
+  'person:ozkan_ulutas': [/ozkan\s*ulutas/i, /özkan\s*ulutaş/i, /ulutaš/i, /ulutaş/i, /ulutas/i, /ulutash/i, /улутас/i, /general-major.*uluta/i],
+  'person:croatian_pilot': [/pilot.*kroat/i, /hrvatsk.*pilot/i, /pilot.*hrvat/i],
+  'person:xhelal_svecla': [/xhelal\s*sveçla/i, /svečla/i, /sveçl/i, /svecl/i],
+  'person:vjosa_osmani': [/vjosa\s*osmani/i, /osmani/i],
+  'person:aleksandar_vucic': [/aleksandar\s*vučić/i, /vučić/i, /vucic/i, /vuçiq/i],
+  'person:petar_petkovic': [/petar\s*petković/i, /petković/i, /petkovic/i],
+  'person:nenad_rasic': [/nenad\s*rašić/i, /rashiq/i, /rašić/i],
+
+  // Institutions & Groups
+  'inst:kfor': [/kfor/i, /kfor-i/i, /kforu/i, /kfor-a/i],
+  'inst:eulex': [/eulex/i, /evleks/i],
+  'inst:kosovo_police': [/policia\s*e\s*kosovës/i, /policija\s*kosova/i, /kosovo\s*police/i, /policij/i, /policia/i, /njoftim\s*i\s*policisë/i],
+  'inst:srpska_lista': [/srpska\s*lista/i, /lista\s*serbe/i],
+  'inst:srpska_demokratija': [/srpska\s*demokratija/i, /srpske\s*demokratije/i],
+
+  // Locations (SR / AL / EN equivalents)
+  'loc:leposavic': [/leposavić/i, /leposaviq/i, /leposavic/i],
+  'loc:mitrovica': [/mitrovic/i, /severn.*mitrovic/i, /mitrovicë/i, /mitrovica/i],
+  'loc:zvecan': [/zvečan/i, /zveçan/i, /zvecan/i],
+  'loc:zubin_potok': [/zubin\s*potok/i, /zubin-potok/i],
+  'loc:peja': [/pejë|peja|peje|peć|pec|peći/i],
+  'loc:prizren': [/prizren/i],
+  'loc:ferizaj': [/ferizaj/i, /uroševac/i, /urosevac/i],
+  'loc:gjilan': [/gjilan/i, /gnjilan/i],
+  'loc:gjakova': [/gjakovë/i, /gjakove/i, /đakovica/i, /djakovica/i],
+  'loc:podujevo': [/podujevë/i, /podujeve/i, /podujevo/i],
+  'loc:shtime': [/shtime/i, /štimlje/i, /stimlje/i],
+  'loc:kacanik': [/kaçanik/i, /kacanik/i],
+  'loc:durres': [/durrës/i, /durres/i, /drač/i],
+  'loc:jarinje': [/jarinj/i],
+  'loc:brnjak': [/brnjak/i, /bërnjak/i],
+  'loc:merdare': [/merdar/i],
+  'loc:dheu_i_bardhe': [/dheu\s*i\s*bardhë/i, /bela\s*zemlja/i],
+  'loc:ibar_bridge': [/most[a-z]*\s*(na\s*)?ibr[a-z]*|ibarsk[a-z]*\s*most[a-z]*|ur[aëesn]+\s*(së\s*|e\s*)?ibr[a-z]*|ibar\s*bridge|ibër\s*bridge/i],
+
+  // Specific Actions & Event Types
+  'event:espionage': [/spiunazh/i, /špijunaž/i, /spijunaz/i, /espionage/i, /spy/i],
+  'event:meeting': [/sastanak|sastati|takim|takimi|meet|meeting|razgovor|takohet/i],
+  'event:meeting_cancellation': [/otkazan|nije\s*održan|nuk\s*u\s*mbajt|nuk\s*u\s*zhvillua|odložen|cancelled|canceled|otkazala|otkazana|dështon\s*takimi|dështoi\s*takimi/i],
+  'event:arrest': [/uhapš|uhaps|prived|arrest|ndalohet|ndaluar|detain/i],
+  'event:theft': [/vjedh[a-z]*|krađ[a-z]*|kradj[a-z]*|ukrad[a-z]*|krad[a-z]*|stolen|theft|burglary/i],
+  'event:robbery': [/grabit[a-z]*|pljačk[a-z]*|pljack[a-z]*|razbojništv[a-z]*|robbery/i],
+  'event:weapon_seizure': [/oružj|oruzj|armë|armat|arsenal|konfisk|zaplen|sekuestr|weapons|arms|seizure/i],
+  'event:drug_seizure': [/kanabis|marihuana|drog|narkotik|cannabis|marijuana|drugs/i],
+  'event:police_action': [/aksion|aksioni|akcija|akciji|operacija|operation|patrolla|patrola|bastisje|pretres|raid/i],
+  'event:incident': [/incident|incidenti|incidenta|sukob|përleshje|perleshje|clash/i],
+  'event:accident': [/aksident|saobraćajn|saobracajn|sudar|udes|traffic accident|crash/i],
+  'event:shooting': [/pucnjav|pucano|të shtëna|te shtena|gjuajtje me armë|shooting|gunfire/i],
+  'event:fire': [/požar|pozar|zjarr|fire|arson/i],
+  'event:protest': [/protest|demonstra|okupjenj|turmë|protestues/i],
+  'event:court': [/gjykata|gjykatan|gjykates|sud|sudb|tužilaštv|prokuror|court|prosecut/i],
+  'event:military_activity': [/vojn|ushtarak|soldier|vojska|military/i],
+  'event:border_incident': [/kufi|kufitar|granič|prelaz|pika kufitare|border/i]
+};
+
+function extractMultilingualEntities(title, description = '') {
+  const text = `${title || ''} ${description || ''}`.toLowerCase();
+  const entities = [];
+
+  for (const [entityKey, patterns] of Object.entries(MULTILINGUAL_ENTITIES)) {
+    if (patterns.some(re => re.test(text))) {
+      entities.push(entityKey);
+    }
+  }
+
+  // 1. Weight / Volume anchors (e.g. "80kg", "80 kg", "100g")
+  const weightMatch = text.match(/\b(\d+)\s*(kg|kilogram|kg\.?|g|gram|tona|tonë)\b/i);
+  if (weightMatch) {
+    entities.push(`qty:${weightMatch[1]}${weightMatch[2].toLowerCase().slice(0, 2)}`);
+  }
+
+  // 2. Money / Currency anchors (e.g. "10,000€", "50.000 euro", "100 mijë euro")
+  const moneyMatch = text.match(/(\d+[\.\,]?\d*)\s*(euro|eur|€|evra|dinar)/i);
+  if (moneyMatch) {
+    const cleanNum = moneyMatch[1].replace(/[\.\,]/g, '');
+    entities.push(`qty:${cleanNum}eur`);
+  }
+
+  // 3. Count anchors (digits or word numbers followed by persons/suspects/arrested)
+  const COUNT_PATTERNS = [
+    { num: '1', re: /(1|një|jedan|jedna|one|edhe\s*një|još\s*jedan)\s*(osumnjič|osob|të\s*arrestuar|të\s*dyshuar|person|arrested|suspect|lënduar|povređ|i\s*dyshuar[it]?)|(osumnjič[a-z]*|osob[a-z]*|i\s*dyshuar[it]?)\s*(i\s*parë|prvi)/i },
+    { num: '2', re: /(2|dy|dva|dve|two)\s*(osumnjič|osob|të\s*arrestuar|të\s*dyshuar|person|arrested|suspect|lënduar|povređ|i\s*dyshuar[it]?)|(osumnjič[a-z]*|osob[a-z]*|i\s*dyshuar[it]?)\s*(i\s*dytë|drugi)/i },
+    { num: '3', re: /(3|tre|tri|three)\s*(osumnjič|osob|të\s*arrestuar|të\s*dyshuar|person|arrested|suspect|lënduar|povređ|i\s*dyshuar[it]?)|(osumnjič[a-z]*|osob[a-z]*|i\s*dyshuar[it]?)\s*(i\s*tretë|treći)/i },
+    { num: '4', re: /(4|katër|i\s*katërt|četiri|četvrti|four)\s*(osumnjič|osob|të\s*arrestuar|të\s*dyshuar|person|arrested|suspect|lënduar|povređ|i\s*dyshuar[it]?)|(osumnjič[a-z]*|osob[a-z]*|i\s*dyshuar[it]?)\s*(i\s*katërt|četvrti)/i },
+    { num: '5', re: /(5|pesë|pet|five)\s*(osumnjič|osob|të\s*arrestuar|të\s*dyshuar|person|arrested|suspect|lënduar|povređ|i\s*dyshuar[it]?)|(osumnjič[a-z]*|osob[a-z]*|i\s*dyshuar[it]?)\s*(i\s*pestë|peti)/i }
+  ];
+
+  for (const p of COUNT_PATTERNS) {
+    if (p.re.test(text)) {
+      entities.push(`qty:${p.num}persons`);
+    }
+  }
+
+  return entities;
+}
+
+/**
+ * Checks whether two entity sets contain conflicting mutually exclusive event types
+ */
+function checkEventTypeConflict(entitiesA, entitiesB) {
+  const eventTypesA = entitiesA.filter(e => e.startsWith('event:'));
+  const eventTypesB = entitiesB.filter(e => e.startsWith('event:'));
+
+  if (eventTypesA.length === 0 || eventTypesB.length === 0) return false;
+
+  const MUTUALLY_EXCLUSIVE_TYPES = [
+    'event:accident',
+    'event:shooting',
+    'event:fire',
+    'event:protest',
+    'event:court',
+    'event:theft',
+    'event:weapon_seizure',
+    'event:drug_seizure'
+  ];
+
+  const exA = eventTypesA.filter(e => MUTUALLY_EXCLUSIVE_TYPES.includes(e));
+  const exB = eventTypesB.filter(e => MUTUALLY_EXCLUSIVE_TYPES.includes(e));
+
+  if (exA.length > 0 && exB.length > 0) {
+    return !exA.some(t => exB.includes(t));
+  }
+
+  return false;
+}
+
+const SOURCE_AUTHORITY = {
+  'Koha Ditore': 100,
+  'Koha': 100,
+  'Koha.net': 100,
+  'Radio Kim': 90,
+  'Radio KIM': 90,
+  'Kallxo': 90,
+  'Gazeta Express': 80,
+  'Telegrafi': 80,
+  'RTK': 80,
+  'Radio Kosova': 75,
+  'Tanjug': 70,
+  'Kossev': 70,
+  'KoSSev': 70,
+  'Radio Mitrovica Sever': 70,
+  'Indeks Online': 60,
+  'MitrovicaSOT': 60,
+  'Jepize': 60,
+  'Mitropol': 60,
+  'Lajmi': 60,
+  'Botasot': 60,
+  'Reporteri': 60,
+  'Bota Sot': 60,
+  'Syri': 50
+};
+
+function normalizeUrl(url) {
+  if (!url || typeof url !== 'string' || url === '#') return '';
+  try {
+    const u = new URL(url);
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'ref', 'fbclid'].forEach(p => u.searchParams.delete(p));
+    let clean = (u.hostname.replace(/^www\./, '') + u.pathname + u.search).toLowerCase();
+    return clean.replace(/\/+$/, '');
+  } catch (e) {
+    return url.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '');
+  }
+}
+
+function normalizeHeadline(title) {
+  if (!title || typeof title !== 'string') return '';
+  let text = title.toLowerCase();
+
+  text = text.replace(/\[(video|foto|e plotë|audio|live|pamje|lajm i fundit)\]/gi, '');
+  text = text.replace(/\((video|foto|e plotë|audio|live|pamje|lajm i fundit)\)/gi, '');
+
+  text = text.replace(/\s*[\-\|]\s*(gazeta\s+express|koha(\.net)?|telegrafi|rtk|radiokim|tanjug|botasot|indeksonline|reporteri|syri|veriu\.info|zëri|zeri)\s*$/gi, '');
+  text = text.replace(/^(rtk|express|koha|telegrafi|tanjug|indeksonline|reporteri):\s*/gi, '');
+
+  text = text.replace(/[^\p{L}\p{N}\s]/gu, ' ');
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+function calculateTitleSimilarity(title1, title2) {
+  const norm1 = normalizeHeadline(title1);
+  const norm2 = normalizeHeadline(title2);
+
+  if (norm1 === norm2) return 1.0;
+  if (!norm1 || !norm2) return 0.0;
+
+  const tokens1 = norm1.split(' ').filter(w => w.length > 1);
+  const tokens2 = norm2.split(' ').filter(w => w.length > 1);
+
+  if (tokens1.length === 0 || tokens2.length === 0) return 0.0;
+
+  const set1 = new Set(tokens1);
+  const set2 = new Set(tokens2);
+
+  let common = 0;
+  for (const t of set1) {
+    if (set2.has(t)) common++;
+  }
+
+  const dice = (2 * common) / (tokens1.length + tokens2.length);
+  const minTokens = Math.min(tokens1.length, tokens2.length);
+  const containment = common / minTokens;
+
+  if (minTokens <= 3) {
+    return norm1 === norm2 ? 1.0 : (common === minTokens && tokens1.length === tokens2.length ? 1.0 : dice * 0.8);
+  }
+
+  if (containment >= 0.9 && dice >= 0.75) {
+    return Math.max(dice, containment);
+  }
+
+  return dice;
+}
+
+function isDuplicateStory(itemA, itemB, similarityThreshold = 0.82) {
+  const normUrlA = normalizeUrl(itemA.url);
+  const normUrlB = normalizeUrl(itemB.url);
+
+  if (normUrlA && normUrlB && normUrlA === normUrlB) {
+    return true;
+  }
+
+  // If numeric anchors conflict (e.g. 3 vs 4 suspects or 12,000 vs 5,750 EUR), NOT a duplicate story!
+  const entA = itemA.multilingualEntities || extractMultilingualEntities(itemA.title, itemA.description);
+  const entB = itemB.multilingualEntities || extractMultilingualEntities(itemB.title, itemB.description);
+  const numA = entA.filter(e => e.startsWith('qty:'));
+  const numB = entB.filter(e => e.startsWith('qty:'));
+  if (numA.length > 0 && numB.length > 0 && !numA.some(n => numB.includes(n))) {
+    return false;
+  }
+
+  const sim = calculateTitleSimilarity(itemA.title, itemB.title);
+  return sim >= similarityThreshold;
+}
+
+function deduplicateNewsItems(items, similarityThreshold = 0.82) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const getAuthority = (item) => {
+    if (typeof item.reliability === 'number') return item.reliability * 100;
+    return SOURCE_AUTHORITY[item.source] || 50;
+  };
+
+  const getTimestamp = (item) => {
+    const t = new Date(item.publishedAt).getTime();
+    return isNaN(t) ? Date.now() : t;
+  };
+
+  const uniqueGroups = [];
+
+  for (let idx = 0; idx < items.length; idx++) {
+    const current = items[idx];
+    let matchedGroup = null;
+
+    for (const group of uniqueGroups) {
+      if (group.some(existing => isDuplicateStory(existing, current, similarityThreshold))) {
+        matchedGroup = group;
+        break;
+      }
+    }
+
+    if (matchedGroup) {
+      matchedGroup.push(current);
+    } else {
+      uniqueGroups.push([current]);
+    }
+  }
+
+  return uniqueGroups.map(group => {
+    group.sort((a, b) => {
+      const authA = getAuthority(a);
+      const authB = getAuthority(b);
+      if (authA !== authB) return authB - authA;
+      const timeA = getTimestamp(a);
+      const timeB = getTimestamp(b);
+      if (timeA !== timeB) return timeA - timeB;
+      return 0;
+    });
+
+    const primary = group[0];
+    const allSources = [...new Set(group.flatMap(g => g.sources || [g.source]))];
+
+    return {
+      ...primary,
+      sources: allSources,
+      sourceCount: allSources.length
+    };
+  });
+}
+
+/**
+ * Deterministic Event ID Generator based on semantic anchors
+ */
+function generateDeterministicEventId(article, entities = []) {
+  const specificAnchors = entities.filter(e => 
+    !e.startsWith('inst:kosovo_police') && 
+    !e.startsWith('event:incident') &&
+    !e.startsWith('event:police_action')
+  ).sort();
+
+  if (specificAnchors.length > 0) {
+    const key = specificAnchors.slice(0, 4).join('_').replace(/[^a-z0-9_:\-]/gi, '_').toLowerCase();
+    return `event-${key.replace(/[:]/g, '_')}`;
+  }
+
+  const normTitle = normalizeHeadline(article.title || 'event');
+  const titleSlug = normTitle.split(' ').slice(0, 4).join('-');
+  return `event-${titleSlug.replace(/[^a-z0-9\-]/gi, '')}`;
+}
+
+/**
+ * Classifies an article's canonical development state across SR / AL / EN
+ */
+function classifyDevelopmentState(article, isFirstArticle = false) {
+  const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
+
+  // Contradiction / Denial
+  if (/demant|demantoi|demanton|mohojnë|mohon|odbacuje|denied|denies|contradiction|porekao/i.test(text)) {
+    return 'CONTRADICTION';
+  }
+
+  // Meeting states (SR / AL / EN)
+  if (/otkazan|nije\s*održan|nuk\s*u\s*mbajt|nuk\s*u\s*zhvillua|odložen|dështon\s*takimi|dështoi\s*takimi|cancelled|meeting cancelled|meeting failed/i.test(text)) {
+    if (/sastanak|takim|meeting|razgovor|kurti|uluta/i.test(text)) {
+      return 'MEETING_CANCELLED';
+    }
+  }
+  if (/sastanak|takim|meeting|razgovor|takohet|sastao|sastali/i.test(text)) {
+    if (/zakazan|najavljen|najavio|najavljuje|paralajmërohet|paralajmëron|sot\s*me|sastaje\s*se|scheduled|will meet|planiran|pritet\s*të/i.test(text)) {
+      return 'MEETING_SCHEDULED';
+    }
+    if (/održan|sastali\s*se|u\s*mbajt|janë\s*takuar|held|met today/i.test(text)) {
+      return 'MEETING_HELD';
+    }
+    return 'MEETING_SCHEDULED';
+  }
+
+  // Enforcement / Criminality states
+  if (/uhapš|uhaps|prived|arrest|ndalohet|ndaluar|detain/i.test(text)) {
+    return 'ARREST';
+  }
+  if (/pušten|pušt|liroh|liruar|releas/i.test(text)) {
+    return 'RELEASE';
+  }
+  if (/identifik|identifi/i.test(text)) {
+    return 'IDENTIFICATION';
+  }
+  if (/pretres|bastis|search|raid/i.test(text)) {
+    return 'SEARCH';
+  }
+  if (/zaplen|oduzet|konfisk|sekuestr|seiz/i.test(text)) {
+    return 'SEIZURE';
+  }
+
+  // Fire states
+  if (/ugašen\s*požar|fiket\s*zjarr|fire extinguished/i.test(text)) return 'FIRE_EXTINGUISHED';
+  if (/lokalizovan\s*požar|lokalizohet\s*zjarr|fire contained/i.test(text)) return 'FIRE_CONTAINED';
+  if (/požar|pozar|zjarr|fire/i.test(text)) return 'FIRE_STARTED';
+
+  // Casualties
+  if (/ranjen|plagos|lënd|injur|povred/i.test(text)) return 'INJURY';
+  if (/ubijen|ubistv|vrarë|vrasj|poginul|vdekj|kill|dead|murder/i.test(text)) return 'DEATH';
+
+  // Legal / Judiciary
+  if (/optužnica|aktakuzë|indicted|charged/i.test(text)) return 'CHARGE';
+  if (/sud|sudb|gjykata|paraburgim|custody|court/i.test(text)) return 'COURT_UPDATE';
+  if (/odluka|vendim|decision/i.test(text)) return 'DECISION';
+
+  // Border / Protest / Military
+  if (/kufi|granič|border/i.test(text)) return 'BORDER_UPDATE';
+  if (/protest|demonstra/i.test(text)) return 'PROTEST_UPDATE';
+  if (/kfor|eulex|military|ushtarak|vojska/i.test(text)) return 'MILITARY_UPDATE';
+
+  // Confirmation
+  if (/potvrdio|potvrdila|konfirmoj|konfirmon|potvrđeno|confirmed|confirmation/i.test(text)) {
+    return 'CONFIRMATION';
+  }
+
+  if (isFirstArticle) return 'INITIAL_REPORT';
+  return 'UPDATE';
+}
+
+function classifyDevelopmentType(article, isFirstArticle = false) {
+  return classifyDevelopmentState(article, isFirstArticle);
+}
+
+/**
+ * Groups articles in an Event into discrete factual Developments with multiple sources
+ */
+function groupArticlesIntoDevelopments(eventArticles) {
+  if (!Array.isArray(eventArticles) || eventArticles.length === 0) return [];
+
+  // Sort articles chronologically by publishedAt ascending
+  const sorted = [...eventArticles].sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
+  const developments = [];
+
+  sorted.forEach((art) => {
+    const devState = classifyDevelopmentState(art, developments.length === 0);
+    const mEntities = art.multilingualEntities || extractMultilingualEntities(art.title, art.description);
+    const numAnchors = mEntities.filter(e => e.startsWith('qty:'));
+
+    // Find if an existing development in this event matches this exact factual state
+    let matchedDev = developments.find(dev => {
+      // If development types are different, they are distinct developments (unless confirmation)
+      if (dev.type !== devState) {
+        if (dev.type === 'INITIAL_REPORT' && devState === 'CONFIRMATION') {
+          return true;
+        }
+        return false;
+      }
+
+      // Both have the same canonical development type
+      // Check numeric anchor conflict (e.g. qty:3persons vs qty:4persons or qty:12000eur vs qty:5750eur)
+      const devAnchors = dev.numericAnchors || [];
+      if (numAnchors.length > 0 && devAnchors.length > 0) {
+        const match = numAnchors.some(a => devAnchors.includes(a));
+        if (!match) return false; // Factual state numeric change -> NEW DEVELOPMENT!
+      }
+
+      return true; // Same development state & matching numeric anchors -> SAME DEVELOPMENT!
+    });
+
+    if (matchedDev) {
+      // Add source if not already present
+      const artSources = Array.isArray(art.sources) ? art.sources : [art.source];
+      artSources.forEach(s => {
+        if (s && !matchedDev.sources.includes(s)) {
+          matchedDev.sources.push(s);
+        }
+      });
+      if (!matchedDev.articles.some(a => a.id === art.id || (a.url && a.url === art.url))) {
+        matchedDev.articles.push(art);
+      }
+      // Update development timestamp if later
+      const tArt = new Date(art.publishedAt).getTime();
+      const tDev = new Date(matchedDev.timestamp).getTime();
+      if (!isNaN(tArt) && (isNaN(tDev) || tArt > tDev)) {
+        matchedDev.timestamp = art.publishedAt;
+      }
+    } else {
+      const artSources = Array.isArray(art.sources) ? art.sources : [art.source];
+      developments.push({
+        developmentId: `dev-${devState.toLowerCase()}-${art.id || Math.random().toString(36).slice(2)}`,
+        type: devState,
+        timestamp: art.publishedAt,
+        articleId: art.id,
+        title: art.title,
+        summary: art.description || art.title,
+        source: art.source,
+        sources: [...new Set(artSources.filter(Boolean))],
+        articles: [art],
+        numericAnchors: numAnchors,
+        multilingualEntities: mEntities,
+        noveltyScore: devState === 'INITIAL_REPORT' ? 10 : (devState === 'CONTRADICTION' ? 9 : 7)
+      });
+    }
+  });
+
+  // Sort developments chronologically
+  developments.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  if (developments.length > 0) {
+    developments[developments.length - 1].isLatest = true;
+  }
+
+  return developments;
+}
+
+/**
+ * Determines Event Lifecycle Status
+ */
+function determineEventStatus(developments, independentSourceCount) {
+  if (!Array.isArray(developments) || developments.length === 0) return 'UNKNOWN';
+
+  const latestDev = developments[developments.length - 1];
+  if (latestDev.type === 'CONTRADICTION') return 'CONTRADICTED';
+
+  const RESOLVED_TYPES = ['ARREST', 'RELEASE', 'FIRE_EXTINGUISHED', 'MEETING_HELD', 'MEETING_CANCELLED'];
+  if (RESOLVED_TYPES.includes(latestDev.type)) return 'RESOLVED';
+
+  if (independentSourceCount >= 2) return 'CONFIRMED';
+  if (developments.length > 1) return 'DEVELOPING';
+
+  return 'DEVELOPING';
+}
+
+/**
+ * Generates a clean Event Title summary
+ */
+function generateEventTitle(primaryArticle, entities = []) {
+  if (!primaryArticle || !primaryArticle.title) return 'Security Event';
+  let title = primaryArticle.title;
+  title = title.replace(/\s*[\-\|]\s*(gazeta\s+express|koha(\.net)?|telegrafi|rtk|radiokim|tanjug|kossev|lajmi|indeksonline|mitropol|jepize|radio\s*mitrovica\s*sever)\s*$/gi, '').trim();
+  title = title.replace(/\[(video|foto|e plotë|audio|live)\]/gi, '').trim();
+  return title;
+}
+
+/**
+ * Explain/Audit helper for comparing two articles
+ */
+function explainEventMatch(articleA, articleB) {
+  const entA = articleA.multilingualEntities || extractMultilingualEntities(articleA.title, articleA.description);
+  const entB = articleB.multilingualEntities || extractMultilingualEntities(articleB.title, articleB.description);
+
+  const locsA = entA.filter(e => e.startsWith('loc:'));
+  const locsB = entB.filter(e => e.startsWith('loc:'));
+  const typesA = entA.filter(e => e.startsWith('event:'));
+  const typesB = entB.filter(e => e.startsWith('event:'));
+  const numA = entA.filter(e => e.startsWith('qty:'));
+  const numB = entB.filter(e => e.startsWith('qty:'));
+
+  const matchedAnchors = entA.filter(e => entB.includes(e));
+  const conflictingAnchors = [];
+
+  let hasLocConflict = false;
+  if (locsA.length > 0 && locsB.length > 0 && !locsA.some(l => locsB.includes(l))) {
+    hasLocConflict = true;
+    conflictingAnchors.push(`location:${locsA.join(',')}_vs_${locsB.join(',')}`);
+  }
+
+  let hasTypeConflict = checkEventTypeConflict(entA, entB);
+  if (hasTypeConflict) {
+    conflictingAnchors.push(`eventType:${typesA.join(',')}_vs_${typesB.join(',')}`);
+  }
+
+  const t1 = new Date(articleA.publishedAt).getTime();
+  const t2 = new Date(articleB.publishedAt).getTime();
+  const timeDiffHours = (!isNaN(t1) && !isNaN(t2)) ? Math.abs(t1 - t2) / 3600000 : 0;
+  if (timeDiffHours > 48) {
+    conflictingAnchors.push(`timeDiff:${timeDiffHours.toFixed(1)}h`);
+  }
+
+  const titleSim = calculateTitleSimilarity(articleA.title, articleB.title);
+
+  let sameEvent = false;
+  let decision = 'REJECT';
+
+  if (!hasLocConflict && !hasTypeConflict && timeDiffHours <= 48) {
+    const hasKurtiUlutasA = entA.includes('person:albin_kurti') && (entA.includes('person:ozkan_ulutas') || entA.includes('inst:kfor'));
+    const hasKurtiUlutasB = entB.includes('person:albin_kurti') && (entB.includes('person:ozkan_ulutas') || entB.includes('inst:kfor'));
+    const hasMeetingA = entA.includes('event:meeting') || entA.includes('event:meeting_cancellation');
+    const hasMeetingB = entB.includes('event:meeting') || entB.includes('event:meeting_cancellation');
+
+    if (hasKurtiUlutasA && hasKurtiUlutasB && hasMeetingA && hasMeetingB) {
+      sameEvent = true;
+      decision = 'MATCH: Kurti-Ulutas Meeting';
+    } else if (matchedAnchors.length >= 2) {
+      const nonGeneric = matchedAnchors.filter(e => !e.startsWith('inst:kosovo_police') && !e.startsWith('event:incident') && !e.startsWith('inst:kfor'));
+      if (nonGeneric.length >= 1) {
+        sameEvent = true;
+        decision = `MATCH: Shared anchors (${nonGeneric.join(', ')})`;
+      }
+    } else if (titleSim >= 0.55) {
+      sameEvent = true;
+      decision = `MATCH: Title similarity (${titleSim.toFixed(2)})`;
+    }
+  } else {
+    decision = `REJECT: Conflicts (${conflictingAnchors.join(', ')})`;
+  }
+
+  return {
+    sameEvent,
+    score: titleSim,
+    matchedAnchors,
+    conflictingAnchors,
+    eventTypeA: typesA,
+    eventTypeB: typesB,
+    locationA: locsA,
+    locationB: locsB,
+    numericAnchorsA: numA,
+    numericAnchorsB: numB,
+    decision
+  };
+}
+
+/**
+ * Multi-Factor Event Clustering Engine (Level A - Event Identity)
+ */
+function clusterEventArticles(articles) {
+  if (!Array.isArray(articles) || articles.length === 0) return [];
+
+  const dedupedInput = deduplicateNewsItems(articles);
+  const clusters = [];
+
+  for (const article of dedupedInput) {
+    const mEntities = extractMultilingualEntities(article.title, article.description);
+    const legacyEntities = extractEventEntities(article.title, article.description);
+    const allEntities = [...new Set([...mEntities, ...legacyEntities])];
+    article.multilingualEntities = allEntities;
+
+    let matchedCluster = null;
+
+    for (const cluster of clusters) {
+      // 1. Time proximity check (within 48 hours)
+      const t1 = new Date(article.publishedAt).getTime();
+      const t2 = new Date(cluster.lastUpdated).getTime();
+      if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) > 48 * 3600 * 1000) {
+        continue;
+      }
+
+      // 2. Reject match if explicit locations conflict (e.g. Pejë vs Prizren)
+      const locsA = allEntities.filter(e => e.startsWith('loc:'));
+      const locsB = cluster.entities.filter(e => e.startsWith('loc:'));
+      if (locsA.length > 0 && locsB.length > 0) {
+        const hasCommonLoc = locsA.some(l => locsB.includes(l));
+        if (!hasCommonLoc) {
+          continue;
+        }
+      }
+
+      // 3. Reject match if distinct event types conflict (e.g. accident vs weapon seizure vs espionage)
+      if (checkEventTypeConflict(allEntities, cluster.entities)) {
+        continue;
+      }
+
+      // 4. Check shared entities
+      const shared = cluster.entities.filter(e => allEntities.includes(e));
+
+      // Rule A: Kurti-Ulutas / Kurti-KFOR Meeting Lifecycle Match
+      const hasKurtiMeetingA = allEntities.includes('person:albin_kurti') && 
+        (allEntities.includes('person:ozkan_ulutas') || allEntities.includes('inst:kfor')) && 
+        (allEntities.includes('event:meeting') || allEntities.includes('event:meeting_cancellation'));
+      
+      const hasKurtiMeetingB = cluster.entities.includes('person:albin_kurti') && 
+        (cluster.entities.includes('person:ozkan_ulutas') || cluster.entities.includes('inst:kfor')) && 
+        (cluster.entities.includes('event:meeting') || cluster.entities.includes('event:meeting_cancellation'));
+
+      let isMatch = false;
+      if (hasKurtiMeetingA && hasKurtiMeetingB) {
+        // Hard separation: If one is specifically about Ibër bridge inspection and the other is not, keep isolated
+        const bridgeA = allEntities.includes('loc:ibar_bridge');
+        const bridgeB = cluster.entities.includes('loc:ibar_bridge');
+        if (bridgeA === bridgeB) {
+          isMatch = true;
+        }
+      }
+
+      // Rule B: Matching non-generic anchors (>= 2 entities where at least 1 is specific)
+      if (!isMatch && shared.length >= 2) {
+        const specificShared = shared.filter(e => 
+          !e.startsWith('inst:kfor') && 
+          !e.startsWith('inst:kosovo_police') && 
+          !e.startsWith('event:incident') &&
+          !e.startsWith('person:albin_kurti') &&
+          !e.startsWith('event:meeting')
+        );
+        if (specificShared.length >= 1) {
+          isMatch = true;
+        }
+      }
+
+      // Rule C: Location + specific event/numeric anchor
+      if (!isMatch && shared.length >= 1) {
+        const hasSpecificAction = shared.some(e => 
+          e.startsWith('event:theft') || 
+          e.startsWith('event:drug_seizure') || 
+          e.startsWith('event:weapon_seizure') ||
+          e.startsWith('qty:')
+        );
+        if (hasSpecificAction) {
+          isMatch = true;
+        }
+      }
+
+      // Rule D: High title similarity when no conflicting anchors
+      if (!isMatch) {
+        const sim = calculateTitleSimilarity(article.title, cluster.primary.title);
+        if (sim >= 0.55) {
+          isMatch = true;
+        }
+      }
+
+      if (isMatch) {
+        matchedCluster = cluster;
+        break;
+      }
+    }
+
+    if (matchedCluster) {
+      matchedCluster.articles.push(article);
+      matchedCluster.entities = [...new Set([...matchedCluster.entities, ...allEntities])];
+
+      // Update cluster primary article if new article has higher authority or score
+      const currentAuth = (SOURCE_AUTHORITY[article.source] || 50) + (article.intensityScore || 5);
+      const primaryAuth = (SOURCE_AUTHORITY[matchedCluster.primary.source] || 50) + (matchedCluster.primary.intensityScore || 5);
+      if (currentAuth > primaryAuth || (article.eventType === 'event' && matchedCluster.primary.eventType === 'commentary')) {
+        matchedCluster.primary = article;
+      }
+
+      const articleTime = new Date(article.publishedAt).getTime();
+      if (!isNaN(articleTime)) {
+        if (articleTime < new Date(matchedCluster.firstSeen).getTime()) matchedCluster.firstSeen = article.publishedAt;
+        if (articleTime > new Date(matchedCluster.lastUpdated).getTime()) matchedCluster.lastUpdated = article.publishedAt;
+      }
+    } else {
+      const deterministicEventId = generateDeterministicEventId(article, allEntities);
+      clusters.push({
+        eventId: deterministicEventId,
+        entities: allEntities,
+        primary: article,
+        articles: [article],
+        firstSeen: article.publishedAt,
+        lastUpdated: article.publishedAt
+      });
+    }
+  }
+
+  // Transform clusters into clean Event Objects with Factual Developments Timeline
+  return clusters.map(c => {
+    const primary = c.primary;
+    const allSources = [...new Set(c.articles.flatMap(a => Array.isArray(a.sources) ? a.sources : [a.source]))];
+
+    // Canonical deterministic eventId based on complete cluster entities
+    const canonicalEventId = generateDeterministicEventId(primary, c.entities);
+
+    // Compute independent source count by grouping syndicated items
+    const syndicatedGroups = deduplicateNewsItems(c.articles, 0.82);
+    const independentSourceCount = syndicatedGroups.length;
+
+    // Group articles into discrete factual Developments Timeline
+    const developments = groupArticlesIntoDevelopments(c.articles);
+    const latestDevelopment = developments.length > 0 ? developments[developments.length - 1] : null;
+    const status = determineEventStatus(developments, independentSourceCount);
+    const title = generateEventTitle(primary, c.entities);
+
+    // Confidence calculation based on independent sources and contradiction penalty
+    let confidence = primary.confidence || 0.50;
+    if (independentSourceCount >= 3) confidence = Math.min(0.98, confidence + 0.25);
+    else if (independentSourceCount >= 2) confidence = Math.min(0.95, confidence + 0.15);
+
+    const hasContradiction = developments.some(d => d.type === 'CONTRADICTION');
+    if (hasContradiction) {
+      confidence = Math.max(0.30, confidence - 0.10);
+    }
+
+    // Novelty score (higher if recent developments brought new facts)
+    const noveltyScore = Math.min(10, Math.max(1, developments.length * 2 + (independentSourceCount > 1 ? 2 : 0)));
+
+    const allTags = [...new Set(c.articles.flatMap(a => a.tags || []))];
+
+    return {
+      ...primary,
+      id: canonicalEventId,
+      eventId: canonicalEventId,
+      title,
+      canonicalTitle: title,
+      status,
+      firstSeen: c.firstSeen,
+      lastUpdated: c.lastUpdated,
+      publishedAt: c.lastUpdated,
+      sources: allSources,
+      primarySource: primary.source,
+      sourceCount: allSources.length,
+      independentSourceCount,
+      uniqueSourceCount: independentSourceCount,
+      developmentCount: developments.length,
+      confidence: Number(confidence.toFixed(2)),
+      noveltyScore,
+      tags: allTags,
+      developments,
+      latestDevelopment,
+      articles: c.articles,
+      relatedArticles: c.articles.map(a => ({
+        source: a.source,
+        title: a.title,
+        url: a.url,
+        publishedAt: a.publishedAt
+      }))
+    };
+  });
+}
+
+// ─────────────────────────────────────
 // MAIN
 // ─────────────────────────────────────
 
@@ -545,10 +1323,13 @@ async function fetchNews({
   // Filter out non-security articles from the main intelligence dashboard feed
   const securityArticles = allArticles.filter(a => a.isSecurityRelevant);
 
-  // Deduplicate and cluster multi-source events
-  const deduplicatedEvents = clusterSecurityArticles(securityArticles);
+  // Deduplicate syndicated news items before clustering
+  const deduplicatedArticles = deduplicateNewsItems(securityArticles);
 
-  // Sort Order: 1. Severity, 2. Score, 3. Confidence, 4. SourceCount, 5. PublishedAt
+  // Multi-Factor Event Clustering Engine (groups articles into unified Event Objects)
+  const deduplicatedEvents = clusterEventArticles(deduplicatedArticles);
+
+  // Sort Order: 1. Severity, 2. Score, 3. Confidence, 4. IndependentSourceCount, 5. PublishedAt
   const severityRank = { critical: 4, high: 3, medium: 2, low: 1 };
   deduplicatedEvents.sort((a, b) => {
     if (severityRank[b.severity] !== severityRank[a.severity]) {
@@ -560,8 +1341,8 @@ async function fetchNews({
     if (Math.abs(b.confidence - a.confidence) >= 0.01) {
       return b.confidence - a.confidence;
     }
-    if (b.sourceCount !== a.sourceCount) {
-      return b.sourceCount - a.sourceCount;
+    if (b.independentSourceCount !== a.independentSourceCount) {
+      return b.independentSourceCount - a.independentSourceCount;
     }
     return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
   });
@@ -584,5 +1365,17 @@ async function fetchNews({
 
 module.exports = {
   fetchNews,
-  analyzeArticle
+  analyzeArticle,
+  deduplicateNewsItems,
+  clusterEventArticles,
+  groupArticlesIntoDevelopments,
+  classifyDevelopmentType,
+  determineEventStatus,
+  generateEventTitle,
+  explainEventMatch,
+  extractMultilingualEntities,
+  normalizeHeadline,
+  calculateTitleSimilarity,
+  isDuplicateStory,
+  normalizeUrl
 };

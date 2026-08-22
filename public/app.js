@@ -835,26 +835,57 @@ function filterNewsItems(items, filter) {
     const eventType = (item.eventType || 'event').toUpperCase();
     const catLabel = (item.category || 'security').replace(/_/g, ' ').toUpperCase();
     const confPercent = Math.round((item.confidence || 0.7) * 100);
-    const sourcesText = item.sourceCount > 1
-      ? `📡 ${escHtml(item.source)} +${item.sourceCount - 1} sources`
-      : `📡 ${escHtml(item.source)}`;
+    const status = item.status || 'DEVELOPING';
+    const statusClass = `status-${status.toLowerCase()}`;
+    const sourceCount = item.sourceCount || (Array.isArray(item.sources) ? item.sources.length : 1);
+    const indCount = item.independentSourceCount || item.uniqueSourceCount || 1;
+    const devCount = item.developmentCount || (Array.isArray(item.developments) ? item.developments.length : 1);
     const allSourcesList = (item.sources || [item.source]).join(', ');
     const tags = (item.tags || []).slice(0, 3).map(t => `<span class="news-tag">${escHtml(t.replace(/_/g, ' '))}</span>`).join('');
     const url = isValidArticleUrl(item.url) ? item.url.trim() : '';
+
+    const developments = Array.isArray(item.developments) ? item.developments : [];
+    const devTimelineHtml = developments.length > 0 ? `
+      <div class="news-event-developments" style="margin-top: 6px; padding-top: 6px;">
+        <div class="news-developments-title" style="font-size: 9px; margin-bottom: 4px;">TIMELINE (${devCount} DEVELOPMENTS)</div>
+        <div class="news-developments-list" style="gap: 4px;">
+          ${developments.map(d => `
+            <div class="news-dev-item" style="padding: 4px 6px;">
+              <div class="news-dev-header">
+                <span class="news-dev-type news-dev-${(d.type || 'update').toLowerCase()}">${escHtml(d.type || 'UPDATE')}</span>
+                <span class="news-dev-time">${d.timestamp ? escHtml(formatTimeAgo(d.timestamp)) : ''}</span>
+              </div>
+              <div class="news-dev-summary" style="font-size: 10.5px;">${escHtml(d.title || d.summary || '')}</div>
+              <div class="news-dev-source" style="font-size: 9px; color: var(--text-dim); font-family: var(--font-mono);">
+                Sources: ${escHtml(Array.isArray(d.sources) ? d.sources.join(', ') : d.source || '')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : '';
 
     const card = `<div class="news-item ${cls}">
       <div class="news-item-header">
         <span class="news-score score-${s}">${s}/10</span>
         <span class="news-severity sev-${sev}">${sev.toUpperCase()}</span>
-        <span class="news-event-type type-${(item.eventType || 'event').toLowerCase()}">${eventType}</span>
+        <span class="news-event-status-badge ${statusClass}">STATUS: ${escHtml(status)}</span>
         <span class="news-category">${catLabel}</span>
         <span class="news-confidence">${confPercent}% Conf</span>
         <span class="news-time">${formatTimeAgo(item.publishedAt)}</span>
       </div>
-      <div class="news-title">${escHtml(item.title)}</div>
+      <div class="news-event-metrics-bar" style="font-size: 9px; margin-top: 4px; margin-bottom: 4px;">
+        <span>${sourceCount} SOURCES</span>
+        <span>·</span>
+        <span>${indCount} INDEPENDENT</span>
+        <span>·</span>
+        <span>${devCount} DEVELOPMENTS</span>
+      </div>
+      <div class="news-title">${escHtml(item.title || item.canonicalTitle || '')}</div>
       ${item.description ? `<div class="news-desc">${escHtml(item.description)}</div>` : ''}
-      <div class="news-footer">
-        <span class="news-source" title="${escHtml(allSourcesList)}">${sourcesText}</span>
+      ${devTimelineHtml}
+      <div class="news-footer" style="margin-top: 6px;">
+        <span class="news-source" title="${escHtml(allSourcesList)}">Primary: ${escHtml(item.primarySource || item.source || '')}</span>
         <div class="news-tags">${tags}</div>
       </div>
     </div>`;
@@ -1892,28 +1923,75 @@ function renderEarthquakeMapMarkers(eqData) {
 
 function buildNewsPopupHtml(item) {
   if (!item) return '';
+
   const s = item.intensityScore || 5;
   const sev = (item.severity ? item.severity.toUpperCase() : (s >= 9 ? 'CRITICAL' : (s >= 7 ? 'HIGH' : (s >= 5 ? 'MEDIUM' : 'LOW'))));
   const color = sev === 'CRITICAL' ? '#f87171' : sev === 'HIGH' ? '#fb923c' : sev === 'MEDIUM' ? '#fbbf24' : '#34d399';
 
-  const titleText = item.title || 'News Intelligence';
+  const eventTitle = item.title || item.canonicalTitle || 'News Intelligence Event';
   const rawUrl = item.url ? item.url.trim() : '';
   const url = isValidArticleUrl(rawUrl) ? rawUrl : (rawUrl && rawUrl !== '#' && !rawUrl.startsWith('#') ? rawUrl : '');
 
+  const status = item.status || 'DEVELOPING';
+  const statusClass = `status-${status.toLowerCase()}`;
+
+  const sourceCount = item.sourceCount || (Array.isArray(item.sources) ? item.sources.length : 1);
+  const indSourceCount = item.independentSourceCount || item.uniqueSourceCount || 1;
+  const devCount = item.developmentCount || (Array.isArray(item.developments) ? item.developments.length : 1);
+
+  const developments = Array.isArray(item.developments) ? item.developments : [];
+
   const headlineHtml = url ? `
     <a class="news-popup-headline-link" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open article on source website">
-      ${escHtml(titleText)}
+      ${escHtml(eventTitle)}
     </a>
   ` : `
-    <div class="news-popup-headline">${escHtml(titleText)}</div>
+    <div class="news-popup-headline">${escHtml(eventTitle)}</div>
+  `;
+
+  const developmentsTimelineHtml = developments.length > 0 ? `
+    <div class="news-event-developments">
+      <div class="news-developments-title">TIMELINE DEVELOPMENTS (${devCount})</div>
+      <div class="news-developments-list">
+        ${developments.map(d => `
+          <div class="news-dev-item">
+            <div class="news-dev-header">
+              <span class="news-dev-type news-dev-${(d.type || 'update').toLowerCase()}">${escHtml(d.type || 'UPDATE')}</span>
+              <span class="news-dev-time">${d.timestamp ? escHtml(formatTimeAgo(d.timestamp)) : ''}</span>
+            </div>
+            <div class="news-dev-summary">${escHtml(d.title || d.summary || '')}</div>
+            <div class="news-dev-source" style="font-size:9.5px; color:var(--text-dim); font-family:var(--font-mono);">
+              ${escHtml(Array.isArray(d.sources) ? d.sources.join(', ') : d.source || '')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const eventContent = `
+    <div class="news-event">
+      <div class="news-event-header">
+        <span class="news-event-status-badge ${statusClass}">STATUS: ${escHtml(status)}</span>
+      </div>
+      <div class="news-event-metrics-bar">
+        <span>${sourceCount} SOURCES</span>
+        <span>·</span>
+        <span>${indSourceCount} INDEPENDENT</span>
+        <span>·</span>
+        <span>${devCount} DEVELOPMENTS</span>
+      </div>
+      ${headlineHtml}
+      ${developmentsTimelineHtml}
+    </div>
   `;
 
   return buildMapPopupHtml({
     icon: '📰',
-    title: 'NEWS INTELLIGENCE',
-    source: item.source || 'News Feed',
+    title: 'NEWS EVENT',
+    source: item.source || item.primarySource || 'News Feed',
     badge: { text: sev, color },
-    contentHtml: headlineHtml,
+    contentHtml: eventContent,
     stats: []
   });
 }
@@ -2114,6 +2192,153 @@ function openNewsPopup(item, coords, markerEl = null) {
   return popup;
 }
 
+const SOURCE_AUTHORITY_APP = {
+  'Koha Ditore': 100,
+  'Koha': 100,
+  'Koha.net': 100,
+  'Radio Kim': 90,
+  'Kallxo': 90,
+  'Gazeta Express': 80,
+  'Telegrafi': 80,
+  'RTK': 80,
+  'Radio Kosova': 75,
+  'Tanjug': 70,
+  'Kossev': 70,
+  'Indeksonline': 60,
+  'Botasot': 60,
+  'Reporteri': 60,
+  'Bota Sot': 60,
+  'Syri': 50
+};
+
+function normalizeUrlForDedup(url) {
+  if (!url || typeof url !== 'string' || url === '#') return '';
+  try {
+    const u = new URL(url);
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'ref', 'fbclid'].forEach(p => u.searchParams.delete(p));
+    let clean = (u.hostname.replace(/^www\./, '') + u.pathname + u.search).toLowerCase();
+    return clean.replace(/\/+$/, '');
+  } catch (e) {
+    return url.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '');
+  }
+}
+
+function normalizeHeadlineForDedup(title) {
+  if (!title || typeof title !== 'string') return '';
+  let text = title.toLowerCase();
+
+  text = text.replace(/\[(video|foto|e plotë|audio|live|pamje|lajm i fundit)\]/gi, '');
+  text = text.replace(/\((video|foto|e plotë|audio|live|pamje|lajm i fundit)\)/gi, '');
+
+  text = text.replace(/\s*[\-\|]\s*(gazeta\s+express|koha(\.net)?|telegrafi|rtk|radiokim|tanjug|botasot|indeksonline|reporteri|syri|veriu\.info|zëri|zeri)\s*$/gi, '');
+  text = text.replace(/^(rtk|express|koha|telegrafi|tanjug|indeksonline|reporteri):\s*/gi, '');
+
+  text = text.replace(/[^\p{L}\p{N}\s]/gu, ' ');
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+function calculateTitleSimilarityForDedup(title1, title2) {
+  const norm1 = normalizeHeadlineForDedup(title1);
+  const norm2 = normalizeHeadlineForDedup(title2);
+
+  if (norm1 === norm2) return 1.0;
+  if (!norm1 || !norm2) return 0.0;
+
+  const tokens1 = norm1.split(' ').filter(w => w.length > 1);
+  const tokens2 = norm2.split(' ').filter(w => w.length > 1);
+
+  if (tokens1.length === 0 || tokens2.length === 0) return 0.0;
+
+  const set1 = new Set(tokens1);
+  const set2 = new Set(tokens2);
+
+  let common = 0;
+  for (const t of set1) {
+    if (set2.has(t)) common++;
+  }
+
+  const dice = (2 * common) / (tokens1.length + tokens2.length);
+  const minTokens = Math.min(tokens1.length, tokens2.length);
+  const containment = common / minTokens;
+
+  if (minTokens <= 3) {
+    return norm1 === norm2 ? 1.0 : (common === minTokens && tokens1.length === tokens2.length ? 1.0 : dice * 0.8);
+  }
+
+  if (containment >= 0.9 && dice >= 0.75) {
+    return Math.max(dice, containment);
+  }
+
+  return dice;
+}
+
+function isDuplicateStoryForDedup(itemA, itemB, similarityThreshold = 0.82) {
+  const normUrlA = normalizeUrlForDedup(itemA.url);
+  const normUrlB = normalizeUrlForDedup(itemB.url);
+
+  if (normUrlA && normUrlB && normUrlA === normUrlB) {
+    return true;
+  }
+
+  const sim = calculateTitleSimilarityForDedup(itemA.title, itemB.title);
+  return sim >= similarityThreshold;
+}
+
+function deduplicateNewsItems(items, similarityThreshold = 0.82) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const getAuthority = (item) => {
+    if (typeof item.reliability === 'number') return item.reliability * 100;
+    return SOURCE_AUTHORITY_APP[item.source] || 50;
+  };
+
+  const getTimestamp = (item) => {
+    const t = new Date(item.publishedAt).getTime();
+    return isNaN(t) ? Date.now() : t;
+  };
+
+  const uniqueGroups = [];
+
+  for (let idx = 0; idx < items.length; idx++) {
+    const current = items[idx];
+    let matchedGroup = null;
+
+    for (const group of uniqueGroups) {
+      if (group.some(existing => isDuplicateStoryForDedup(existing, current, similarityThreshold))) {
+        matchedGroup = group;
+        break;
+      }
+    }
+
+    if (matchedGroup) {
+      matchedGroup.push(current);
+    } else {
+      uniqueGroups.push([current]);
+    }
+  }
+
+  return uniqueGroups.map(group => {
+    group.sort((a, b) => {
+      const authA = getAuthority(a);
+      const authB = getAuthority(b);
+      if (authA !== authB) return authB - authA;
+      const timeA = getTimestamp(a);
+      const timeB = getTimestamp(b);
+      if (timeA !== timeB) return timeA - timeB;
+      return 0;
+    });
+
+    const primary = group[0];
+    const allSources = [...new Set(group.flatMap(g => g.sources || [g.source]))];
+
+    return {
+      ...primary,
+      sources: allSources,
+      sourceCount: allSources.length
+    };
+  });
+}
+
 function renderNewsMapMarkers(newsData) {
   if (!state.map || state.activeMapModule !== 'news') return;
   clearMarkerList(moduleLayers.news.markers);
@@ -2124,8 +2349,10 @@ function renderNewsMapMarkers(newsData) {
     return;
   }
 
+  const eventItems = data.items;
+
   const itemsWithCoords = [];
-  data.items.forEach((item, idx) => {
+  eventItems.forEach((item, idx) => {
     const loc = extractNewsLocation(item);
     if (loc && typeof loc.lat === 'number' && typeof loc.lon === 'number') {
       const s = item.intensityScore || 5;
@@ -5664,5 +5891,6 @@ window.createClusterMarkerElement = createClusterMarkerElement;
 window.calculateRoute = calculateRoute;
 window.clearRoute = clearRoute;
 window.addRouteDestinationInput = addRouteDestinationInput;
+window.deduplicateNewsItems = deduplicateNewsItems;
 window.resolveLocationCoordinates = resolveLocationCoordinates;
 window.state = state;

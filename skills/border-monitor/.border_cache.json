@@ -3,7 +3,7 @@
   "status": "LIVE_DATA",
   "source": "QKMK",
   "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
-  "updatedAt": "2026-08-21T23:53:58.000Z",
+  "updatedAt": "2026-08-22T22:39:20.000Z",
   "count": 13,
   "crossings": [
     {
@@ -46,7 +46,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -64,16 +64,16 @@
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 5,
-          "waitingMinutesText": "03-05 min",
+          "waitingMinutes": 10,
+          "waitingMinutesText": "05-10 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 40,
-          "waitingMinutesText": "30-40 min",
-          "queueLengthMeters": 350,
-          "queueLengthText": "350 m"
+          "waitingMinutes": 30,
+          "waitingMinutesText": "25-30 min",
+          "queueLengthMeters": 100,
+          "queueLengthText": "100 m"
         }
       },
       "trucks": {
@@ -91,7 +91,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -110,13 +110,13 @@
       "direction": {
         "entry": {
           "waitingMinutes": 5,
-          "waitingMinutesText": "03-05 min",
+          "waitingMinutesText": "05 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         },
         "exit": {
           "waitingMinutes": 5,
-          "waitingMinutesText": "03-05 min",
+          "waitingMinutesText": "05 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         }
@@ -136,7 +136,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -154,14 +154,14 @@
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 5,
-          "waitingMinutesText": "03-05 min",
+          "waitingMinutes": 10,
+          "waitingMinutesText": "05-10 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 5,
-          "waitingMinutesText": "03-05 min",
+          "waitingMinutes": 10,
+          "waitingMinutesText": "05-10 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         }
@@ -181,7 +181,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -199,14 +199,14 @@
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 10,
-          "waitingMinutesText": "05-10 min",
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 10,
-          "waitingMinutesText": "05-10 min",
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         }
@@ -226,7 +226,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -244,16 +244,16 @@
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 10,
-          "waitingMinutesText": "05-10 min",
-          "queueLengthMeters": 50,
-          "queueLengthText": "30-50 m"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 10,
-          "waitingMinutesText": "05-10 min",
-          "queueLengthMeters": 50,
-          "queueLengthText": "30-50 m"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "03-05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
       "trucks": {
@@ -271,7 +271,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -295,10 +295,10 @@
           "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 80,
-          "waitingMinutesText": "60-80 min",
-          "queueLengthMeters": 800,
-          "queueLengthText": "800 m"
+          "waitingMinutes": 20,
+          "waitingMinutesText": "15-20 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
       "trucks": {
@@ -316,7 +316,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -334,16 +334,16 @@
       },
       "direction": {
         "entry": {
-          "waitingMinutes": 10,
-          "waitingMinutesText": "05-10 min",
+          "waitingMinutes": 5,
+          "waitingMinutesText": "05 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         },
         "exit": {
-          "waitingMinutes": 30,
-          "waitingMinutesText": "20-30 min",
-          "queueLengthMeters": 400,
-          "queueLengthText": "400 m"
+          "waitingMinutes": 5,
+          "waitingMinutesText": "05 min",
+          "queueLengthMeters": 0,
+          "queueLengthText": "0 m"
         }
       },
       "trucks": {
@@ -361,7 +361,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -406,7 +406,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -451,7 +451,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -496,7 +496,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -515,13 +515,13 @@
       "direction": {
         "entry": {
           "waitingMinutes": 5,
-          "waitingMinutesText": "03-05 min",
+          "waitingMinutesText": "05 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         },
         "exit": {
           "waitingMinutes": 5,
-          "waitingMinutesText": "03-05 min",
+          "waitingMinutesText": "05 min",
           "queueLengthMeters": 0,
           "queueLengthText": "0 m"
         }
@@ -541,7 +541,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
@@ -586,7 +586,7 @@
         }
       },
       "status": "OPEN",
-      "updatedAt": "2026-08-21T23:53:58.000Z",
+      "updatedAt": "2026-08-22T22:39:20.000Z",
       "source": "QKMK",
       "sourceUrl": "https://mpb.rks-gov.net/?culture=sr-latn-rs",
       "sourceAttribution": null
