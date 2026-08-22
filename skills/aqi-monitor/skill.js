@@ -24,6 +24,67 @@ function classifyAQI(europeanAQI) {
 const aqiCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+const KOSOVO_AQI_STATIONS = [
+  { id: 'prishtine', name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
+  { id: 'mitrovice', name: 'Mitrovicë', lat: 42.8914, lon: 20.8660 },
+  { id: 'prizren',   name: 'Prizren',   lat: 42.2139, lon: 20.7397 },
+  { id: 'peje',      name: 'Pejë',      lat: 42.6593, lon: 20.2883 },
+  { id: 'gjilan',    name: 'Gjilan',    lat: 42.4635, lon: 21.4694 },
+  { id: 'ferizaj',   name: 'Ferizaj',   lat: 42.3705, lon: 21.1553 },
+  { id: 'gjakove',   name: 'Gjakovë',   lat: 42.3803, lon: 20.4308 },
+  { id: 'podujeve',  name: 'Podujevë',  lat: 42.9114, lon: 21.1933 }
+];
+
+async function fetchStationAQI(st, forceRefresh = false) {
+  try {
+    const cacheKey = `st_${st.lat.toFixed(3)},${st.lon.toFixed(3)}`;
+    if (!forceRefresh && aqiCache.has(cacheKey)) {
+      const cached = aqiCache.get(cacheKey);
+      if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return cached.data;
+      }
+    }
+
+    const res = await axios.get('https://air-quality-api.open-meteo.com/v1/air-quality', {
+      params: {
+        latitude: st.lat,
+        longitude: st.lon,
+        current: 'european_aqi,european_aqi_pm2_5,european_aqi_pm10,european_aqi_nitrogen_dioxide,european_aqi_ozone,european_aqi_sulphur_dioxide,pm2_5,pm10,nitrogen_dioxide,ozone,sulphur_dioxide',
+        timezone: 'auto'
+      },
+      timeout: 8000
+    });
+
+    const c = res.data?.current;
+    if (!c || typeof c.european_aqi !== 'number') return null;
+
+    const classification = classifyAQI(c.european_aqi);
+    const stationData = {
+      id: st.id,
+      name: st.name,
+      coordinates: { lat: st.lat, lon: st.lon },
+      current: {
+        europeanAQI: Math.round(c.european_aqi),
+        label: classification.label,
+        level: classification.level,
+        color: classification.color,
+        icon: classification.icon,
+        pm2_5: typeof c.pm2_5 === 'number' ? +c.pm2_5.toFixed(1) : 0,
+        pm10: typeof c.pm10 === 'number' ? +c.pm10.toFixed(1) : 0,
+        no2: typeof c.nitrogen_dioxide === 'number' ? +c.nitrogen_dioxide.toFixed(1) : 0,
+        o3: typeof c.ozone === 'number' ? +c.ozone.toFixed(1) : 0,
+        so2: typeof c.sulphur_dioxide === 'number' ? +c.sulphur_dioxide.toFixed(1) : 0,
+        dominantPollutant: (c.european_aqi_pm2_5 >= c.european_aqi_pm10 ? 'PM2.5' : 'PM10')
+      }
+    };
+
+    aqiCache.set(cacheKey, { timestamp: Date.now(), data: stationData });
+    return stationData;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function geocode(location) {
   try {
     const res = await axios.get('https://nominatim.openstreetmap.org/search', {
@@ -274,6 +335,23 @@ async function fetchAQI({ location = 'Kosovo', lat, lon, forceRefresh = false } 
       alerts,
       isCached: false
     };
+
+    // Fetch AQI for all Kosovo stations in parallel
+    const stationResults = await Promise.allSettled(
+      KOSOVO_AQI_STATIONS.map(st => fetchStationAQI(st, forceRefresh))
+    );
+    const validStations = stationResults
+      .filter(r => r.status === 'fulfilled' && r.value)
+      .map(r => r.value);
+
+    payload.stations = validStations.length > 0 ? validStations : [
+      {
+        id: 'central',
+        name: location || 'Kosovo AQI Station',
+        coordinates: { lat: resolvedLat, lon: resolvedLon },
+        current: payload.current
+      }
+    ];
 
     // Cache successful response
     aqiCache.set(cacheKey, { timestamp: Date.now(), data: payload });

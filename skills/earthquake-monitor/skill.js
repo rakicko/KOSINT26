@@ -37,49 +37,122 @@ function getDemoData(location) {
    };
 }
 
-async function fetchEarthquakes({ location, lat, lon, radiusKm = 500, minMagnitude = 2.0 }) {
+async function fetchEarthquakes({ location = 'Kosovo', lat = 42.6026, lon = 20.9030, radiusKm = 500, minMagnitude = 1.5 } = {}) {
   try {
-    if (!lat || !lon) ({ lat, lon } = await geocode(location));
+    if (!lat || !lon) {
+      try {
+        ({ lat, lon } = await geocode(location));
+      } catch (e) {
+        lat = 42.6026;
+        lon = 20.9030;
+      }
+    }
 
-    const endTime = new Date().toISOString().split('.')[0];
     const startTime = new Date(Date.now() - 7 * 24 * 3600000).toISOString().split('.')[0];
+    const endTime = new Date().toISOString().split('.')[0];
+    const maxradiusDegrees = Math.min(10, Math.max(1, Math.round(radiusKm / 111 * 10) / 10));
 
-    const res = await axios.get('https://earthquake.usgs.gov/fdsnws/event/1/query', {
-      params: {
-        format: 'geojson', latitude: lat, longitude: lon,
-        maxradiuskm: radiusKm, minmagnitude: minMagnitude,
-        starttime: startTime, endtime: endTime,
-        orderby: 'magnitude', limit: 10,
-      },
-      timeout: 8000,
-    });
+    let features = [];
+    let sourceUsed = 'EMSC';
 
-    const features = res.data.features || [];
+    // Primary: EMSC (European-Mediterranean Seismological Centre - official European regional seismic agency)
+    try {
+      const emscRes = await axios.get('https://seismicportal.eu/fdsnws/event/1/query', {
+        params: {
+          format: 'json',
+          lat: lat,
+          lon: lon,
+          maxradius: maxradiusDegrees,
+          minmag: minMagnitude,
+          start: startTime,
+          end: endTime,
+          limit: 30
+        },
+        timeout: 8000
+      });
+      if (emscRes.data && Array.isArray(emscRes.data.features) && emscRes.data.features.length > 0) {
+        features = emscRes.data.features;
+        sourceUsed = 'EMSC';
+      }
+    } catch (e) {
+      console.warn('[earthquake-monitor] EMSC query failed:', e.message);
+    }
+
+    // Fallback: USGS (United States Geological Survey)
+    if (features.length === 0) {
+      try {
+        const usgsRes = await axios.get('https://earthquake.usgs.gov/fdsnws/event/1/query', {
+          params: {
+            format: 'geojson',
+            latitude: lat,
+            longitude: lon,
+            maxradiuskm: radiusKm,
+            minmagnitude: minMagnitude,
+            starttime: startTime + 'Z',
+            endtime: endTime + 'Z',
+            orderby: 'time',
+            limit: 30
+          },
+          timeout: 8000
+        });
+        if (usgsRes.data && Array.isArray(usgsRes.data.features) && usgsRes.data.features.length > 0) {
+          features = usgsRes.data.features;
+          sourceUsed = 'USGS';
+        }
+      } catch (e) {
+        console.warn('[earthquake-monitor] USGS query failed:', e.message);
+      }
+    }
+
     const earthquakes = features.map(f => {
-      const p = f.properties;
-      const coords = f.geometry.coordinates; // [lon, lat, depth]
-      const mag = p.mag || 0;
+      const p = f.properties || {};
+      const coords = (f.geometry && Array.isArray(f.geometry.coordinates)) ? f.geometry.coordinates : [p.lon || lon, p.lat || lat, p.depth || 10];
+      const eqLon = typeof coords[0] === 'number' ? coords[0] : lon;
+      const eqLat = typeof coords[1] === 'number' ? coords[1] : lat;
+      const depth = typeof coords[2] === 'number' ? Math.round(Math.abs(coords[2])) : (p.depth ? Math.round(p.depth) : 10);
+      const mag = typeof p.mag === 'number' ? +p.mag.toFixed(1) : 0;
       const cls = classifyMagnitude(mag);
-      const distanceKm = Math.round(haversine(lat, lon, coords[1], coords[0]));
+      const distanceKm = Math.round(haversine(lat, lon, eqLat, eqLon));
+      const place = p.flynn_region || p.place || 'Balkan Region';
+      const timeIso = p.time ? new Date(p.time).toISOString() : new Date().toISOString();
+
       return {
-        id: f.id, magnitude: mag, depth: Math.round(coords[2]),
-        place: p.place || 'Unknown', time: new Date(p.time).toISOString(),
-        distanceKm, lat: coords[1], lon: coords[0],
-        ...cls,
+        id: f.id || p.unid || `eq-${Math.random().toString(36).slice(2)}`,
+        magnitude: mag,
+        depth,
+        place,
+        time: timeIso,
+        distanceKm,
+        lat: eqLat,
+        lon: eqLon,
+        ...cls
       };
     });
 
+    earthquakes.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
     const maxMag = earthquakes.reduce((m, e) => Math.max(m, e.magnitude), 0);
-    const alertLevel = maxMag >= 5.0 ? 'high' : maxMag >= 3.0 ? 'medium' : 'low';
+    const alertLevel = maxMag >= 5.0 ? 'high' : (maxMag >= 3.0 ? 'medium' : 'low');
 
     return {
-      skill: 'earthquake-monitor', location, fetchedAt: new Date().toISOString(),
-      earthquakes, summary: { total: earthquakes.length, maxMagnitude: maxMag, alertLevel },
-      source: 'usgs',
+      skill: 'earthquake-monitor',
+      location,
+      fetchedAt: new Date().toISOString(),
+      earthquakes,
+      summary: { total: earthquakes.length, maxMagnitude: maxMag, alertLevel },
+      source: sourceUsed
     };
   } catch (err) {
-    console.warn('[earthquake-monitor] error, using demo:', err.message);
-    return getDemoData(location);
+    console.warn('[earthquake-monitor] fetch failed:', err.message);
+    return {
+      skill: 'earthquake-monitor',
+      location,
+      fetchedAt: new Date().toISOString(),
+      earthquakes: [],
+      summary: { total: 0, maxMagnitude: 0, alertLevel: 'low' },
+      source: 'EMSC / USGS',
+      error: err.message
+    };
   }
 }
 

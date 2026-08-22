@@ -24,6 +24,11 @@ const SOURCES = [
     lang: 'sr'
   },
   {
+    url: 'https://www.radiokim.net/feed/',
+    name: 'Radio KIM',
+    lang: 'sr'
+  },
+  {
     url: 'https://bih.kosova.info/feed/',
     name: 'Kosova.info',
     lang: 'sr'
@@ -33,6 +38,11 @@ const SOURCES = [
   {
     url: 'https://www.gazetaexpress.com/feed',
     name: 'Gazeta Express',
+    lang: 'al'
+  },
+  {
+    url: 'https://www.koha.net/rss',
+    name: 'Koha',
     lang: 'al'
   },
   {
@@ -59,11 +69,6 @@ const SOURCES = [
     url: 'https://mitrovicasot.net/feed/',
     name: 'MitrovicaSOT',
     lang: 'al'
-  },
-  {
-    url: 'https://klankosova.tv/feed/',
-    name: 'Klan Kosova',
-    lang: 'al'
   }
 ];
 
@@ -74,14 +79,15 @@ const SOURCES = [
 const SOURCE_RELIABILITY = {
   'KoSSev': 0.90,
   'Radio Mitrovica Sever': 0.85,
+  'Radio KIM': 0.85,
   'Kosova.info': 0.80,
   'Gazeta Express': 0.85,
+  'Koha': 0.90,
   'Indeks Online': 0.75,
   'Lajmi': 0.70,
   'Jepize': 0.65,
   'Mitropol': 0.70,
-  'MitrovicaSOT': 0.80,
-  'Klan Kosova': 0.85
+  'MitrovicaSOT': 0.80
 };
 
 // ─────────────────────────────────────
@@ -169,7 +175,8 @@ const MEDIUM_SIGNALS = [
   /\b(kfor|eulex|nato|unmik|rosu|fsk|ksf)\b/i,
   /most na ibru/i, /mostu na ibru/i, /mosta na ibru/i, /ura e ibrit/i, /urën e ibrit/i, /otvaranje mosta/i, /hapja e urës/i,
   /tenzij/i, /tensione/i, /krizë/i, /kriza/i, /eskalac/i, /përshkallëz/i,
-  /poginul/i, /viktim/i
+  /poginul/i, /viktim/i,
+  /aksident/i, /saobraćajn/i, /saobracajn/i, /sudar/i, /udes/i, /rrugë e mbyllur|rruga e mbyllur|bllokim i rrugës|zatvoren put|obustava saobraćaja|zastoj|kolonë/i
 ];
 
 // Commentary / Reaction Markers
@@ -445,12 +452,20 @@ async function fetchRSS(source) {
       }
     });
 
-    const parsed = await xml2js.parseStringPromise(response.data);
+    const rawXml = (typeof response.data === 'string' ? response.data : '').replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
+    const parsed = await xml2js.parseStringPromise(rawXml);
     const items = parsed.rss?.channel?.[0]?.item || parsed['rdf:RDF']?.item || parsed.feed?.entry || [];
 
     return items.map((item, index) => {
-      const title = item.title?.[0] || '';
-      const description = item.description?.[0]?.replace(/<[^>]+>/g, '') || item.summary?.[0]?.replace(/<[^>]+>/g, '') || '';
+      const getRawText = (val) => {
+        if (!val) return '';
+        if (typeof val === 'string') return val;
+        if (Array.isArray(val) && val.length > 0) return getRawText(val[0]);
+        if (typeof val === 'object' && val._) return String(val._);
+        return '';
+      };
+      const title = getRawText(item.title);
+      const description = getRawText(item.description || item.summary || item.content).replace(/<[^>]+>/g, '');
 
       let link = '#';
       if (typeof item.link?.[0] === 'string') {

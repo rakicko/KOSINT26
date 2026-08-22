@@ -66,9 +66,15 @@ const TRAFFIC_RELEVANCE_TERMS = {
   }
 };
 
+const NON_TRAFFIC_ACCIDENTAL = /kallash|armë zjarri|arme zjarri|fishek|shkrep.*armë|shkrepur fishek|plagos.*me armë|u vetëvra|vetevra|ubistvo iz nehata|pucanje iz nehata/i;
+
 function classifyTrafficIncident(title, description) {
   const text = `${title || ''} ${description || ''}`.toLowerCase();
   
+  if (NON_TRAFFIC_ACCIDENTAL.test(text) && !/aksident trafiku|aksident me veturë|saobraćajn|saobracajn/i.test(text)) {
+    return { isTraffic: false, type: null, label: null };
+  }
+
   for (const lang of ['sq', 'sr']) {
     const terms = TRAFFIC_RELEVANCE_TERMS[lang];
     if (!terms) continue;
@@ -79,7 +85,14 @@ function classifyTrafficIncident(title, description) {
       }
     }
     for (const term of terms.accident) {
-      if (text.includes(term.toLowerCase())) {
+      const termLower = term.toLowerCase();
+      if (termLower === 'aksident' && (text.includes('aksidentalisht') || text.includes('aksidentale'))) {
+        if (text.includes('aksident trafiku') || text.includes('aksident rrugor') || text.includes('aksident me veturë') || text.includes('aksidenti') || text.includes('aksidente') || text.includes('aksidentuar')) {
+          return { isTraffic: true, type: 'accident', label: 'Traffic Accident' };
+        }
+        continue;
+      }
+      if (text.includes(termLower)) {
         return { isTraffic: true, type: 'accident', label: 'Traffic Accident' };
       }
     }
@@ -117,41 +130,66 @@ function detectAnomalies(incidents) {
 }
 
 const KOSOVO_LOCATIONS = [
-  { city: 'Vushtrri', lat: 42.8250, lon: 20.9660, keywords: ['smrekonic', 'smrekovnic', 'vushtrr', 'vučitrn', 'vucitrn'] },
-  { city: 'Drenas', lat: 42.6250, lon: 20.8920, keywords: ['komoran', 'drenas', 'gllogoc', 'glogovac'] },
-  { city: 'Suharekë', lat: 42.3600, lon: 20.8250, keywords: ['duhël', 'duhel', 'dulje', 'suharek', 'suva reka', 'therand'] },
-  { city: 'Podujevë', lat: 42.9100, lon: 21.1900, keywords: ['merdar', 'lluzhan', 'podujev', 'podujevo', 'besian'] },
-  { city: 'Brezovicë', lat: 42.2180, lon: 20.9980, keywords: ['brezovic', 'shtërpc', 'shterpc', 'štrpce', 'strpce'] },
-  { city: 'Shtime', lat: 42.4330, lon: 21.0400, keywords: ['carralev', 'shtime', 'štimlje', 'stimlje'] },
-  { city: 'Pejë', lat: 42.6593, lon: 20.2887, keywords: ['rugov', 'pejë', 'peje', 'peć', 'pec'] },
-  { city: 'Mitrovicë', lat: 42.8914, lon: 20.8660, keywords: ['zveçan', 'zvecan', 'mitrovic', 'mitrovica'] },
-  { city: 'Leposaviq', lat: 43.1000, lon: 20.8000, keywords: ['jaranja', 'jarinj', 'leposaviq', 'leposavić', 'leposavic'] },
-  { city: 'Zubin Potok', lat: 42.9100, lon: 20.6900, keywords: ['gazivod', 'ujman', 'zubin potok'] },
+  // North Kosovo Municipalities & Key Towns
+  { city: 'Zveçan', lat: 42.9080, lon: 20.8400, keywords: ['zveçan', 'zvečan', 'zvecan', 'banjsk', 'banjska'] },
+  { city: 'Leposaviq', lat: 43.1000, lon: 20.8000, keywords: ['jaranja', 'jarinj', 'leposaviq', 'leposavić', 'leposavic', 'sočanic', 'soçanic'] },
+  { city: 'Zubin Potok', lat: 42.9100, lon: 20.6900, keywords: ['zubin potok', 'gazivod', 'ujman', 'varag', 'varage'] },
+  { city: 'Mitrovicë', lat: 42.8914, lon: 20.8660, keywords: ['mitrovic', 'mitrovica', 'mitrovicë', 'mitrovice', 'severna mitrovica', 'mitrovica e veriut', 'mitrovica e jugut', 'ibër bridge', 'most na ibru', 'ura e ibrit'] },
+
+  // Border Crossings & Key Landmarks
+  { city: 'Merdare', lat: 42.9367, lon: 21.2425, keywords: ['merdar', 'merdare'] },
+  { city: 'Bërnjak', lat: 42.9667, lon: 20.5500, keywords: ['bërnjak', 'bernjak', 'brnjak'] },
+
+  // Other Kosovo Municipalities & Towns
+  { city: 'Prishtinë', lat: 42.6629, lon: 21.1655, keywords: ['prishtin', 'prištin', 'pristina', 'veternik', 'çagllavic', 'caglavic', 'hajvali', 'hajvalia'] },
+  { city: 'Graçanicë', lat: 42.6000, lon: 21.1930, keywords: ['graçanic', 'gračanica', 'gracanica'] },
   { city: 'Fushë Kosovë', lat: 42.6340, lon: 21.0960, keywords: ['fushë kosov', 'fushe kosov', 'kosovo polje'] },
-  { city: 'Prishtinë', lat: 42.6629, lon: 21.1655, keywords: ['veternik', 'çagllavic', 'caglavic', 'prishtin', 'prištin', 'pristina'] },
-  { city: 'Prizren', lat: 42.2139, lon: 20.7397, keywords: ['shadervan', 'ortakoll', 'bazhderhane', 'prizren'] },
-  { city: 'Gjilan', lat: 42.4635, lon: 21.4694, keywords: ['gavran', 'gjilan', 'gnjilan'] },
-  { city: 'Ferizaj', lat: 42.3705, lon: 21.1530, keywords: ['ferizaj', 'uroševac', 'urosevac'] },
-  { city: 'Gjakovë', lat: 42.3810, lon: 20.4320, keywords: ['gjakov', 'đakovic', 'djakovic'] },
-  { city: 'Rahovec', lat: 42.3990, lon: 20.6550, keywords: ['rahovec', 'orahovac'] },
+  { city: 'Obiliq', lat: 42.6870, lon: 21.0770, keywords: ['obiliq', 'obilić', 'kastriot', 'kek'] },
+  { city: 'Podujevë', lat: 42.9100, lon: 21.1900, keywords: ['podujev', 'podujevo', 'besian', 'lluzhan'] },
+  { city: 'Vushtrri', lat: 42.8250, lon: 20.9660, keywords: ['vushtrr', 'vučitrn', 'vucitrn', 'smrekonic', 'smrekovnic'] },
+  { city: 'Drenas', lat: 42.6250, lon: 20.8920, keywords: ['drenas', 'gllogoc', 'glogovac', 'komoran'] },
+  { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica', 'prekaz'] },
+  { city: 'Pejë', lat: 42.6593, lon: 20.2887, keywords: ['pejë', 'peje', 'peć', 'pec', 'rugov'] },
+  { city: 'Istog', lat: 42.7800, lon: 20.4900, keywords: ['istog', 'istok', 'burim'] },
   { city: 'Klinë', lat: 42.6210, lon: 20.5780, keywords: ['klinë', 'kline', 'klina'] },
   { city: 'Deçan', lat: 42.5410, lon: 20.2880, keywords: ['deçan', 'decan', 'dečani', 'decani'] },
-  { city: 'Istog', lat: 42.7800, lon: 20.4900, keywords: ['istog', 'istok', 'burim'] },
-  { city: 'Lipjan', lat: 42.5220, lon: 21.1250, keywords: ['janjev', 'lipjan', 'lipljan'] },
-  { city: 'Kaçanik', lat: 42.2300, lon: 21.2600, keywords: ['kaçanik', 'kacanik'] },
-  { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica'] },
+  { city: 'Gjakovë', lat: 42.3810, lon: 20.4320, keywords: ['gjakov', 'đakovic', 'djakovic'] },
+  { city: 'Rahovec', lat: 42.3990, lon: 20.6550, keywords: ['rahovec', 'orahovac'] },
   { city: 'Malishevë', lat: 42.4820, lon: 20.7450, keywords: ['malishev', 'mališevo', 'malisevo'] },
-  { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['dardan', 'kamenic', 'kamenica'] },
-  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['kllokot', 'klokot', 'viti', 'vitina'] }
+  { city: 'Prizren', lat: 42.2139, lon: 20.7397, keywords: ['prizren', 'shadervan', 'ortakoll', 'bazhderhane'] },
+  { city: 'Suharekë', lat: 42.3600, lon: 20.8250, keywords: ['suharek', 'suva reka', 'therand', 'duhël', 'duhel', 'dulje'] },
+  { city: 'Shtërpcë', lat: 42.2394, lon: 21.0261, keywords: ['shtërpc', 'shterpc', 'štrpce', 'strpce', 'brezovic'] },
+  { city: 'Shtime', lat: 42.4330, lon: 21.0400, keywords: ['shtime', 'štimlje', 'stimlje', 'carralev'] },
+  { city: 'Ferizaj', lat: 42.3705, lon: 21.1530, keywords: ['ferizaj', 'uroševac', 'urosevac'] },
+  { city: 'Lipjan', lat: 42.5220, lon: 21.1250, keywords: ['lipjan', 'lipljan', 'janjev'] },
+  { city: 'Gjilan', lat: 42.4635, lon: 21.4694, keywords: ['gjilan', 'gnjilan', 'gavran'] },
+  { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['kamenic', 'kamenica', 'dardan'] },
+  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['viti', 'vitina', 'kllokot', 'klokot'] },
+  { city: 'Kaçanik', lat: 42.2300, lon: 21.2600, keywords: ['kaçanik', 'kacanik'] }
 ];
 
+function cleanTextForLocation(text) {
+  if (!text) return '';
+  let t = String(text).toLowerCase();
+  t = t.replace(/mitrovicasot(\.net)?/g, '');
+  t = t.replace(/radio\s*(kosovska\s*)?mitrovica(\s*sever)?/g, '');
+  t = t.replace(/kossev(\.info)?/g, '');
+  t = t.replace(/gazeta\s*express/g, '');
+  t = t.replace(/klan\s*kosova/g, '');
+  t = t.replace(/indeks\s*online/g, '');
+  t = t.replace(/jepize(\.com)?/g, '');
+  t = t.replace(/mitropol(\.net)?/g, '');
+  t = t.replace(/lajmi(\.net)?/g, '');
+  return t;
+}
+
 function extractLocation(title, description) {
-  const titleLower = (title || '').toLowerCase();
-  const descLower = (description || '').toLowerCase();
+  const cleanTitle = cleanTextForLocation(title);
+  const cleanDesc = cleanTextForLocation(description);
   
   for (const loc of KOSOVO_LOCATIONS) {
     for (const kw of loc.keywords) {
-      if (titleLower.includes(kw.toLowerCase())) {
+      if (cleanTitle.includes(kw.toLowerCase())) {
         return { city: loc.city, lat: loc.lat, lon: loc.lon };
       }
     }
@@ -159,7 +197,7 @@ function extractLocation(title, description) {
 
   for (const loc of KOSOVO_LOCATIONS) {
     for (const kw of loc.keywords) {
-      if (descLower.includes(kw.toLowerCase())) {
+      if (cleanDesc.includes(kw.toLowerCase())) {
         return { city: loc.city, lat: loc.lat, lon: loc.lon };
       }
     }

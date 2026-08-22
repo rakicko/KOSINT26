@@ -97,19 +97,24 @@
         <span class="nav-rail-tooltip">News Intelligence</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
-      <button class="nav-rail-btn" data-panel="weatherPanel" onclick="toggleModule('weatherPanel')" aria-label="Weather Monitor">
-        <span class="nav-rail-icon">🌤️</span>
-        <span class="nav-rail-tooltip">Weather Monitor</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
       <button class="nav-rail-btn" data-panel="trafficPanel" onclick="toggleModule('trafficPanel')" aria-label="Traffic Intelligence">
         <span class="nav-rail-icon">🚦</span>
         <span class="nav-rail-tooltip">Traffic Intelligence</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
-      <button class="nav-rail-btn" data-panel="radiationPanel" onclick="toggleModule('radiationPanel')" aria-label="Radiation Monitor">
-        <span class="nav-rail-icon">☢️</span>
-        <span class="nav-rail-tooltip">Radiation Monitor</span>
+      <button class="nav-rail-btn" data-panel="borderPanel" onclick="toggleModule('borderPanel')" aria-label="Border Crossing Monitor">
+        <span class="nav-rail-icon">🛂</span>
+        <span class="nav-rail-tooltip">Border Crossing Monitor</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="weatherPanel" onclick="toggleModule('weatherPanel')" aria-label="Weather Monitor">
+        <span class="nav-rail-icon">🌤️</span>
+        <span class="nav-rail-tooltip">Weather Monitor</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')" aria-label="Wildfire Detection">
+        <span class="nav-rail-icon">🔥</span>
+        <span class="nav-rail-tooltip">Wildfire Detection</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
       <button class="nav-rail-btn" data-panel="aqiPanel" onclick="toggleModule('aqiPanel')" aria-label="Air Quality Index">
@@ -122,14 +127,19 @@
         <span class="nav-rail-tooltip">Seismic Activity</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
-      <button class="nav-rail-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')" aria-label="Wildfire Detection">
-        <span class="nav-rail-icon">🔥</span>
-        <span class="nav-rail-tooltip">Wildfire Detection</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
       <button class="nav-rail-btn" data-panel="aviationPanel" onclick="toggleModule('aviationPanel')" aria-label="Aviation Intelligence">
         <span class="nav-rail-icon">✈️</span>
         <span class="nav-rail-tooltip">Aviation Intelligence</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="radiationPanel" onclick="toggleModule('radiationPanel')" aria-label="Radiation Monitor">
+        <span class="nav-rail-icon">☢️</span>
+        <span class="nav-rail-tooltip">Radiation Monitor</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
+      <button class="nav-rail-btn" data-panel="routePanel" onclick="toggleModule('routePanel')" aria-label="Route Intelligence">
+        <span class="nav-rail-icon">🛣️</span>
+        <span class="nav-rail-tooltip">Route Intelligence</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
       <button class="nav-rail-btn" data-panel="telegramPanel" onclick="toggleModule('telegramPanel')" aria-label="Telegram Public Feed">
@@ -137,19 +147,9 @@
         <span class="nav-rail-tooltip">Telegram Public Feed</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
-      <button class="nav-rail-btn" data-panel="borderPanel" onclick="toggleModule('borderPanel')" aria-label="Border Crossing Monitor">
-        <span class="nav-rail-icon">🛂</span>
-        <span class="nav-rail-tooltip">Border Crossing Monitor</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
       <button class="nav-rail-btn" data-panel="cctvIntelligencePanel" onclick="toggleModule('cctvIntelligencePanel')" aria-label="CCTV Surveillance">
         <span class="nav-rail-icon">📹</span>
         <span class="nav-rail-tooltip">CCTV Surveillance</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="routePanel" onclick="toggleModule('routePanel')" aria-label="Route Intelligence">
-        <span class="nav-rail-icon">🛣️</span>
-        <span class="nav-rail-tooltip">Route Intelligence</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
     </div>
@@ -389,8 +389,14 @@
                       <input type="text" id="routeStartInput" class="input-field route-input" placeholder="Start location or lat,lon (e.g. Prishtinë)" list="routeLocationsList" value="Prishtinë" />
                     </div>
                   </div>
+                  <div id="routeViaInputsContainer"></div>
                   <div class="route-input-row">
-                    <label class="route-input-label">DESTINATION</label>
+                    <div class="route-dest-header" style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:2px;">
+                      <label class="route-input-label">DESTINATION</label>
+                      <button type="button" class="route-add-via-btn" onclick="addRouteDestinationInput()" style="background:transparent; border:none; color:var(--cyan); font-size:10px; font-weight:700; cursor:pointer; padding:0; letter-spacing:0.4px;">
+                        + ADD DESTINATION
+                      </button>
+                    </div>
                     <div class="route-input-field-wrap">
                       <span class="route-input-icon">🔴</span>
                       <input type="text" id="routeEndInput" class="input-field route-input" placeholder="Destination or lat,lon (e.g. Mitrovicë)" list="routeLocationsList" value="Mitrovicë" />
@@ -406,6 +412,24 @@
                     <option value="Gjakovë">
                     <option value="Podujevë">
                     <option value="Vushtrri">
+                    <option value="Shtime">
+                    <option value="Kaçanik">
+                    <option value="Obiliq">
+                    <option value="Suharekë">
+                    <option value="Skenderaj">
+                    <option value="Istog">
+                    <option value="Klinë">
+                    <option value="Rahovec">
+                    <option value="Malishevë">
+                    <option value="Kamenicë">
+                    <option value="Dragash">
+                    <option value="Štrpce">
+                    <option value="Novo Brdo">
+                    <option value="Gračanica">
+                    <option value="Deçan">
+                    <option value="Fushë Kosovë">
+                    <option value="Lipjan">
+                    <option value="Brezovica">
                     <option value="Leposavić">
                     <option value="Zvečan">
                     <option value="Zubin Potok">
@@ -552,6 +576,18 @@
     </div>
   </div>
 </main>
+
+<!-- ── Live Alert Ticker Bar ────────────────────────────────────────────── -->
+<div class="live-alert-ticker-bar" id="liveAlertTickerBar">
+  <div class="ticker-prefix">
+    <span class="ticker-pulse">●</span> LIVE ALERTS
+  </div>
+  <div class="ticker-viewport">
+    <div class="ticker-track" id="liveAlertTickerTrack">
+      <span class="ticker-item-placeholder">INITIALIZING KOSINT REAL-TIME INTELLIGENCE ALERTS...</span>
+    </div>
+  </div>
+</div>
 
 <!-- ── Loading overlay ──────────────────────────────────────────────────────── -->
 <div class="loading-overlay" id="loadingOverlay" style="display:none">

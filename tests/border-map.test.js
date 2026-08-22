@@ -30,13 +30,16 @@ expectedCrossings.forEach(id => {
 console.log('✓ Passed: All 13 official border crossings configured with authoritative coordinates');
 
 // 3. Verify marker creation and styling
-console.log('Test 3: Verifying border marker elements and styling...');
+console.log('Test 3: Verifying border marker elements, no inner emoji, and standard 16px dimensions...');
 assert.strictEqual(appJs.includes('function createBorderMarkerElement(color, label, crossingId'), true, 'createBorderMarkerElement defined');
+assert.strictEqual(appJs.includes('<span class="border-pin-icon">🛂</span>'), false, 'Emoji icon 🛂 removed from border marker pin');
 assert.strictEqual(styleCss.includes('.border-custom-marker'), true, '.border-custom-marker styled in style.css');
 assert.strictEqual(styleCss.includes('.border-marker-pin'), true, '.border-marker-pin styled in style.css');
+assert.strictEqual(styleCss.includes('width: 16px;'), true, '.border-marker-pin has standard 16px width');
+assert.strictEqual(styleCss.includes('height: 16px;'), true, '.border-marker-pin has standard 16px height');
 assert.strictEqual(styleCss.includes('.border-marker-label'), true, '.border-marker-label styled in style.css');
 assert.strictEqual(styleCss.includes('.border-custom-marker.active'), true, '.border-custom-marker.active styled for active state');
-console.log('✓ Passed: Border marker custom elements and active states are fully styled');
+console.log('✓ Passed: Border markers have no inner emoji and conform to standard 16px marker dimensions');
 
 // 4. Verify popup builder matches unified map popup structure
 console.log('Test 4: Verifying buildBorderPopupHtml and unified popup styling...');

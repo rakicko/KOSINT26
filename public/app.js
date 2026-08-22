@@ -278,7 +278,7 @@ class BasemapControl {
 function switchBasemap(basemapId) {
   if (!state.map) return;
   const map = state.map;
-  
+
   if (basemapId === 'dark') {
     if (map.getLayer('osm-basemap')) map.setLayoutProperty('osm-basemap', 'visibility', 'visible');
     if (map.getLayer('satellite-basemap')) map.setLayoutProperty('satellite-basemap', 'visibility', 'none');
@@ -318,11 +318,11 @@ class MapModeControl {
 const KOSOVO_WEATHER_CITIES = [
   { id: 'prishtine', name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
   { id: 'mitrovice', name: 'Mitrovicë', lat: 42.8914, lon: 20.8660 },
-  { id: 'peje',      name: 'Pejë',      lat: 42.6591, lon: 20.2883 },
-  { id: 'prizren',   name: 'Prizren',   lat: 42.2153, lon: 20.7415 },
-  { id: 'ferizaj',   name: 'Ferizaj',   lat: 42.3705, lon: 21.1553 },
-  { id: 'gjilan',    name: 'Gjilan',    lat: 42.4635, lon: 21.4694 },
-  { id: 'gjakove',   name: 'Gjakovë',   lat: 42.3803, lon: 20.4308 }
+  { id: 'peje', name: 'Pejë', lat: 42.6591, lon: 20.2883 },
+  { id: 'prizren', name: 'Prizren', lat: 42.2153, lon: 20.7415 },
+  { id: 'ferizaj', name: 'Ferizaj', lat: 42.3705, lon: 21.1553 },
+  { id: 'gjilan', name: 'Gjilan', lat: 42.4635, lon: 21.4694 },
+  { id: 'gjakove', name: 'Gjakovë', lat: 42.3803, lon: 20.4308 }
 ];
 
 const BORDER_CROSSING_LOCATIONS = {
@@ -379,7 +379,7 @@ function clearMarkerList(markerList) {
           m.getPopup().remove();
         }
         m.remove();
-      } catch(e) {}
+      } catch (e) { }
     });
     markerList.length = 0;
   }
@@ -452,7 +452,7 @@ const moduleLayers = {
   },
   telegram: {
     markers: [],
-    render: () => {},
+    render: () => { },
     clear: () => closeMapPopup()
   },
   border: {
@@ -473,7 +473,7 @@ const moduleLayers = {
   },
   route: {
     markers: [],
-    render: () => {},
+    render: () => { },
     clear: () => {
       clearRoute(false);
       closeMapPopup();
@@ -486,7 +486,7 @@ function clearAllModuleLayers() {
   Object.keys(moduleLayers).forEach(mod => {
     try {
       moduleLayers[mod].clear();
-    } catch(e) {
+    } catch (e) {
       console.warn(`Error clearing module layer ${mod}:`, e);
     }
   });
@@ -561,13 +561,13 @@ const $ = id => document.getElementById(id);
 
 function setMapViewMode(mode) {
   if (!state.map) return;
-  
+
   state.mapMode = mode;
   const buttons = document.querySelectorAll('.map-mode-btn');
   buttons.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   });
-  
+
   if (mode === '3d') {
     state.map.setPitch(50);
     state.map.setBearing(0);
@@ -585,7 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAlertHistory();
   initMap();
   startMonitor();
-  
+
   setupCCTVPanelButtons();
 });
 
@@ -597,7 +597,7 @@ function setupCCTVPanelButtons() {
       closeCCTVViewer();
     });
   }
-  
+
   const rawFeedBtn = $('cctvRawFeed');
   if (rawFeedBtn) {
     rawFeedBtn.addEventListener('click', (e) => {
@@ -608,7 +608,7 @@ function setupCCTVPanelButtons() {
       }
     });
   }
-  
+
   const mapTargetBtn = $('cctvMapTargetBtn');
   if (mapTargetBtn) {
     mapTargetBtn.addEventListener('click', (e) => {
@@ -642,7 +642,7 @@ function connectSSE() {
       if (m.type === 'alert') {
         loadAlertHistory();
       }
-    } catch {}
+    } catch { }
   };
 }
 function setLiveStatus(online) {
@@ -706,7 +706,7 @@ function schedulePoll() {
   clearPollTimer();
   if (!state.pollIntervalMs || !state.currentLocation) return;
   state.pollTimer = setTimeout(async () => {
-    try { await fetchAndRender(state.currentLocation, state.currentTimeline, true); } catch {}
+    try { await fetchAndRender(state.currentLocation, state.currentTimeline, true); } catch { }
     schedulePoll();
   }, state.pollIntervalMs);
 }
@@ -798,7 +798,7 @@ function sortNewsByChronological(items) {
     }
     if (validA && !validB) return -1;
     if (!validA && validB) return 1;
-    
+
     // Both invalid or missing
     const titleA = String(a.title || a.url || '');
     const titleB = String(b.title || b.url || '');
@@ -835,8 +835,8 @@ function filterNewsItems(items, filter) {
     const eventType = (item.eventType || 'event').toUpperCase();
     const catLabel = (item.category || 'security').replace(/_/g, ' ').toUpperCase();
     const confPercent = Math.round((item.confidence || 0.7) * 100);
-    const sourcesText = item.sourceCount > 1 
-      ? `📡 ${escHtml(item.source)} +${item.sourceCount - 1} sources` 
+    const sourcesText = item.sourceCount > 1
+      ? `📡 ${escHtml(item.source)} +${item.sourceCount - 1} sources`
       : `📡 ${escHtml(item.source)}`;
     const allSourcesList = (item.sources || [item.source]).join(', ');
     const tags = (item.tags || []).slice(0, 3).map(t => `<span class="news-tag">${escHtml(t.replace(/_/g, ' '))}</span>`).join('');
@@ -846,7 +846,7 @@ function filterNewsItems(items, filter) {
       <div class="news-item-header">
         <span class="news-score score-${s}">${s}/10</span>
         <span class="news-severity sev-${sev}">${sev.toUpperCase()}</span>
-        <span class="news-event-type type-${(item.eventType||'event').toLowerCase()}">${eventType}</span>
+        <span class="news-event-type type-${(item.eventType || 'event').toLowerCase()}">${eventType}</span>
         <span class="news-category">${catLabel}</span>
         <span class="news-confidence">${confPercent}% Conf</span>
         <span class="news-time">${formatTimeAgo(item.publishedAt)}</span>
@@ -900,7 +900,8 @@ function buildMapPopupHtml({
   contentHtml = '', // direct custom body html
   sections = '', // raw custom html like hourly forecast
   footer = '', // raw footer html or text
-  linkUrl = ''
+  linkUrl = '',
+  linkText = ''
 }) {
   const badgeObj = typeof badge === 'string' ? { text: badge, color: 'var(--cyan)' } : badge;
   const badgeHtml = badgeObj ? `
@@ -941,10 +942,11 @@ function buildMapPopupHtml({
     <div class="map-popup-desc-text">${escHtml(description)}</div>
   ` : '';
 
+  const linkBtnText = linkText || 'OPEN SOURCE REPORT ↗';
   const linkHtml = linkUrl ? `
     <div class="map-popup-link-row">
       <a href="${escHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" class="map-popup-link-btn" onclick="event.stopPropagation()">
-        OPEN SOURCE REPORT ↗
+        ${escHtml(linkBtnText)}
       </a>
     </div>
   ` : '';
@@ -1030,19 +1032,19 @@ function openMapPopup(coords, html, onClose, opts = {}) {
 function closeMapPopup() {
   const p = state.activeMapPopup || state.weatherPopup || state.borderPopup;
   if (state.activeMapPopup) {
-    try { state.activeMapPopup.remove(); } catch(e) {}
+    try { state.activeMapPopup.remove(); } catch (e) { }
     state.activeMapPopup = null;
   }
   if (state.weatherPopup) {
-    try { state.weatherPopup.remove(); } catch(e) {}
+    try { state.weatherPopup.remove(); } catch (e) { }
     state.weatherPopup = null;
   }
   if (state.borderPopup) {
-    try { state.borderPopup.remove(); } catch(e) {}
+    try { state.borderPopup.remove(); } catch (e) { }
     state.borderPopup = null;
   }
   if (p) {
-    try { p.remove(); } catch(e) {}
+    try { p.remove(); } catch (e) { }
   }
   if (typeof document !== 'undefined' && document.querySelectorAll) {
     try {
@@ -1050,7 +1052,7 @@ function closeMapPopup() {
       openPopups.forEach(pop => {
         if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
       });
-    } catch(e) {}
+    } catch (e) { }
   }
   state.selectedWeatherCityId = null;
   state.selectedNewsItemId = null;
@@ -1063,7 +1065,7 @@ function closeMapPopup() {
         const el = m.getElement ? m.getElement() : m._element;
         if (el) el.classList.remove('active');
         if (m.getPopup && m.getPopup()) {
-          try { m.getPopup().remove(); } catch(e) {}
+          try { m.getPopup().remove(); } catch (e) { }
         }
       });
     }
@@ -1132,7 +1134,7 @@ function closeWeatherPopup() {
 
 function openWeatherPopup(city, weatherData) {
   if (!state.map) return;
-  
+
   closeMapPopup();
   state.selectedWeatherCityId = city.id;
 
@@ -1218,7 +1220,7 @@ async function fetchCityWeather(cityId, forceRefresh = false, showPopup = true) 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     state.weatherCache[city.id] = { data, fetchedAt: now };
-    
+
     // Update ONLY this specific city's marker
     updateWeatherCityMarker(city.id, data);
 
@@ -1344,9 +1346,15 @@ const TRAFFIC_RELEVANCE_TERMS = {
   }
 };
 
+const NON_TRAFFIC_ACCIDENTAL = /kallash|armë zjarri|arme zjarri|fishek|shkrep.*armë|shkrepur fishek|plagos.*me armë|u vetëvra|vetevra|ubistvo iz nehata|pucanje iz nehata/i;
+
 function classifyTrafficIncident(title, description) {
   const text = `${title || ''} ${description || ''}`.toLowerCase();
-  
+
+  if (NON_TRAFFIC_ACCIDENTAL.test(text) && !/aksident trafiku|aksident me veturë|saobraćajn|saobracajn/i.test(text)) {
+    return { isTraffic: false, type: null, label: null };
+  }
+
   for (const lang of ['sq', 'sr']) {
     const terms = TRAFFIC_RELEVANCE_TERMS[lang];
     if (!terms) continue;
@@ -1357,7 +1365,14 @@ function classifyTrafficIncident(title, description) {
       }
     }
     for (const term of terms.accident) {
-      if (text.includes(term.toLowerCase())) {
+      const termLower = term.toLowerCase();
+      if (termLower === 'aksident' && (text.includes('aksidentalisht') || text.includes('aksidentale'))) {
+        if (text.includes('aksident trafiku') || text.includes('aksident rrugor') || text.includes('aksident me veturë') || text.includes('aksidenti') || text.includes('aksidente') || text.includes('aksidentuar')) {
+          return { isTraffic: true, type: 'accident', label: 'Traffic Accident' };
+        }
+        continue;
+      }
+      if (text.includes(termLower)) {
         return { isTraffic: true, type: 'accident', label: 'Traffic Accident' };
       }
     }
@@ -1381,46 +1396,146 @@ function classifyTrafficIncident(title, description) {
   return { isTraffic: false, type: null, label: null };
 }
 
-const KOSOVO_TRAFFIC_LOCATIONS = [
-  { city: 'Vushtrri', lat: 42.8250, lon: 20.9660, keywords: ['smrekonic', 'smrekovnic', 'vushtrr', 'vučitrn', 'vucitrn'] },
-  { city: 'Drenas', lat: 42.6250, lon: 20.8920, keywords: ['komoran', 'drenas', 'gllogoc', 'glogovac'] },
-  { city: 'Suharekë', lat: 42.3600, lon: 20.8250, keywords: ['duhël', 'duhel', 'dulje', 'suharek', 'suva reka', 'therand'] },
-  { city: 'Podujevë', lat: 42.9100, lon: 21.1900, keywords: ['merdar', 'lluzhan', 'podujev', 'podujevo', 'besian'] },
-  { city: 'Brezovicë', lat: 42.2180, lon: 20.9980, keywords: ['brezovic', 'shtërpc', 'shterpc', 'štrpce', 'strpce'] },
-  { city: 'Shtime', lat: 42.4330, lon: 21.0400, keywords: ['carralev', 'shtime', 'štimlje', 'stimlje'] },
-  { city: 'Pejë', lat: 42.6593, lon: 20.2887, keywords: ['rugov', 'pejë', 'peje', 'peć', 'pec'] },
-  { city: 'Mitrovicë', lat: 42.8914, lon: 20.8660, keywords: ['zveçan', 'zvecan', 'mitrovic', 'mitrovica'] },
-  { city: 'Leposaviq', lat: 43.1000, lon: 20.8000, keywords: ['jaranja', 'jarinj', 'leposaviq', 'leposavić', 'leposavic'] },
-  { city: 'Zubin Potok', lat: 42.9100, lon: 20.6900, keywords: ['gazivod', 'ujman', 'zubin potok'] },
+function cleanTextForNewsLocation(text) {
+  if (!text) return '';
+  let t = String(text).toLowerCase();
+  t = t.replace(/mitrovicasot(\.net)?/g, '');
+  t = t.replace(/radio\s*(kosovska\s*)?mitrovica(\s*sever)?/g, '');
+  t = t.replace(/kossev(\.info)?/g, '');
+  t = t.replace(/gazeta\s*express/g, '');
+  t = t.replace(/klan\s*kosova/g, '');
+  t = t.replace(/indeks\s*online/g, '');
+  t = t.replace(/jepize(\.com)?/g, '');
+  t = t.replace(/mitropol(\.net)?/g, '');
+  t = t.replace(/lajmi(\.net)?/g, '');
+  return t;
+}
+
+const KOSOVO_LOCATIONS = [
+  // North Kosovo Municipalities & Key Towns
+  { city: 'Zveçan', lat: 42.9080, lon: 20.8400, keywords: ['zveçan', 'zvečan', 'zvecan', 'banjsk', 'banjska'] },
+  { city: 'Leposaviq', lat: 43.1000, lon: 20.8000, keywords: ['jaranja', 'jarinj', 'leposaviq', 'leposavić', 'leposavic', 'sočanic', 'soçanic'] },
+  { city: 'Zubin Potok', lat: 42.9100, lon: 20.6900, keywords: ['zubin potok', 'gazivod', 'ujman', 'varag', 'varage'] },
+  { city: 'Mitrovicë', lat: 42.8914, lon: 20.8660, keywords: ['mitrovic', 'mitrovica', 'mitrovicë', 'mitrovice', 'severna mitrovica', 'mitrovica e veriut', 'mitrovica e jugut', 'ibër bridge', 'most na ibru', 'ura e ibrit'] },
+
+  // Border Crossings & Key Landmarks
+  { city: 'Merdare', lat: 42.9367, lon: 21.2425, keywords: ['merdar', 'merdare'] },
+  { city: 'Bërnjak', lat: 42.9667, lon: 20.5500, keywords: ['bërnjak', 'bernjak', 'brnjak'] },
+
+  // Other Kosovo Municipalities & Towns
+  { city: 'Prishtinë', lat: 42.6629, lon: 21.1655, keywords: ['prishtin', 'prištin', 'pristina', 'veternik', 'çagllavic', 'caglavic', 'hajvali', 'hajvalia'] },
+  { city: 'Graçanicë', lat: 42.6000, lon: 21.1930, keywords: ['graçanic', 'gračanica', 'gracanica'] },
   { city: 'Fushë Kosovë', lat: 42.6340, lon: 21.0960, keywords: ['fushë kosov', 'fushe kosov', 'kosovo polje'] },
-  { city: 'Prishtinë', lat: 42.6629, lon: 21.1655, keywords: ['veternik', 'çagllavic', 'caglavic', 'prishtin', 'prištin', 'pristina'] },
-  { city: 'Prizren', lat: 42.2139, lon: 20.7397, keywords: ['shadervan', 'ortakoll', 'bazhderhane', 'prizren'] },
-  { city: 'Gjilan', lat: 42.4635, lon: 21.4694, keywords: ['gavran', 'gjilan', 'gnjilan'] },
-  { city: 'Ferizaj', lat: 42.3705, lon: 21.1530, keywords: ['ferizaj', 'uroševac', 'urosevac'] },
-  { city: 'Gjakovë', lat: 42.3810, lon: 20.4320, keywords: ['gjakov', 'đakovic', 'djakovic'] },
-  { city: 'Rahovec', lat: 42.3990, lon: 20.6550, keywords: ['rahovec', 'orahovac'] },
+  { city: 'Obiliq', lat: 42.6870, lon: 21.0770, keywords: ['obiliq', 'obilić', 'kastriot', 'kek'] },
+  { city: 'Podujevë', lat: 42.9100, lon: 21.1900, keywords: ['podujev', 'podujevo', 'besian', 'lluzhan'] },
+  { city: 'Vushtrri', lat: 42.8250, lon: 20.9660, keywords: ['vushtrr', 'vučitrn', 'vucitrn', 'smrekonic', 'smrekovnic'] },
+  { city: 'Drenas', lat: 42.6250, lon: 20.8920, keywords: ['drenas', 'gllogoc', 'glogovac', 'komoran'] },
+  { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica', 'prekaz'] },
+  { city: 'Pejë', lat: 42.6593, lon: 20.2887, keywords: ['pejë', 'peje', 'peć', 'pec', 'rugov'] },
+  { city: 'Istog', lat: 42.7800, lon: 20.4900, keywords: ['istog', 'istok', 'burim'] },
   { city: 'Klinë', lat: 42.6210, lon: 20.5780, keywords: ['klinë', 'kline', 'klina'] },
   { city: 'Deçan', lat: 42.5410, lon: 20.2880, keywords: ['deçan', 'decan', 'dečani', 'decani'] },
-  { city: 'Istog', lat: 42.7800, lon: 20.4900, keywords: ['istog', 'istok', 'burim'] },
-  { city: 'Lipjan', lat: 42.5220, lon: 21.1250, keywords: ['janjev', 'lipjan', 'lipljan'] },
-  { city: 'Kaçanik', lat: 42.2300, lon: 21.2600, keywords: ['kaçanik', 'kacanik'] },
-  { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica'] },
+  { city: 'Gjakovë', lat: 42.3810, lon: 20.4320, keywords: ['gjakov', 'đakovic', 'djakovic'] },
+  { city: 'Rahovec', lat: 42.3990, lon: 20.6550, keywords: ['rahovec', 'orahovac'] },
   { city: 'Malishevë', lat: 42.4820, lon: 20.7450, keywords: ['malishev', 'mališevo', 'malisevo'] },
-  { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['dardan', 'kamenic', 'kamenica'] },
-  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['kllokot', 'klokot', 'viti', 'vitina'] }
+  { city: 'Prizren', lat: 42.2139, lon: 20.7397, keywords: ['prizren', 'shadervan', 'ortakoll', 'bazhderhane'] },
+  { city: 'Suharekë', lat: 42.3600, lon: 20.8250, keywords: ['suharek', 'suva reka', 'therand', 'duhël', 'duhel', 'dulje'] },
+  { city: 'Shtërpcë', lat: 42.2394, lon: 21.0261, keywords: ['shtërpc', 'shterpc', 'štrpce', 'strpce', 'brezovic'] },
+  { city: 'Shtime', lat: 42.4330, lon: 21.0400, keywords: ['shtime', 'štimlje', 'stimlje', 'carralev'] },
+  { city: 'Ferizaj', lat: 42.3705, lon: 21.1530, keywords: ['ferizaj', 'uroševac', 'urosevac'] },
+  { city: 'Lipjan', lat: 42.5220, lon: 21.1250, keywords: ['lipjan', 'lipljan', 'janjev'] },
+  { city: 'Gjilan', lat: 42.4635, lon: 21.4694, keywords: ['gjilan', 'gnjilan', 'gavran'] },
+  { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['kamenic', 'kamenica', 'dardan'] },
+  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['viti', 'vitina', 'kllokot', 'klokot'] },
+  { city: 'Kaçanik', lat: 42.2300, lon: 21.2600, keywords: ['kaçanik', 'kacanik'] }
 ];
+const KOSOVO_TRAFFIC_LOCATIONS = KOSOVO_LOCATIONS;
 
-function extractTrafficLocation(title, description) {
-  const titleLower = (title || '').toLowerCase();
-  const descLower = (description || '').toLowerCase();
-  for (const loc of KOSOVO_TRAFFIC_LOCATIONS) {
-    for (const kw of loc.keywords) {
-      if (titleLower.includes(kw.toLowerCase())) return { city: loc.city, lat: loc.lat, lon: loc.lon };
+function extractNewsLocation(item) {
+  if (!item) return null;
+
+  // 1. Explicit coordinates on item object
+  if (item.location && typeof item.location.lat === 'number' && typeof item.location.lon === 'number') {
+    return {
+      city: item.location.city || item.location.name || 'Explicit Location',
+      lat: item.location.lat,
+      lon: item.location.lon
+    };
+  }
+  if (item.coords && Array.isArray(item.coords) && item.coords.length === 2 && typeof item.coords[0] === 'number' && typeof item.coords[1] === 'number') {
+    return {
+      city: item.city || 'Explicit Location',
+      lat: item.coords[1],
+      lon: item.coords[0]
+    };
+  }
+  if (item.coordinates && typeof item.coordinates.lat === 'number' && typeof item.coordinates.lon === 'number') {
+    return {
+      city: item.city || 'Explicit Location',
+      lat: item.coordinates.lat,
+      lon: item.coordinates.lon
+    };
+  }
+  if (typeof item.lat === 'number' && typeof item.lon === 'number') {
+    return {
+      city: item.city || (typeof item.location === 'string' ? item.location : 'Explicit Location'),
+      lat: item.lat,
+      lon: item.lon
+    };
+  }
+
+  // 2. Explicit location/city string property on item
+  const explicitCityStr = (typeof item.location === 'string' && item.location) || (typeof item.city === 'string' && item.city);
+  if (explicitCityStr) {
+    const cleanedExplicit = cleanTextForNewsLocation(explicitCityStr);
+    for (const loc of KOSOVO_LOCATIONS) {
+      for (const kw of loc.keywords) {
+        if (cleanedExplicit.includes(kw.toLowerCase())) {
+          return { city: loc.city, lat: loc.lat, lon: loc.lon };
+        }
+      }
     }
   }
-  for (const loc of KOSOVO_TRAFFIC_LOCATIONS) {
+
+  // 3. Extract location from headline (title)
+  const cleanTitle = cleanTextForNewsLocation(item.title);
+  if (cleanTitle) {
+    for (const loc of KOSOVO_LOCATIONS) {
+      for (const kw of loc.keywords) {
+        if (cleanTitle.includes(kw.toLowerCase())) {
+          return { city: loc.city, lat: loc.lat, lon: loc.lon };
+        }
+      }
+    }
+  }
+
+  // 4. Extract location from description
+  const cleanDesc = cleanTextForNewsLocation(item.description);
+  if (cleanDesc) {
+    for (const loc of KOSOVO_LOCATIONS) {
+      for (const kw of loc.keywords) {
+        if (cleanDesc.includes(kw.toLowerCase())) {
+          return { city: loc.city, lat: loc.lat, lon: loc.lon };
+        }
+      }
+    }
+  }
+
+  // 5. Unresolved location -> return null (no marker on map)
+  return null;
+}
+
+function extractTrafficLocation(title, description) {
+  const cleanTitle = cleanTextForNewsLocation(title);
+  const cleanDesc = cleanTextForNewsLocation(description);
+  for (const loc of KOSOVO_LOCATIONS) {
     for (const kw of loc.keywords) {
-      if (descLower.includes(kw.toLowerCase())) return { city: loc.city, lat: loc.lat, lon: loc.lon };
+      if (cleanTitle.includes(kw.toLowerCase())) return { city: loc.city, lat: loc.lat, lon: loc.lon };
+    }
+  }
+  for (const loc of KOSOVO_LOCATIONS) {
+    for (const kw of loc.keywords) {
+      if (cleanDesc.includes(kw.toLowerCase())) return { city: loc.city, lat: loc.lat, lon: loc.lon };
     }
   }
   return null;
@@ -1442,7 +1557,7 @@ function renderTraffic(traffic) {
     $('incidentList').innerHTML = `<div class="error-state">Traffic data unavailable</div>`;
     return;
   }
-  
+
   $('trafficMeta').textContent = `via intelligence RSS feeds`;
   $('trafficAnomaly').style.display = traffic.anomalyDetected ? '' : 'none';
   $('trafficAnomalyBanner').style.display = traffic.anomalyDetected ? '' : 'none';
@@ -1538,23 +1653,22 @@ function renderRadiation(rad) {
   const p = rad.primary;
   const circumference = 2 * Math.PI * 40;
   const pct = Math.min(100, (p.usvh / 2) * 100);
-  const gaugeColor = { normal:'var(--green)', elevated:'var(--amber)', high:'var(--orange)', critical:'var(--red)' }[p.status] || 'var(--cyan)';
+  const gaugeColor = { normal: 'var(--green)', elevated: 'var(--amber)', high: 'var(--orange)', critical: 'var(--red)' }[p.status] || 'var(--cyan)';
   $('radiationPrimary').innerHTML = `
     <div class="radiation-gauge">
       <svg class="gauge-svg" viewBox="0 0 100 100">
         <circle class="gauge-track" cx="50" cy="50" r="40"/>
-        <circle class="gauge-fill" cx="50" cy="50" r="40" stroke="${gaugeColor}" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference-(pct/100)*circumference}"/>
+        <circle class="gauge-fill" cx="50" cy="50" r="40" stroke="${gaugeColor}" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - (pct / 100) * circumference}"/>
       </svg>
       <div class="gauge-center"><div class="gauge-value" style="color:${gaugeColor}">${p.usvh.toFixed(3)}</div><div class="gauge-unit">µSv/h</div></div>
     </div>
     <div class="radiation-info">
       <div class="radiation-status status-${p.status}">${p.status.toUpperCase()}</div>
-      <div class="radiation-sensor">📡 ${escHtml(p.sensorName)}${p.sensorDistanceKm?` (${p.sensorDistanceKm}km away)`:''}</div>
+      <div class="radiation-sensor">📡 ${escHtml(p.sensorName)}${p.sensorDistanceKm ? ` (${p.sensorDistanceKm}km away)` : ''}</div>
       <div class="radiation-quality">Baseline: ${rad.baseline} µSv/h · ${rad.dataQuality?.toUpperCase()}</div>
     </div>`;
-  $('radiationNeighbors').innerHTML = `<table class="neighbor-table"><thead><tr><th>Region</th><th>Dist.</th><th>µSv/h</th><th>Status</th></tr></thead><tbody>${
-    (rad.neighbors||[]).map(n=>`<tr><td>${escHtml(n.name)}</td><td>${n.distanceKm}km</td><td>${n.usvh.toFixed(3)}</td><td><span class="rad-status-pill pill-${n.status}">${n.status}</span></td></tr>`).join('')
-  }</tbody></table>`;
+  $('radiationNeighbors').innerHTML = `<table class="neighbor-table"><thead><tr><th>Region</th><th>Dist.</th><th>µSv/h</th><th>Status</th></tr></thead><tbody>${(rad.neighbors || []).map(n => `<tr><td>${escHtml(n.name)}</td><td>${n.distanceKm}km</td><td>${n.usvh.toFixed(3)}</td><td><span class="rad-status-pill pill-${n.status}">${n.status}</span></td></tr>`).join('')
+    }</tbody></table>`;
 }
 
 function renderRadiationMarkers(radData) {
@@ -1668,12 +1782,12 @@ function renderAQI(aqi) {
   if (pollutants) {
     const pList = [
       { name: 'PM2.5', val: c.pm2_5, unit: 'μg/m³' },
-      { name: 'PM10',  val: c.pm10,  unit: 'μg/m³' },
-      { name: 'NO₂',   val: c.no2,   unit: 'μg/m³' },
-      { name: 'O₃',    val: c.o3,    unit: 'μg/m³' },
-      { name: 'SO₂',   val: c.so2,   unit: 'μg/m³' },
-      { name: 'CO',    val: c.co,    unit: 'μg/m³' },
-      { name: 'Dust',  val: c.dust,  unit: 'μg/m³' }
+      { name: 'PM10', val: c.pm10, unit: 'μg/m³' },
+      { name: 'NO₂', val: c.no2, unit: 'μg/m³' },
+      { name: 'O₃', val: c.o3, unit: 'μg/m³' },
+      { name: 'SO₂', val: c.so2, unit: 'μg/m³' },
+      { name: 'CO', val: c.co, unit: 'μg/m³' },
+      { name: 'Dust', val: c.dust, unit: 'μg/m³' }
     ];
 
     pollutants.innerHTML = pList.map(p => `<div class="pollutant-item">
@@ -1706,11 +1820,11 @@ function renderEarthquakes(data) {
   if (!data || data.error) { $('earthquakeList').innerHTML = `<div class="error-state">Seismic data unavailable</div>`; return; }
   $('eqMeta').textContent = `Last 7 days · via ${data.source}`;
 
-  const sig = (data.earthquakes||[]).filter(e => e.magnitude >= 3.0).length;
+  const sig = (data.earthquakes || []).filter(e => e.magnitude >= 3.0).length;
   $('eqBadge').style.display = sig > 0 ? '' : 'none';
   $('eqBadge').textContent = sig > 0 ? `${sig} SIGNIFICANT` : '';
 
-  $('earthquakeList').innerHTML = (data.earthquakes||[]).length
+  $('earthquakeList').innerHTML = (data.earthquakes || []).length
     ? data.earthquakes.map(eq => `<div class="eq-item">
         <div class="eq-magnitude" style="color:${eq.color}">
           <div class="eq-mag-value">${eq.magnitude.toFixed(1)}</div>
@@ -1804,15 +1918,159 @@ function buildNewsPopupHtml(item) {
   });
 }
 
+function createNewsClusterMarkerElement(cluster, highestSeverity = 'normal') {
+  const el = document.createElement('div');
+  const count = (cluster && Array.isArray(cluster.items)) ? cluster.items.length : 1;
+  const sevUpper = String(highestSeverity || '').toUpperCase();
+  const sevClass = sevUpper === 'CRITICAL' ? 'cluster-critical' : (sevUpper === 'HIGH' ? 'cluster-high' : '');
+
+  el.className = `map-cluster-marker ${sevClass}`;
+  el.style.cursor = 'pointer';
+  el.innerHTML = `
+    <span class="map-cluster-icon">📰</span>
+    <span class="map-cluster-count">${count}</span>
+  `;
+
+  if (sevUpper === 'CRITICAL') {
+    const radar = document.createElement('div');
+    radar.className = 'radar-ring critical';
+    el.appendChild(radar);
+  }
+
+  return el;
+}
+
+function buildNewsClusterPopupHtml(cluster) {
+  if (!cluster || !Array.isArray(cluster.items) || cluster.items.length === 0) return '';
+
+  const count = cluster.items.length;
+  const items = cluster.items.map(entry => entry.item || entry);
+
+  const hasCritical = items.some(i => (i.severity ? i.severity.toLowerCase() === 'critical' : (i.intensityScore || 0) >= 9));
+  const hasHigh = items.some(i => (i.severity ? i.severity.toLowerCase() === 'high' : (i.intensityScore || 0) >= 7));
+  const highestSev = hasCritical ? 'CRITICAL' : (hasHigh ? 'HIGH' : 'MEDIUM');
+  const badgeColor = highestSev === 'CRITICAL' ? '#f87171' : (highestSev === 'HIGH' ? '#fb923c' : '#fbbf24');
+
+  const storiesHtml = items.map((item, idx) => {
+    const s = item.intensityScore || 5;
+    const itemSev = (item.severity ? item.severity.toUpperCase() : (s >= 9 ? 'CRITICAL' : (s >= 7 ? 'HIGH' : (s >= 5 ? 'MEDIUM' : 'LOW'))));
+    const itemColor = itemSev === 'CRITICAL' ? '#f87171' : itemSev === 'HIGH' ? '#fb923c' : itemSev === 'MEDIUM' ? '#fbbf24' : '#34d399';
+
+    const titleText = item.title || 'News Story';
+    const rawUrl = item.url ? item.url.trim() : '';
+    const url = isValidArticleUrl(rawUrl) ? rawUrl : (rawUrl && rawUrl !== '#' && !rawUrl.startsWith('#') ? rawUrl : '');
+
+    const timeAgoStr = item.publishedAt ? formatTimeAgo(item.publishedAt) : '';
+    const sourceStr = item.source || (Array.isArray(item.sources) ? item.sources.join(', ') : 'News Feed');
+
+    const headlineHtml = url ? `
+      <a class="news-popup-headline-link" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open article on source website">
+        ${escHtml(titleText)}
+      </a>
+    ` : `
+      <div class="news-popup-headline">${escHtml(titleText)}</div>
+    `;
+
+    return `
+      <div class="news-cluster-item" style="${idx > 0 ? 'margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);' : ''}">
+        <div class="news-cluster-item-header" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+          <span class="map-popup-badge" style="background:${itemColor}20; color:${itemColor}; border:1px solid ${itemColor}40; font-size: 9px; padding: 1px 5px;">
+            ${escHtml(itemSev)}
+          </span>
+          <span class="news-cluster-item-source" style="font-size: 9.5px; color: var(--text-dim); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${escHtml(sourceStr)}${timeAgoStr ? ` · ${escHtml(timeAgoStr)}` : ''}
+          </span>
+        </div>
+        ${headlineHtml}
+      </div>
+    `;
+  }).join('');
+
+  const clusterContent = `
+    <div class="news-cluster-story-list" style="max-height: 240px; overflow-y: auto; padding-right: 2px;">
+      ${storiesHtml}
+    </div>
+  `;
+
+  const footerBtn = `
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+      <span style="font-size: 9.5px; color: var(--text-dim); font-family: var(--font-mono);">${count} STORIES IN CLUSTER</span>
+      <button class="layer-btn" onclick="event.stopPropagation(); zoomToNewsCluster(${cluster.lng}, ${cluster.lat})" style="font-size: 10px; padding: 2px 8px;">
+        🔍 Zoom In
+      </button>
+    </div>
+  `;
+
+  return buildMapPopupHtml({
+    icon: '📰',
+    title: `NEWS CLUSTER (${count})`,
+    source: 'News Intelligence',
+    badge: { text: highestSev, color: badgeColor },
+    contentHtml: clusterContent,
+    footer: footerBtn
+  });
+}
+
+function zoomToNewsCluster(lng, lat) {
+  if (!state.map) return;
+  state.map.flyTo({
+    center: [lng, lat],
+    zoom: Math.min(14, state.map.getZoom() + 2.5),
+    duration: 700
+  });
+}
+
 function closeNewsPopup() {
   closeMapPopup();
   state.selectedNewsItemId = null;
+  state.selectedNewsClusterId = null;
   if (moduleLayers.news?.markers) {
     moduleLayers.news.markers.forEach(m => {
       const el = m.getElement ? m.getElement() : m._element;
       if (el) el.classList.remove('active');
     });
   }
+}
+
+function openNewsClusterPopup(cluster, coords, markerEl = null) {
+  if (!state.map) return null;
+
+  closeMapPopup();
+  const clusterId = `cluster-${cluster.lng.toFixed(4)}-${cluster.lat.toFixed(4)}-${cluster.items.length}`;
+  state.selectedNewsClusterId = clusterId;
+  state.selectedNewsItemId = null;
+
+  if (moduleLayers.news?.markers) {
+    moduleLayers.news.markers.forEach(m => {
+      const el = m.getElement ? m.getElement() : m._element;
+      if (el) {
+        if (m._clusterId === clusterId) el.classList.add('active');
+        else el.classList.remove('active');
+      }
+    });
+  }
+
+  const html = buildNewsClusterPopupHtml(cluster);
+  const popup = createMapPopup(html, { className: 'news-map-popup news-cluster-popup' })
+    .setLngLat(coords);
+
+  popup.on('close', () => {
+    if (state.activeMapPopup === popup) {
+      state.activeMapPopup = null;
+      state.selectedNewsClusterId = null;
+      if (moduleLayers.news?.markers) {
+        moduleLayers.news.markers.forEach(m => {
+          const el = m.getElement ? m.getElement() : m._element;
+          if (el) el.classList.remove('active');
+        });
+      }
+    }
+    updateMapBadgeAndMeta();
+  });
+
+  popup.addTo(state.map);
+  state.activeMapPopup = popup;
+  return popup;
 }
 
 function openNewsPopup(item, coords, markerEl = null) {
@@ -1868,7 +2126,7 @@ function renderNewsMapMarkers(newsData) {
 
   const itemsWithCoords = [];
   data.items.forEach((item, idx) => {
-    const loc = extractTrafficLocation(item.title, item.description);
+    const loc = extractNewsLocation(item);
     if (loc && typeof loc.lat === 'number' && typeof loc.lon === 'number') {
       const s = item.intensityScore || 5;
       const sev = (item.severity ? item.severity.toUpperCase() : (s >= 9 ? 'CRITICAL' : (s >= 7 ? 'HIGH' : (s >= 5 ? 'MEDIUM' : 'LOW'))));
@@ -1885,11 +2143,28 @@ function renderNewsMapMarkers(newsData) {
       const hasCritical = c.items.some(i => i.sev === 'CRITICAL');
       const hasHigh = c.items.some(i => i.sev === 'HIGH');
       const highestSev = hasCritical ? 'CRITICAL' : (hasHigh ? 'HIGH' : 'NORMAL');
-      const markerEl = createClusterMarkerElement(c, '📰', highestSev);
+      const clusterId = `cluster-${c.lng.toFixed(4)}-${c.lat.toFixed(4)}-${c.items.length}`;
+      const markerEl = createNewsClusterMarkerElement(c, highestSev);
+      markerEl.dataset.clusterId = clusterId;
+
+      markerEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        if (state.selectedNewsClusterId === clusterId && state.activeMapPopup) {
+          closeNewsPopup();
+          updateMapBadgeAndMeta();
+          return;
+        }
+
+        openNewsClusterPopup(c, [c.lng, c.lat], markerEl);
+      });
+
       const marker = new maplibregl.Marker({ element: markerEl })
         .setLngLat([c.lng, c.lat])
         .addTo(state.map);
       marker._module = 'news';
+      marker._clusterId = clusterId;
       moduleLayers.news.markers.push(marker);
     } else {
       const { item, color, itemId, coords, sev } = c.item;
@@ -2003,40 +2278,56 @@ function renderAqiMapMarkers(aqiData) {
   clearMarkerList(moduleLayers.aqi.markers);
 
   const data = aqiData || state.data?.aqi;
-  if (!data || data.status !== 'LIVE_DATA' || !data.coordinates) {
+  if (!data || data.status !== 'LIVE_DATA') {
     updateMapBadgeAndMeta();
     return;
   }
 
-  const c = data.current;
-  const color = c?.category?.color || '#34d399';
-  const popupHtml = buildMapPopupHtml({
-    icon: '🌍',
-    title: 'Air Quality Index',
-    subtitle: 'European Air Quality (EAQI)',
-    source: data.source || 'Open-Meteo',
-    badge: { text: c?.category?.label || 'Good', color },
-    primary: {
-      val: `EAQI ${c?.europeanAQI ?? 'N/A'}`,
-      sub: c?.category?.label || 'Air Quality',
-      secondary: `Dominant: ${c?.dominantPollutant ? c.dominantPollutant.toUpperCase() : 'N/A'}`
-    },
-    stats: [
-      { label: 'PM2.5', val: c?.pollutants?.pm2_5 ? `${c.pollutants.pm2_5.value} µg/m³` : 'N/A' },
-      { label: 'PM10', val: c?.pollutants?.pm10 ? `${c.pollutants.pm10.value} µg/m³` : 'N/A' },
-      { label: 'NO2', val: c?.pollutants?.no2 ? `${c.pollutants.no2.value} µg/m³` : 'N/A' },
-      { label: 'O3', val: c?.pollutants?.o3 ? `${c.pollutants.o3.value} µg/m³` : 'N/A' }
-    ],
-    footer: `DOMINANT: ${(c?.dominantPollutant || 'PM2.5').toUpperCase()} · SOURCE: OPEN-METEO`
+  const stationsToRender = Array.isArray(data.stations) && data.stations.length > 0
+    ? data.stations
+    : (data.coordinates && data.current ? [{
+        name: data.location || 'Kosovo AQI Station',
+        coordinates: data.coordinates,
+        current: data.current
+      }] : []);
+
+  stationsToRender.forEach(st => {
+    const coords = st.coordinates || { lat: st.lat, lon: st.lon };
+    if (!coords || typeof coords.lat !== 'number' || typeof coords.lon !== 'number') return;
+    const c = st.current;
+    if (!c) return;
+
+    const color = c.color || (c.category?.color) || '#34d399';
+    const label = c.label || c.category?.label || 'Good';
+    const popupHtml = buildMapPopupHtml({
+      icon: '🌍',
+      title: st.name || 'Air Quality Station',
+      subtitle: 'European Air Quality (EAQI)',
+      source: data.source || 'Open-Meteo & CAMS',
+      badge: { text: String(label).toUpperCase(), color },
+      primary: {
+        val: `EAQI ${c.europeanAQI ?? 'N/A'}`,
+        sub: label || 'Air Quality',
+        secondary: `Dominant: ${String(c.dominantPollutant || 'PM2.5').toUpperCase()}`
+      },
+      stats: [
+        { label: 'PM2.5', val: c.pm2_5 != null ? `${c.pm2_5} µg/m³` : (c.pollutants?.pm2_5 ? `${c.pollutants.pm2_5.value} µg/m³` : 'N/A') },
+        { label: 'PM10', val: c.pm10 != null ? `${c.pm10} µg/m³` : (c.pollutants?.pm10 ? `${c.pollutants.pm10.value} µg/m³` : 'N/A') },
+        { label: 'NO2', val: c.no2 != null ? `${c.no2} µg/m³` : (c.pollutants?.no2 ? `${c.pollutants.no2.value} µg/m³` : 'N/A') },
+        { label: 'O3', val: c.o3 != null ? `${c.o3} µg/m³` : (c.pollutants?.o3 ? `${c.pollutants.o3.value} µg/m³` : 'N/A') }
+      ],
+      footer: `STATION: ${String(st.name || 'KOSOVO').toUpperCase()} · OPEN-METEO & CAMS`
+    });
+
+    const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 14, 3) })
+      .setLngLat([coords.lon, coords.lat])
+      .setPopup(createMapPopup(popupHtml))
+      .addTo(state.map);
+
+    marker._module = 'aqi';
+    moduleLayers.aqi.markers.push(marker);
   });
 
-  const marker = new maplibregl.Marker({ element: createMapMarkerElement(color, 14, 3) })
-    .setLngLat([data.coordinates.lon, data.coordinates.lat])
-    .setPopup(createMapPopup(popupHtml))
-    .addTo(state.map);
-
-  marker._module = 'aqi';
-  moduleLayers.aqi.markers.push(marker);
   updateMapBadgeAndMeta();
 }
 
@@ -2076,7 +2367,7 @@ function renderWildfire(wildfireData) {
     return;
   }
 
-  const detections = (wildfireData.detections || []).filter(d => 
+  const detections = (wildfireData.detections || []).filter(d =>
     typeof d.lat === 'number' && typeof d.lon === 'number' && !d.isDemo
   );
 
@@ -2146,18 +2437,18 @@ function filterWildfire(period, btn) {
   }
 }
 
-window.updateWildfireLayer = async function(period = '24h') {
+window.updateWildfireLayer = async function (period = '24h') {
   if (!state.mapInitialized) return;
   const requestModule = 'wildfire';
-  
+
   try {
     const response = await fetch(`/api/wildfire?period=${period}`);
     if (!response.ok) throw new Error('Failed to fetch wildfire data');
     const data = await response.json();
-    
+
     if (state.data) state.data.wildfire = data;
     renderWildfire(data);
-    
+
     // Async guard check: only render wildfire layer if wildfire is STILL active!
     if (state.activeMapModule === requestModule) {
       renderWildfireMapLayer(data);
@@ -2194,7 +2485,7 @@ function renderWildfireMapLayer(wildfireData) {
     return;
   }
 
-  const validDetections = (data.detections || []).filter(d => 
+  const validDetections = (data.detections || []).filter(d =>
     typeof d.lat === 'number' && typeof d.lon === 'number' && !d.isDemo
   );
 
@@ -2230,7 +2521,7 @@ function renderWildfireMapLayer(wildfireData) {
   updateMapBadgeAndMeta();
 }
 
-window.toggleWildfireLayer = function() {
+window.toggleWildfireLayer = function () {
   if (state.activeMapModule === 'wildfire') {
     closeModulePanel();
   } else {
@@ -2253,7 +2544,7 @@ function createAircraftMarkerElement(aircraft) {
   const el = document.createElement('div');
   el.className = `aircraft-marker-el aircraft-marker-${aircraft.category || 'unknown'}`;
   const rot = typeof aircraft.heading === 'number' ? aircraft.heading : 0;
-  
+
   el.innerHTML = `
     <svg class="aircraft-icon-svg" viewBox="0 0 24 24" style="transform: rotate(${rot}deg);">
       <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
@@ -2291,6 +2582,10 @@ function renderAviationMapMarkers(aviationData) {
     const typeStr = ac.aircraftDesc || ac.aircraftType || 'N/A';
     const callsignStr = ac.callsign || ac.icao24.toUpperCase();
 
+    const icao = (ac.icao24 || '').trim().toLowerCase();
+    const callsign = (ac.callsign || '').trim();
+    const adsbUrl = icao ? `https://globe.adsbexchange.com/?icao=${icao}` : (callsign ? `https://globe.adsbexchange.com/?callsign=${encodeURIComponent(callsign)}` : null);
+
     const popupHtml = buildMapPopupHtml({
       icon: '✈️',
       title: callsignStr,
@@ -2308,6 +2603,8 @@ function renderAviationMapMarkers(aviationData) {
         { label: 'Heading', val: hdgStr },
         { label: 'Type', val: typeStr }
       ],
+      linkUrl: adsbUrl,
+      linkText: 'TRACK ON ADS-B LIVE ↗',
       footer: `ICAO: ${ac.icao24.toUpperCase()} · OPEN SKY BALKAN AIRSPACE`
     });
 
@@ -2609,7 +2906,7 @@ function toggleModule(panelId) {
       closeCCTVViewer();
     }
     document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === 'borderPanel'));
-    
+
     if (!state.borderData) {
       fetchBorder().then(() => {
         if (state.activeMapModule === 'border') {
@@ -2739,7 +3036,7 @@ function closeModulePanel() {
   closeCCTVViewer();
 
   setActiveMapModule(null);
-  
+
   document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.remove('active'));
   if (state.map) {
     setTimeout(() => state.map.resize(), 200);
@@ -2790,7 +3087,7 @@ function createMapMarkerElement(color, size = 16, border = 3, severity = null) {
 function clusterGeoItems(items, getLngLat, radiusPixels = 38) {
   if (!state.map || !Array.isArray(items) || items.length === 0) return [];
   const zoom = state.map.getZoom();
-  
+
   // When zoomed in sufficiently close (zoom >= 11.5), render individual markers with full popups
   if (zoom >= 11.5) {
     return items.map(item => ({ isCluster: false, item }));
@@ -2842,7 +3139,7 @@ function createClusterMarkerElement(cluster, icon = '📍', highestSeverity = 'n
   const el = document.createElement('div');
   const sevUpper = String(highestSeverity || '').toUpperCase();
   const sevClass = sevUpper === 'CRITICAL' ? 'cluster-critical' : (sevUpper === 'HIGH' ? 'cluster-high' : '');
-  
+
   el.className = `map-cluster-marker ${sevClass}`;
   el.innerHTML = `
     <span class="map-cluster-icon">${icon}</span>
@@ -2879,13 +3176,13 @@ function createCCTVMarkerElement(camera, map) {
   const dot = document.createElement('div');
   dot.className = 'cctv-marker-dot';
   container.appendChild(dot);
-  
+
   container.addEventListener('click', (e) => {
     e.stopPropagation();
     e.stopImmediatePropagation();
     openCCTVViewer(camera);
   });
-  
+
   return container;
 }
 
@@ -2957,21 +3254,21 @@ function getCCTVEmbedUrl(camera) {
 
 function openCCTVViewer(camera) {
   currentCCTVCamera = camera;
-  
+
   const panel = $('cctvIntelligencePanel');
   const nameEl = $('cctvName');
   const videoFrame = $('cctvVideoFrame');
   const videoUnavailable = $('cctvVideoUnavailable');
   const openLink = $('cctvOpenFeed');
   const statusEl = $('cctvStatus');
-  
+
   if (panel) {
     panel.style.display = 'flex';
-    
+
     if (nameEl) {
       nameEl.textContent = camera.location || camera.name || 'CAMERA';
     }
-    
+
     const isLive = (camera.status || '').toLowerCase() === 'live';
     if (statusEl) {
       statusEl.textContent = isLive ? '● LIVE' : `● ${(camera.status || 'UNKNOWN').toUpperCase()}`;
@@ -3011,7 +3308,7 @@ function openCCTVViewer(camera) {
         </div>
       `;
     }
-    
+
     const embedUrl = getCCTVEmbedUrl(camera);
 
     // Embed ONLY the dedicated camera player - no external website UI
@@ -3028,22 +3325,22 @@ function openCCTVViewer(camera) {
 
     highlightActiveCCTV(camera);
   }
-  
+
   window.cctvCurrentCamera = camera;
 }
 
 function closeCCTVViewer() {
   const panel = $('cctvIntelligencePanel');
   const videoFrame = $('cctvVideoFrame');
-  
+
   if (panel) {
     panel.style.display = 'none';
   }
-  
+
   if (videoFrame) {
     videoFrame.src = '';
   }
-  
+
   currentCCTVCamera = null;
   window.cctvCurrentCamera = null;
 }
@@ -3139,7 +3436,7 @@ function initMap() {
   state.map.on('load', () => {
     if (state.data) updateMap(state.data);
     setTimeout(() => { if (state.map) state.map.resize(); }, 200);
-    
+
     state.map.on('click', 'wildfire-layer', (e) => {
       if (e.features && e.features.length > 0) {
         const props = e.features[0].properties;
@@ -3165,14 +3462,14 @@ function initMap() {
         openMapPopup(e.lngLat, popupHtml);
       }
     });
-    
+
     state.map.on('mouseenter', 'wildfire-layer', () => {
       if (state.map.getCanvas()) state.map.getCanvas().style.cursor = 'pointer';
     });
     state.map.on('mouseleave', 'wildfire-layer', () => {
       if (state.map.getCanvas()) state.map.getCanvas().style.cursor = '';
     });
-    
+
     state.map.on('click', 'radiation-layer', (e) => {
       if (e.features && e.features.length > 0) {
         const props = e.features[0].properties;
@@ -3197,14 +3494,14 @@ function initMap() {
         openMapPopup(e.lngLat, popupHtml);
       }
     });
-    
+
     state.map.on('mouseenter', 'radiation-layer', () => {
       if (state.map.getCanvas()) state.map.getCanvas().style.cursor = 'pointer';
     });
     state.map.on('mouseleave', 'radiation-layer', () => {
       if (state.map.getCanvas()) state.map.getCanvas().style.cursor = '';
     });
-    
+
     state.map.setPaintProperty('wildfire-layer', 'circle-radius', [
       'interpolate',
       ['linear'],
@@ -3259,7 +3556,7 @@ function initMap() {
   });
 
   state.map.on('idle', () => {
-    try { state.map.triggerRepaint(); } catch (e) {}
+    try { state.map.triggerRepaint(); } catch (e) { }
     const buttons = document.querySelectorAll('.map-mode-btn');
     if (buttons.length >= 2 && !document.querySelector('.map-mode-btn.active')) {
       buttons[0].classList.add('active');
@@ -3300,7 +3597,7 @@ function updateMap(data) {
   } else {
     clearAllModuleLayers();
   }
-  
+
   if (state.mapMode === '3d') {
     state.map.setPitch(50);
     state.map.setBearing(0);
@@ -3308,7 +3605,7 @@ function updateMap(data) {
     state.map.setPitch(0);
     state.map.setBearing(0);
   }
-  
+
   setTimeout(() => { if (state.map) state.map.resize(); }, 100);
 }
 
@@ -3385,7 +3682,7 @@ function exportReport() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `sentinel-report-${d.location.replace(/[^a-z0-9]/gi,'_')}-${new Date().toISOString().slice(0,10)}.txt`;
+  a.download = `sentinel-report-${d.location.replace(/[^a-z0-9]/gi, '_')}-${new Date().toISOString().slice(0, 10)}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -3967,7 +4264,40 @@ function aggregateAndRenderAlerts(statusData = state.data, borderData = state.bo
   renderAlertLog(cappedAlerts);
 }
 
+function renderLiveAlertTicker(alerts = []) {
+  const track = $('liveAlertTickerTrack');
+  if (!track) return;
+
+  if (!alerts || alerts.length === 0) {
+    track.innerHTML = '<span class="ticker-item-placeholder">ALL SYSTEMS NORMAL · KOSINT REAL-TIME INTELLIGENCE ACTIVE</span>';
+    track.style.animation = 'none';
+    return;
+  }
+
+  const itemsHtml = alerts.map(a => {
+    const sev = (a.severity || 'INFO').toUpperCase();
+    const sevClass = sev.toLowerCase();
+    const mod = (a.module || a.category || 'SYSTEM').toUpperCase();
+    const timeStr = formatTimeAgo(a.timestamp);
+    const titleText = a.title || a.message || 'Alert Notice';
+
+    return `
+      <div class="ticker-item" onclick="handleAlertClick('${escHtml(a.id)}')" title="Click to view alert details">
+        <span class="ticker-tag sev-${sevClass}">[${escHtml(sev)}]</span>
+        <span class="ticker-mod">${escHtml(mod)}</span>
+        <span class="ticker-title">${escHtml(titleText)}</span>
+        <span class="ticker-time">· ${escHtml(timeStr)}</span>
+      </div>
+    `;
+  }).join('');
+
+  track.innerHTML = itemsHtml + itemsHtml;
+  track.style.animation = 'tickerMove 160s linear infinite';
+}
+
 function renderAlertLog(alerts = []) {
+  renderLiveAlertTicker(alerts);
+
   const log = $('alertLog');
   const badge = $('unreadBadge');
   if (!log) return;
@@ -4019,7 +4349,7 @@ function renderAlertLog(alerts = []) {
 function handleAlertClick(alertId) {
   if (!state.alertStore || !state.alertStore.has(alertId)) return;
   const alert = state.alertStore.get(alertId);
-  
+
   // Mark clicked alert as read
   alert.read = true;
   state.alertStore.set(alertId, alert);
@@ -4033,7 +4363,7 @@ function handleAlertClick(alertId) {
         zoom: 10,
         essential: true
       });
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // Open corresponding module panel
@@ -4071,7 +4401,7 @@ async function loadAlertHistory() {
         }
       });
     }
-  } catch (e) {}
+  } catch (e) { }
   aggregateAndRenderAlerts();
 }
 
@@ -4083,7 +4413,7 @@ async function markAllRead() {
     }
     renderAlertLog(Array.from(state.alertStore.values()));
   }
-  await fetch('/api/alerts/read', { method: 'POST' }).catch(() => {});
+  await fetch('/api/alerts/read', { method: 'POST' }).catch(() => { });
 }
 
 async function loadLocationHistory() {
@@ -4101,7 +4431,7 @@ function hideWelcome() {
   if (panel) panel.style.display = 'none';
 }
 
-function escHtml(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function isValidArticleUrl(url) {
   if (typeof url !== 'string') return false;
   const trimmed = url.trim();
@@ -4116,15 +4446,15 @@ function isValidArticleUrl(url) {
 function formatTimeAgo(iso) {
   if (!iso) return '';
   const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff/60000);
+  const m = Math.floor(diff / 60000);
   if (m < 1) return 'just now'; if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m/60); if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h/24)}d ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
-function formatHour(iso) { try { return new Date(iso).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false }); } catch { return iso; } }
+function formatHour(iso) { try { return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }); } catch { return iso; } }
 function weatherIcon(code) {
-  if (code===0) return '☀️'; if (code<=3) return '⛅'; if (code<=48) return '🌫️';
-  if (code<=67) return '🌧️'; if (code<=77) return '🌨️'; if (code<=82) return '🌦️'; if (code<=99) return '⛈️'; return '🌤️';
+  if (code === 0) return '☀️'; if (code <= 3) return '⛅'; if (code <= 48) return '🌫️';
+  if (code <= 67) return '🌧️'; if (code <= 77) return '🌨️'; if (code <= 82) return '🌦️'; if (code <= 99) return '⛈️'; return '🌤️';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4279,14 +4609,14 @@ function renderTelegram(telegramData) {
     const timeStr = formatTimeAgo(p.timestamp);
     const postUrl = p.url || `https://t.me/${(p.channelUsername || '').replace(/^@/, '')}/${p.messageId || ''}`;
     const textContent = p.text ? escHtml(p.text).replace(/\n/g, '<br/>') : '<em class="tg-no-text">[Media post / No text]</em>';
-    
+
     let mediaHtml = '';
     if (p.media && p.media.hasMedia) {
       const mType = (p.media.type || 'attachment').toUpperCase();
       const mDesc = p.media.description || `${mType} attachment`;
       const isVideo = p.media.type === 'video' || p.media.type === 'animation';
       const mIcon = p.media.type === 'photo' ? '🖼️' : isVideo ? '🎬' : p.media.type === 'audio' ? '🎵' : p.media.type === 'webpage' ? '🔗' : '📎';
-      
+
       const badgeHtml = `
         <div class="telegram-media-badge media-${escHtml(p.media.type || 'other')}">
           <span class="tg-media-icon">${mIcon}</span>
@@ -4771,15 +5101,15 @@ function renderBorderMapMarkers(borderData) {
   const crossings = (data && Array.isArray(data.crossings) && data.crossings.length > 0)
     ? data.crossings
     : Object.entries(BORDER_CROSSING_LOCATIONS).map(([id, meta]) => ({
-        id,
-        name: meta.name,
-        shortName: meta.shortName,
-        neighborCountry: meta.neighbor,
-        coordinates: { lat: meta.lat, lon: meta.lon },
-        status: 'OPEN',
-        direction: { entry: { waitingMinutes: 5, queueLengthMeters: 0 }, exit: { waitingMinutes: 5, queueLengthMeters: 0 } },
-        source: 'QKMK'
-      }));
+      id,
+      name: meta.name,
+      shortName: meta.shortName,
+      neighborCountry: meta.neighbor,
+      coordinates: { lat: meta.lat, lon: meta.lon },
+      status: 'OPEN',
+      direction: { entry: { waitingMinutes: 5, queueLengthMeters: 0 }, exit: { waitingMinutes: 5, queueLengthMeters: 0 } },
+      source: 'QKMK'
+    }));
 
   crossings.forEach(c => {
     const coords = c.coordinates || BORDER_CROSSING_LOCATIONS[c.id] || BORDER_CROSSING_LOCATIONS[`border-${c.id}`];
@@ -4837,7 +5167,6 @@ function createBorderMarkerElement(color, label, crossingId = '', delayClass = '
 
   el.innerHTML = `
     <div class="border-marker-pin ${pulseClass}" style="background:${color}; box-shadow: 0 0 10px ${color}88; position: relative;">
-      <span class="border-pin-icon">🛂</span>
       ${isCritical ? '<div class="radar-ring critical"></div>' : ''}
     </div>
     <div class="border-marker-label">${escHtml(label)}</div>
@@ -4848,7 +5177,7 @@ function createBorderMarkerElement(color, label, crossingId = '', delayClass = '
 function focusBorderCrossing(crossingId) {
   const crossing = (state.borderData?.crossings || []).find(c => c.id === crossingId);
   const coords = crossing?.coordinates || BORDER_CROSSING_LOCATIONS[crossingId] || BORDER_CROSSING_LOCATIONS[`border-${crossingId}`];
-  
+
   if (coords && state.map) {
     state.map.flyTo({ center: [coords.lon, coords.lat], zoom: 12, speed: 1.2 });
     if (crossing) {
@@ -4860,6 +5189,7 @@ function focusBorderCrossing(crossingId) {
 // ── ROUTE INTELLIGENCE & THREAT CORRIDOR ANALYSIS ─────────────────────────────
 
 const KOSOVO_LOCATIONS_GEOCODE = {
+  // Major cities & regional centers
   'prishtinë': { name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
   'prishtine': { name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
   'pristina': { name: 'Prishtinë', lat: 42.6629, lon: 21.1655 },
@@ -4885,6 +5215,72 @@ const KOSOVO_LOCATIONS_GEOCODE = {
   'zvečan': { name: 'Zvečan', lat: 42.9064, lon: 20.8403 },
   'zvecan': { name: 'Zvečan', lat: 42.9064, lon: 20.8403 },
   'zubin potok': { name: 'Zubin Potok', lat: 42.9144, lon: 20.6908 },
+
+  // Smaller towns & regional municipalities
+  'shtime': { name: 'Shtime', lat: 42.4331, lon: 21.0397 },
+  'stimlje': { name: 'Shtime', lat: 42.4331, lon: 21.0397 },
+  'kaçanik': { name: 'Kaçanik', lat: 42.2319, lon: 21.2594 },
+  'kacanik': { name: 'Kaçanik', lat: 42.2319, lon: 21.2594 },
+  'obiliq': { name: 'Obiliq', lat: 42.6869, lon: 21.0772 },
+  'obilic': { name: 'Obiliq', lat: 42.6869, lon: 21.0772 },
+  'kastriot': { name: 'Obiliq', lat: 42.6869, lon: 21.0772 },
+  'suharekë': { name: 'Suharekë', lat: 42.3586, lon: 20.8250 },
+  'suhareke': { name: 'Suharekë', lat: 42.3586, lon: 20.8250 },
+  'suva reka': { name: 'Suharekë', lat: 42.3586, lon: 20.8250 },
+  'skenderaj': { name: 'Skenderaj', lat: 42.7486, lon: 20.7878 },
+  'srbica': { name: 'Skenderaj', lat: 42.7486, lon: 20.7878 },
+  'istog': { name: 'Istog', lat: 42.7808, lon: 20.4875 },
+  'istok': { name: 'Istog', lat: 42.7808, lon: 20.4875 },
+  'klinë': { name: 'Klinë', lat: 42.6217, lon: 20.5778 },
+  'kline': { name: 'Klinë', lat: 42.6217, lon: 20.5778 },
+  'klina': { name: 'Klinë', lat: 42.6217, lon: 20.5778 },
+  'rahovec': { name: 'Rahovec', lat: 42.3994, lon: 20.6547 },
+  'orahovac': { name: 'Rahovec', lat: 42.3994, lon: 20.6547 },
+  'malishevë': { name: 'Malishevë', lat: 42.4822, lon: 20.7458 },
+  'malisheve': { name: 'Malishevë', lat: 42.4822, lon: 20.7458 },
+  'malisevo': { name: 'Malishevë', lat: 42.4822, lon: 20.7458 },
+  'kamenicë': { name: 'Kamenicë', lat: 42.5781, lon: 21.5803 },
+  'kamenice': { name: 'Kamenicë', lat: 42.5781, lon: 21.5803 },
+  'kosovska kamenica': { name: 'Kamenicë', lat: 42.5781, lon: 21.5803 },
+  'dragash': { name: 'Dragash', lat: 42.0625, lon: 20.6533 },
+  'dragas': { name: 'Dragash', lat: 42.0625, lon: 20.6533 },
+  'štrpce': { name: 'Štrpce', lat: 42.2394, lon: 21.0272 },
+  'strpce': { name: 'Štrpce', lat: 42.2394, lon: 21.0272 },
+  'shtërpcë': { name: 'Štrpce', lat: 42.2394, lon: 21.0272 },
+  'shterpce': { name: 'Štrpce', lat: 42.2394, lon: 21.0272 },
+  'novo brdo': { name: 'Novo Brdo', lat: 42.6156, lon: 21.4339 },
+  'novobërdë': { name: 'Novo Brdo', lat: 42.6156, lon: 21.4339 },
+  'novoberde': { name: 'Novo Brdo', lat: 42.6156, lon: 21.4339 },
+  'gračanica': { name: 'Gračanica', lat: 42.5981, lon: 21.1933 },
+  'gracanica': { name: 'Gračanica', lat: 42.5981, lon: 21.1933 },
+  'graçanicë': { name: 'Gračanica', lat: 42.5981, lon: 21.1933 },
+  'gracanice': { name: 'Gračanica', lat: 42.5981, lon: 21.1933 },
+  'deçan': { name: 'Deçan', lat: 42.5403, lon: 20.2889 },
+  'decan': { name: 'Deçan', lat: 42.5403, lon: 20.2889 },
+  'decani': { name: 'Deçan', lat: 42.5403, lon: 20.2889 },
+  'fushë kosovë': { name: 'Fushë Kosovë', lat: 42.6339, lon: 21.0964 },
+  'fushe kosove': { name: 'Fushë Kosovë', lat: 42.6339, lon: 21.0964 },
+  'kosovo polje': { name: 'Fushë Kosovë', lat: 42.6339, lon: 21.0964 },
+  'lipjan': { name: 'Lipjan', lat: 42.5217, lon: 21.1258 },
+  'lipljan': { name: 'Lipjan', lat: 42.5217, lon: 21.1258 },
+  'ranilug': { name: 'Ranilug', lat: 42.4922, lon: 21.5986 },
+  'ranillug': { name: 'Ranilug', lat: 42.4922, lon: 21.5986 },
+  'partesh': { name: 'Partesh', lat: 42.4019, lon: 21.4325 },
+  'parteš': { name: 'Partesh', lat: 42.4019, lon: 21.4325 },
+  'klokot': { name: 'Klokot', lat: 42.3711, lon: 21.3736 },
+  'kllokot': { name: 'Klokot', lat: 42.3711, lon: 21.3736 },
+  'brezovica': { name: 'Brezovica', lat: 42.2222, lon: 21.0028 },
+  'banjë': { name: 'Banjë / Banja', lat: 42.8156, lon: 20.6722 },
+  'banje': { name: 'Banjë / Banja', lat: 42.8156, lon: 20.6722 },
+  'banja': { name: 'Banjë / Banja', lat: 42.8156, lon: 20.6722 },
+  'gazivode': { name: 'Gazivodë / Gazivode', lat: 42.9619, lon: 20.6178 },
+  'gazivodë': { name: 'Gazivodë / Gazivode', lat: 42.9619, lon: 20.6178 },
+  'prekaz': { name: 'Prekaz', lat: 42.7667, lon: 20.8167 },
+  'rugovë': { name: 'Rugovë', lat: 42.6833, lon: 20.1667 },
+  'rugove': { name: 'Rugovë', lat: 42.6833, lon: 20.1667 },
+  'rugova': { name: 'Rugovë', lat: 42.6833, lon: 20.1667 },
+
+  // Border crossings
   'jarinje': { name: 'Jarinje (Border)', lat: 43.2185, lon: 20.6980 },
   'brnjak': { name: 'Brnjak (Border)', lat: 42.9644, lon: 20.5528 },
   'merdarë': { name: 'Merdarë (Border)', lat: 42.9360, lon: 21.2460 },
@@ -4934,21 +5330,67 @@ function resolveLocationCoordinates(query) {
   return null;
 }
 
+function addRouteDestinationInput(val = '') {
+  const container = $('routeViaInputsContainer');
+  if (!container) return;
+
+  const count = container.children.length + 1;
+  const row = document.createElement('div');
+  row.className = 'route-input-row route-via-row';
+  row.style.marginTop = '6px';
+  row.style.marginBottom = '6px';
+  row.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:2px;">
+      <label class="route-input-label">VIA WAYPOINT ${count}</label>
+      <button type="button" onclick="this.closest('.route-via-row').remove();" style="background:transparent; border:none; color:#f87171; font-size:11px; font-weight:700; cursor:pointer; padding:0;">✕</button>
+    </div>
+    <div class="route-input-field-wrap">
+      <span class="route-input-icon">🔵</span>
+      <input type="text" class="input-field route-input route-via-input" placeholder="Via town / locality (e.g. Ferizaj)" list="routeLocationsList" value="${escHtml(val)}" />
+    </div>
+  `;
+  container.appendChild(row);
+}
+
 async function calculateRoute() {
   const startQuery = $('routeStartInput')?.value.trim();
   const endQuery = $('routeEndInput')?.value.trim();
-  if (!startQuery || !endQuery) {
-    alert('Please enter both a start point and destination.');
+  const viaInputs = Array.from(document.querySelectorAll('.route-via-input'))
+    .map(i => i.value.trim())
+    .filter(Boolean);
+
+  if (!startQuery || (!endQuery && viaInputs.length === 0)) {
+    alert('Please enter a start point and at least one destination.');
     return;
   }
 
-  const startCoords = resolveLocationCoordinates(startQuery);
-  const endCoords = resolveLocationCoordinates(endQuery);
+  const rawQueries = [startQuery];
+  viaInputs.forEach(v => {
+    v.split(',').map(s => s.trim()).filter(Boolean).forEach(q => rawQueries.push(q));
+  });
+  if (endQuery) {
+    endQuery.split(',').map(s => s.trim()).filter(Boolean).forEach(q => rawQueries.push(q));
+  }
 
-  if (!startCoords || !endCoords) {
-    alert(`Could not resolve coordinates for "${!startCoords ? startQuery : endQuery}". Please enter a valid city name, border crossing, or coordinates (lat, lon).`);
+  const resolvedPoints = [];
+  const unresolvable = [];
+
+  for (const q of rawQueries) {
+    const resolved = resolveLocationCoordinates(q);
+    if (resolved) {
+      resolvedPoints.push(resolved);
+    } else {
+      unresolvable.push(q);
+    }
+  }
+
+  if (unresolvable.length > 0 || resolvedPoints.length < 2) {
+    alert(`Could not resolve coordinates for "${unresolvable.join(', ') || 'selected points'}". Please enter valid city/town names, border crossings, or lat,lon coordinates.`);
     return;
   }
+
+  const startCoords = resolvedPoints[0];
+  const endCoords = resolvedPoints[resolvedPoints.length - 1];
 
   const calcBtn = $('routeCalcBtn');
   if (calcBtn) {
@@ -4963,7 +5405,8 @@ async function calculateRoute() {
   const waypointsSummary = $('routeWaypointsSummary');
 
   try {
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startCoords.lon},${startCoords.lat};${endCoords.lon},${endCoords.lat}?overview=full&geometries=geojson`;
+    const osrmCoordsStr = resolvedPoints.map(p => `${p.lon},${p.lat}`).join(';');
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoordsStr}?overview=full&geometries=geojson`;
 
     let routeGeoJson = null;
     let distanceKm = null;
@@ -4991,14 +5434,13 @@ async function calculateRoute() {
     }
 
     if (!routeGeoJson) {
-      // Clear route line & markers when real routing is unavailable
       state.currentRoute = null;
       if (state.map) {
         const source = state.map.getSource('route-source');
         if (source) source.setData({ type: 'FeatureCollection', features: [] });
       }
       if (state.routeMarkers) {
-        state.routeMarkers.forEach(m => { try { m.remove(); } catch(e) {} });
+        state.routeMarkers.forEach(m => { try { m.remove(); } catch (e) { } });
         state.routeMarkers = [];
       }
 
@@ -5009,7 +5451,7 @@ async function calculateRoute() {
         statusBadge.className = 'metric-status-badge status-unavailable';
       }
       if (waypointsSummary) {
-        waypointsSummary.textContent = `${startCoords.name} → ${endCoords.name} · DRIVE (UNAVAILABLE)`;
+        waypointsSummary.textContent = `${resolvedPoints.map(p => p.name).join(' → ')} · DRIVE (UNAVAILABLE)`;
       }
       if (resultsCard) {
         resultsCard.style.display = 'flex';
@@ -5017,10 +5459,10 @@ async function calculateRoute() {
       return;
     }
 
-    // Real route received
     state.currentRoute = {
       start: startCoords,
       end: endCoords,
+      points: resolvedPoints,
       geoJson: routeGeoJson,
       distanceKm,
       durationMin
@@ -5037,19 +5479,19 @@ async function calculateRoute() {
       statusBadge.className = 'metric-status-badge status-normal';
     }
     if (waypointsSummary) {
-      waypointsSummary.textContent = `${startCoords.name} → ${endCoords.name} · DRIVE`;
+      waypointsSummary.textContent = `${resolvedPoints.map(p => p.name).join(' → ')} · DRIVE`;
     }
 
     if (resultsCard) {
       resultsCard.style.display = 'flex';
     }
 
-    renderRouteOnMap(routeGeoJson, startCoords, endCoords);
+    renderRouteOnMap(routeGeoJson, resolvedPoints);
 
   } catch (err) {
     console.error('Route calculation error:', err);
     if (statusBadge) {
-      statusBadge.textContent = '⚠ ROUTING SERVICE UNAVAILABLE';
+      statusBadge.textContent = '⚠ ROUTING ERROR';
       statusBadge.className = 'metric-status-badge status-unavailable';
     }
   } finally {
@@ -5060,8 +5502,10 @@ async function calculateRoute() {
   }
 }
 
-function renderRouteOnMap(routeGeoJson, startCoords, endCoords) {
+function renderRouteOnMap(routeGeoJson, pointsOrStart, endCoords) {
   if (!state.map) return;
+
+  const points = Array.isArray(pointsOrStart) ? pointsOrStart : [pointsOrStart, endCoords].filter(Boolean);
 
   let source = state.map.getSource('route-source');
   if (!source) {
@@ -5088,29 +5532,28 @@ function renderRouteOnMap(routeGeoJson, startCoords, endCoords) {
   }
 
   if (state.routeMarkers) {
-    state.routeMarkers.forEach(m => { try { m.remove(); } catch(e) {} });
+    state.routeMarkers.forEach(m => { try { m.remove(); } catch (e) { } });
     state.routeMarkers = [];
   } else {
     state.routeMarkers = [];
   }
 
-  const elA = document.createElement('div');
-  elA.className = 'route-pin-marker route-pin-a';
-  elA.textContent = 'A';
-  elA.title = `Start: ${startCoords.name || 'Origin'}`;
-  const markerA = new maplibregl.Marker({ element: elA })
-    .setLngLat([startCoords.lon, startCoords.lat])
-    .addTo(state.map);
-  state.routeMarkers.push(markerA);
+  points.forEach((pt, idx) => {
+    const isStart = idx === 0;
+    const isEnd = idx === points.length - 1;
+    const pinLetter = String.fromCharCode(65 + Math.min(idx, 25));
 
-  const elB = document.createElement('div');
-  elB.className = 'route-pin-marker route-pin-b';
-  elB.textContent = 'B';
-  elB.title = `Destination: ${endCoords.name || 'Destination'}`;
-  const markerB = new maplibregl.Marker({ element: elB })
-    .setLngLat([endCoords.lon, endCoords.lat])
-    .addTo(state.map);
-  state.routeMarkers.push(markerB);
+    const el = document.createElement('div');
+    const pinType = isStart ? 'route-pin-a' : (isEnd ? 'route-pin-b' : 'route-pin-via');
+    el.className = `route-pin-marker ${pinType}`;
+    el.textContent = pinLetter;
+    el.title = `${isStart ? 'Start' : (isEnd ? 'Destination' : `Waypoint ${idx}`)}: ${pt.name || 'Location'}`;
+
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat([pt.lon, pt.lat])
+      .addTo(state.map);
+    state.routeMarkers.push(marker);
+  });
 
   const coordinates = routeGeoJson.geometry.coordinates;
   const bounds = coordinates.reduce((b, coord) => {
@@ -5131,7 +5574,7 @@ function clearRoute(resetInputs = true) {
   }
 
   if (state.routeMarkers) {
-    state.routeMarkers.forEach(m => { try { m.remove(); } catch(e) {} });
+    state.routeMarkers.forEach(m => { try { m.remove(); } catch (e) { } });
     state.routeMarkers = [];
   }
 
@@ -5164,6 +5607,7 @@ window.focusBorderCrossing = focusBorderCrossing;
 window.buildAlerts = buildAlerts;
 window.aggregateAndRenderAlerts = aggregateAndRenderAlerts;
 window.renderAlertLog = renderAlertLog;
+window.renderLiveAlertTicker = renderLiveAlertTicker;
 window.handleAlertClick = handleAlertClick;
 window.loadAlertHistory = loadAlertHistory;
 window.fetchAndRender = fetchAndRender;
@@ -5195,7 +5639,14 @@ window.TRAFFIC_RELEVANCE_TERMS = TRAFFIC_RELEVANCE_TERMS;
 window.renderRadiationMapMarkers = renderRadiationMapMarkers;
 window.renderEarthquakeMapMarkers = renderEarthquakeMapMarkers;
 window.renderNewsMapMarkers = renderNewsMapMarkers;
+window.extractNewsLocation = extractNewsLocation;
+window.cleanTextForNewsLocation = cleanTextForNewsLocation;
+window.KOSOVO_LOCATIONS = KOSOVO_LOCATIONS;
 window.buildNewsPopupHtml = buildNewsPopupHtml;
+window.buildNewsClusterPopupHtml = buildNewsClusterPopupHtml;
+window.openNewsClusterPopup = openNewsClusterPopup;
+window.zoomToNewsCluster = zoomToNewsCluster;
+window.createNewsClusterMarkerElement = createNewsClusterMarkerElement;
 window.openNewsPopup = openNewsPopup;
 window.closeNewsPopup = closeNewsPopup;
 window.renderAqiMapMarkers = renderAqiMapMarkers;
@@ -5212,5 +5663,6 @@ window.clusterGeoItems = clusterGeoItems;
 window.createClusterMarkerElement = createClusterMarkerElement;
 window.calculateRoute = calculateRoute;
 window.clearRoute = clearRoute;
+window.addRouteDestinationInput = addRouteDestinationInput;
 window.resolveLocationCoordinates = resolveLocationCoordinates;
 window.state = state;
