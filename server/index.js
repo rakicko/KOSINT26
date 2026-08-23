@@ -92,12 +92,13 @@ app.post('/api/preferences', (req, res) => {
 
 // ── API: Weather ─────────────────────────────────────────────────────────────
 app.get('/api/weather', async (req, res) => {
-  const { location = 'Prishtinë', lat, lon } = req.query;
+  const { location = 'Prishtinë', lat, lon, forceRefresh = 'false' } = req.query;
   try {
     const data = await fetchWeather({
       location,
       lat: lat ? parseFloat(lat) : undefined,
       lon: lon ? parseFloat(lon) : undefined,
+      forceRefresh: forceRefresh === 'true',
     });
     res.json(data);
   } catch (err) {

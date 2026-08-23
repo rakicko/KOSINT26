@@ -8,7 +8,25 @@ const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const axios = require('axios');
 
-const SESSION_FILE = path.join(__dirname, '.telegram_session');
+// Lifecycle States
+const ClientLifecycleState = Object.freeze({
+  IDLE: 'IDLE',
+  CONNECTING: 'CONNECTING',
+  CONNECTED: 'CONNECTED',
+  DISCONNECTING: 'DISCONNECTING',
+  DISCONNECTED: 'DISCONNECTED',
+  FAILED: 'FAILED'
+});
+
+// Environment Types
+const TelegramEnvironment = Object.freeze({
+  LOCAL: 'local',
+  PRODUCTION: 'production'
+});
+
+const SESSION_FILE_LOCAL = path.join(__dirname, '.telegram_session_local');
+const SESSION_FILE_LEGACY = path.join(__dirname, '.telegram_session');
+const LOCK_FILE_LOCAL = path.join(__dirname, '.telegram_local.lock');
 const ENV_FILE = path.join(__dirname, '../../.env');
 
 // Default public channels if not configured
@@ -19,61 +37,260 @@ let telegramCache = null;
 let lastFetchTime = 0;
 const DEFAULT_CACHE_TTL_MS = parseInt(process.env.TELEGRAM_CACHE_TTL_MS || '60000', 10); // 60 seconds
 
-// Singleton Telegram client instance to reuse connection
+// Singleton Telegram client instance state
 let activeClient = null;
-let clientConnecting = null;
+let clientConnectingPromise = null;
+let clientDisconnectingPromise = null;
+let lifecycleState = ClientLifecycleState.IDLE;
+let isShutdownRegistered = false;
+let localLockHeld = false;
 
 /**
- * Retrieve saved StringSession from environment or local session store
+ * Determine active runtime environment for Telegram sessions
+ * Resolves to 'production' or 'local'
  */
-function getSavedSession() {
-  const envSession = process.env.TELEGRAM_SESSION || process.env.TELEGRAM_STRING_SESSION;
-  if (envSession && envSession.trim()) {
-    return envSession.trim();
+function getTelegramEnvironment() {
+  const explicitEnv = (process.env.TELEGRAM_ENVIRONMENT || process.env.TELEGRAM_ENV || '').toLowerCase().trim();
+  if (explicitEnv === 'production' || explicitEnv === 'prod') {
+    return TelegramEnvironment.PRODUCTION;
   }
-  if (fs.existsSync(SESSION_FILE)) {
+  if (explicitEnv === 'local' || explicitEnv === 'development' || explicitEnv === 'dev' || explicitEnv === 'test') {
+    return TelegramEnvironment.LOCAL;
+  }
+
+  // Render environment auto-detection
+  const isRender = Boolean(
+    process.env.RENDER === 'true' ||
+    process.env.RENDER === '1' ||
+    process.env.RENDER_SERVICE_ID ||
+    process.env.IS_RENDER === 'true'
+  );
+  if (isRender) {
+    return TelegramEnvironment.PRODUCTION;
+  }
+
+  // NODE_ENV detection
+  const nodeEnv = (process.env.NODE_ENV || '').toLowerCase().trim();
+  if (nodeEnv === 'production') {
+    return TelegramEnvironment.PRODUCTION;
+  }
+
+  return TelegramEnvironment.LOCAL;
+}
+
+/**
+ * Retrieve saved StringSession strictly for the given environment
+ * Never allows cross-environment fallback between local and production
+ */
+function getSavedSession(targetEnv) {
+  const env = targetEnv || getTelegramEnvironment();
+
+  if (env === TelegramEnvironment.PRODUCTION) {
+    const prodSession = process.env.TELEGRAM_SESSION_PRODUCTION || process.env.TELEGRAM_SESSION_PROD;
+    if (prodSession && prodSession.trim()) {
+      return prodSession.trim();
+    }
+    // Strict isolation: NEVER fall back to local session or files in production
+    return '';
+  }
+
+  // Local environment
+  const localSession = process.env.TELEGRAM_SESSION_LOCAL || process.env.TELEGRAM_SESSION_DEV;
+  if (localSession && localSession.trim()) {
+    return localSession.trim();
+  }
+
+  // Local session file fallback strictly for local dev
+  if (fs.existsSync(SESSION_FILE_LOCAL)) {
     try {
-      const fileSession = fs.readFileSync(SESSION_FILE, 'utf8').trim();
+      const fileSession = fs.readFileSync(SESSION_FILE_LOCAL, 'utf8').trim();
       if (fileSession) return fileSession;
     } catch (e) {}
   }
+
+  if (fs.existsSync(SESSION_FILE_LEGACY)) {
+    try {
+      const fileSession = fs.readFileSync(SESSION_FILE_LEGACY, 'utf8').trim();
+      if (fileSession) return fileSession;
+    } catch (e) {}
+  }
+
+  // Strict isolation: NEVER fall back to production session in local dev
   return '';
 }
 
 /**
- * Persist StringSession locally into .env and .telegram_session
+ * Validate Telegram configuration for the target environment
  */
-function persistSession(sessionString) {
-  if (!sessionString || typeof sessionString !== 'string') return;
-  const trimmed = sessionString.trim();
+function validateTelegramConfiguration(targetEnv) {
+  const env = targetEnv || getTelegramEnvironment();
+  const apiIdStr = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
+  const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const sessionStr = getSavedSession(env);
 
-  // 1. Save to local .telegram_session file
-  try {
-    fs.writeFileSync(SESSION_FILE, trimmed, { encoding: 'utf8', mode: 0o600 });
-  } catch (err) {
-    console.warn('[telegram-auth] Could not write to .telegram_session file:', err.message);
+  const errors = [];
+
+  if (!apiIdStr && !apiHash && !botToken) {
+    errors.push('TELEGRAM_API_ID and TELEGRAM_API_HASH (or TELEGRAM_BOT_TOKEN) are not configured in environment variables.');
+    return { valid: false, env, errors, mode: 'UNCONFIGURED' };
   }
 
-  // 2. Update or append TELEGRAM_SESSION in .env file
+  if (apiIdStr && !apiHash) errors.push('TELEGRAM_API_HASH is missing in environment variables.');
+  if (!apiIdStr && apiHash) errors.push('TELEGRAM_API_ID is missing in environment variables.');
+
+  if (apiIdStr) {
+    const apiId = parseInt(apiIdStr, 10);
+    if (isNaN(apiId) || apiId <= 0) {
+      errors.push('TELEGRAM_API_ID must be a valid positive integer.');
+    }
+  }
+
+  if (apiIdStr && apiHash) {
+    if (!sessionStr && !botToken) {
+      if (env === TelegramEnvironment.PRODUCTION) {
+        errors.push('TELEGRAM_SESSION_PRODUCTION (or TELEGRAM_SESSION_PROD) is required in production (Render). Refusing to fallback to local session to prevent AUTH_KEY_DUPLICATED.');
+      } else {
+        errors.push('TELEGRAM_SESSION_LOCAL is required in local development. Run "node skills/telegram-monitor/skill.js --auth" to create a local session.');
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    env,
+    errors,
+    sessionConfigured: Boolean(sessionStr),
+    botTokenConfigured: Boolean(botToken),
+    mode: botToken ? 'BOT_API' : (sessionStr ? 'MTPROTO' : 'UNCONFIGURED')
+  };
+}
+
+/**
+ * Check if a process ID is actively running
+ */
+function isPidAlive(pid) {
+  if (!pid || typeof pid !== 'number') return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === 'EPERM';
+  }
+}
+
+/**
+ * Acquire local session lock to prevent dual local processes (Antigravity/nodemon)
+ * from invoking MTProto concurrently with the same local session key
+ */
+function acquireLocalLock() {
+  const env = getTelegramEnvironment();
+  if (env !== TelegramEnvironment.LOCAL) {
+    return { acquired: true };
+  }
+
+  if (localLockHeld) {
+    return { acquired: true };
+  }
+
+  try {
+    if (fs.existsSync(LOCK_FILE_LOCAL)) {
+      try {
+        const content = fs.readFileSync(LOCK_FILE_LOCAL, 'utf8');
+        const lockData = JSON.parse(content);
+        const lockPid = lockData.pid;
+
+        if (lockPid && lockPid !== process.pid && isPidAlive(lockPid)) {
+          return {
+            acquired: false,
+            heldByPid: lockPid,
+            reason: `Local Telegram session is already locked by active Node process (PID: ${lockPid}). Simultaneous connections cause 406 AUTH_KEY_DUPLICATED.`
+          };
+        }
+      } catch (parseErr) {
+        // Stale or invalid lock file, safe to overwrite
+      }
+    }
+
+    const payload = JSON.stringify({
+      pid: process.pid,
+      env,
+      createdAt: new Date().toISOString(),
+      timestamp: Date.now()
+    }, null, 2);
+
+    fs.writeFileSync(LOCK_FILE_LOCAL, payload, { encoding: 'utf8', mode: 0o600 });
+    localLockHeld = true;
+    return { acquired: true };
+  } catch (err) {
+    console.warn('[telegram-monitor] Warning: Could not write local lock file:', err.message);
+    return { acquired: true, warning: err.message };
+  }
+}
+
+/**
+ * Release local session lock
+ */
+function releaseLocalLock() {
+  if (!localLockHeld && !fs.existsSync(LOCK_FILE_LOCAL)) {
+    return;
+  }
+
+  try {
+    if (fs.existsSync(LOCK_FILE_LOCAL)) {
+      const content = fs.readFileSync(LOCK_FILE_LOCAL, 'utf8');
+      const lockData = JSON.parse(content);
+      if (lockData.pid === process.pid) {
+        fs.unlinkSync(LOCK_FILE_LOCAL);
+      }
+    }
+  } catch (err) {
+    // Ignore release errors during shutdown
+  } finally {
+    localLockHeld = false;
+  }
+}
+
+/**
+ * Persist StringSession locally into .env and session store
+ */
+function persistSession(sessionString, targetEnv = TelegramEnvironment.LOCAL) {
+  if (!sessionString || typeof sessionString !== 'string') return;
+  const trimmed = sessionString.trim();
+  const isProd = targetEnv === TelegramEnvironment.PRODUCTION;
+  const sessionVar = isProd ? 'TELEGRAM_SESSION_PRODUCTION' : 'TELEGRAM_SESSION_LOCAL';
+
+  // 1. Save to local session file for local dev
+  if (!isProd) {
+    try {
+      fs.writeFileSync(SESSION_FILE_LOCAL, trimmed, { encoding: 'utf8', mode: 0o600 });
+    } catch (err) {
+      console.warn('[telegram-auth] Could not write to .telegram_session_local file:', err.message);
+    }
+  }
+
+  // 2. Update or append key in .env file
   try {
     let envContent = '';
     if (fs.existsSync(ENV_FILE)) {
       envContent = fs.readFileSync(ENV_FILE, 'utf8');
     }
 
-    if (/^TELEGRAM_SESSION=.*$/m.test(envContent)) {
-      envContent = envContent.replace(/^TELEGRAM_SESSION=.*$/m, `TELEGRAM_SESSION=${trimmed}`);
-    } else if (envContent.includes('TELEGRAM_SESSION=')) {
-      envContent = envContent.replace(/TELEGRAM_SESSION=.*/, `TELEGRAM_SESSION=${trimmed}`);
+    const regex = new RegExp(`^${sessionVar}=.*$`, 'm');
+    if (regex.test(envContent)) {
+      envContent = envContent.replace(regex, `${sessionVar}=${trimmed}`);
+    } else if (envContent.includes(`${sessionVar}=`)) {
+      const inlineRegex = new RegExp(`${sessionVar}=.*`);
+      envContent = envContent.replace(inlineRegex, `${sessionVar}=${trimmed}`);
     } else {
-      envContent = envContent ? `${envContent.trimEnd()}\nTELEGRAM_SESSION=${trimmed}\n` : `TELEGRAM_SESSION=${trimmed}\n`;
+      envContent = envContent ? `${envContent.trimEnd()}\n${sessionVar}=${trimmed}\n` : `${sessionVar}=${trimmed}\n`;
     }
     fs.writeFileSync(ENV_FILE, envContent, { encoding: 'utf8' });
   } catch (err) {
-    console.warn('[telegram-auth] Could not update .env file:', err.message);
+    console.warn(`[telegram-auth] Could not update ${sessionVar} in .env file:`, err.message);
   }
 
-  process.env.TELEGRAM_SESSION = trimmed;
+  process.env[sessionVar] = trimmed;
 }
 
 /**
@@ -94,7 +311,6 @@ function askQuestion(promptText) {
 
 /**
  * Clean and normalize channel usernames
- * Strips '@' or 'https://t.me/' prefixes
  */
 function normalizeChannelName(rawName) {
   if (!rawName || typeof rawName !== 'string') return '';
@@ -218,7 +434,7 @@ function extractMediaInfo(msg, channelUsername = '') {
     };
   }
 
-  // Geo / Venue (Read-only metadata, strictly non-interactive)
+  // Geo / Venue
   if (className === 'MessageMediaGeo' || className === 'MessageMediaVenue') {
     return {
       hasMedia: true,
@@ -239,80 +455,200 @@ function extractMediaInfo(msg, channelUsername = '') {
 }
 
 /**
- * Initialize or get active MTProto client
+ * Initialize or get active singleton MTProto client
+ * Protected against race conditions, duplicate connections, and multi-process collisions
  */
-async function getTelegramClient() {
-  const apiIdStr = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
-  const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
-  const sessionStr = getSavedSession();
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+async function getTelegramClient(customClientFactory = null) {
+  const env = getTelegramEnvironment();
 
-  if (!apiIdStr || !apiHash) {
-    return null;
-  }
-
-  const apiId = parseInt(apiIdStr, 10);
-  if (isNaN(apiId) || apiId <= 0) {
-    return null;
-  }
-
-  if (activeClient && activeClient.connected) {
+  // 1. If already connected, reuse existing singleton immediately
+  if (lifecycleState === ClientLifecycleState.CONNECTED && activeClient && activeClient.connected) {
     return activeClient;
   }
 
-  if (clientConnecting) {
-    return clientConnecting;
+  // 2. If connection is in progress, coalesce concurrent calls to the same Promise
+  if (clientConnectingPromise) {
+    return clientConnectingPromise;
   }
 
-  clientConnecting = (async () => {
+  // 3. If disconnecting, wait until disconnection finishes before reconnecting
+  if (clientDisconnectingPromise) {
+    await clientDisconnectingPromise;
+  }
+
+  // 4. Validate environment-specific configuration
+  const validation = validateTelegramConfiguration(env);
+  if (!validation.valid) {
+    validation.errors.forEach(err => console.warn(`[telegram-monitor] ${err}`));
+    lifecycleState = ClientLifecycleState.FAILED;
+    return null;
+  }
+
+  // 5. Local lock check
+  if (env === TelegramEnvironment.LOCAL) {
+    const lockResult = acquireLocalLock();
+    if (!lockResult.acquired) {
+      console.warn(`[telegram-monitor] ${lockResult.reason}`);
+      lifecycleState = ClientLifecycleState.FAILED;
+      return null;
+    }
+  }
+
+  const apiId = parseInt(process.env.TELEGRAM_API_ID || process.env.TG_API_ID, 10);
+  const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
+  const sessionStr = getSavedSession(env);
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+  console.log(`[telegram-monitor] Initializing Telegram singleton [Environment: ${env.toUpperCase()} | SessionMode: ${botToken ? 'BOT_API' : (env === TelegramEnvironment.PRODUCTION ? 'TELEGRAM_SESSION_PRODUCTION' : 'TELEGRAM_SESSION_LOCAL')}]`);
+
+  lifecycleState = ClientLifecycleState.CONNECTING;
+
+  async function connectClient() {
     try {
-      const stringSession = new StringSession(sessionStr);
-      const client = new TelegramClient(stringSession, apiId, apiHash, {
-        connectionRetries: 2,
-        timeout: 10,
-        autoReconnect: true,
-        useWSS: false
-      });
+      let client;
+      if (typeof customClientFactory === 'function') {
+        client = customClientFactory({ sessionStr, apiId, apiHash, botToken, env });
+      } else {
+        const stringSession = new StringSession(sessionStr || '');
+        client = new TelegramClient(stringSession, apiId, apiHash, {
+          connectionRetries: 3,
+          timeout: 10,
+          autoReconnect: true,
+          useWSS: false
+        });
+      }
 
       if (botToken) {
-        await client.start({
-          botAuthToken: botToken
-        });
+        if (!client.connected) {
+          await client.start({ botAuthToken: botToken });
+        }
       } else {
-        await client.connect();
-
-        if (!sessionStr) {
-          console.warn('[telegram-monitor] No saved session string. Run "node skills/telegram-monitor/skill.js --auth" to authenticate.');
-          activeClient = null;
-          return null;
+        if (!client.connected) {
+          await client.connect();
         }
 
         const isAuth = await client.checkAuthorization();
         if (!isAuth) {
-          console.warn('[telegram-monitor] Telegram session is not authorized. Run "node skills/telegram-monitor/skill.js --auth" to log in.');
+          console.warn(`[telegram-monitor] Telegram session is not authorized in ${env} environment.`);
+          lifecycleState = ClientLifecycleState.FAILED;
+          try { await client.disconnect(); } catch (e) {}
+          releaseLocalLock();
           activeClient = null;
           return null;
         }
       }
 
       activeClient = client;
-      return client;
+      lifecycleState = ClientLifecycleState.CONNECTED;
+      ensureShutdownHandlersRegistered();
+      return activeClient;
     } catch (err) {
-      console.warn('[telegram-monitor] Failed to connect MTProto client:', err.message);
+      lifecycleState = ClientLifecycleState.FAILED;
       activeClient = null;
-      throw err;
-    } finally {
-      clientConnecting = null;
-    }
-  })();
+      releaseLocalLock();
 
-  return clientConnecting;
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('AUTH_KEY_DUPLICATED')) {
+        console.error(`[telegram-monitor] 🛑 CRITICAL 406: AUTH_KEY_DUPLICATED detected in ${env} environment.`);
+        console.error(`[telegram-monitor] Ensure Render uses TELEGRAM_SESSION_PRODUCTION and localhost uses TELEGRAM_SESSION_LOCAL with distinct session keys.`);
+      } else {
+        console.warn(`[telegram-monitor] Failed to connect MTProto client (${env}):`, errMsg);
+      }
+      return null;
+    }
+  }
+
+  clientConnectingPromise = connectClient().finally(() => {
+    clientConnectingPromise = null;
+  });
+
+  return clientConnectingPromise;
+}
+
+/**
+ * Gracefully disconnect singleton Telegram client
+ */
+async function disconnectTelegramClient() {
+  if (clientDisconnectingPromise) {
+    return clientDisconnectingPromise;
+  }
+
+  if (!activeClient && lifecycleState !== ClientLifecycleState.CONNECTING) {
+    lifecycleState = ClientLifecycleState.DISCONNECTED;
+    releaseLocalLock();
+    return;
+  }
+
+  lifecycleState = ClientLifecycleState.DISCONNECTING;
+
+  async function performDisconnect() {
+    try {
+      if (activeClient && typeof activeClient.disconnect === 'function') {
+        await activeClient.disconnect();
+      }
+    } catch (err) {
+      console.warn('[telegram-monitor] Disconnect error:', err.message);
+    } finally {
+      activeClient = null;
+      clientConnectingPromise = null;
+      lifecycleState = ClientLifecycleState.DISCONNECTED;
+      releaseLocalLock();
+    }
+  }
+
+  clientDisconnectingPromise = performDisconnect().finally(() => {
+    clientDisconnectingPromise = null;
+  });
+
+  return clientDisconnectingPromise;
+}
+
+
+/**
+ * Register process signal handlers for graceful shutdown once
+ */
+function ensureShutdownHandlersRegistered() {
+  if (isShutdownRegistered) return;
+  isShutdownRegistered = true;
+
+  const handleShutdown = async (signal) => {
+    try {
+      await disconnectTelegramClient();
+    } catch (e) {}
+  };
+
+  process.once('SIGINT', () => handleShutdown('SIGINT'));
+  process.once('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.once('beforeExit', () => handleShutdown('beforeExit'));
+}
+
+/**
+ * Testing helper to reset internal singleton state
+ */
+function _resetTelegramClientForTesting() {
+  activeClient = null;
+  clientConnectingPromise = null;
+  clientDisconnectingPromise = null;
+  lifecycleState = ClientLifecycleState.IDLE;
+  isShutdownRegistered = false;
+  releaseLocalLock();
+}
+
+/**
+ * Get current client lifecycle state
+ */
+function getClientLifecycleState() {
+  return lifecycleState;
 }
 
 /**
  * Interactive one-time login flow for Telegram user accounts
  */
 async function authenticateInteractive() {
+  const isProd = process.argv.includes('--prod') || process.argv.includes('--production');
+  const targetEnv = isProd ? TelegramEnvironment.PRODUCTION : TelegramEnvironment.LOCAL;
+  const sessionVarName = isProd ? 'TELEGRAM_SESSION_PRODUCTION' : 'TELEGRAM_SESSION_LOCAL';
+
   const apiIdStr = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
   const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
 
@@ -327,10 +663,10 @@ async function authenticateInteractive() {
     process.exit(1);
   }
 
-  console.log('\n🔐 Telegram MTProto One-Time Authentication');
-  console.log('─────────────────────────────────────────────');
+  console.log(`\n🔐 Telegram MTProto Authentication [Target: ${targetEnv.toUpperCase()} -> ${sessionVarName}]`);
+  console.log('─────────────────────────────────────────────────────────────────');
 
-  const existingSession = getSavedSession();
+  const existingSession = getSavedSession(targetEnv);
   const stringSession = new StringSession(existingSession);
 
   const client = new TelegramClient(stringSession, apiId, apiHash, {
@@ -343,10 +679,9 @@ async function authenticateInteractive() {
   try {
     await client.connect();
 
-    // Check if existing session is already authorized
     const isAuthorized = await client.checkAuthorization();
     if (isAuthorized) {
-      console.log('✅ Existing session is already authenticated and active!');
+      console.log('✅ Existing session for this environment is already authenticated and active!');
       try {
         const me = await client.getMe();
         if (me) {
@@ -354,13 +689,13 @@ async function authenticateInteractive() {
         }
       } catch (e) {}
       const savedStr = client.session.save();
-      persistSession(savedStr);
-      console.log('💾 Session verified and saved locally.');
+      persistSession(savedStr, targetEnv);
+      console.log(`💾 Session verified and saved to ${sessionVarName}.`);
       await client.disconnect();
       return;
     }
 
-    console.log('Initiating Telegram authentication with official MTProto servers...\n');
+    console.log(`Initiating Telegram authentication for ${targetEnv.toUpperCase()} with official MTProto servers...\n`);
 
     await client.start({
       phoneNumber: async () => {
@@ -393,9 +728,14 @@ async function authenticateInteractive() {
     } catch (e) {}
 
     const savedSessionString = client.session.save();
-    persistSession(savedSessionString);
-    console.log('💾 Session saved to .env and local session store.');
-    console.log('✨ You can now run "node skills/telegram-monitor/skill.js" or start SENTINEL without logging in again.\n');
+    persistSession(savedSessionString, targetEnv);
+
+    console.log(`💾 Session saved into ${sessionVarName}.`);
+    if (isProd) {
+      console.log('🚀 For Render deployment: Set TELEGRAM_SESSION_PRODUCTION (or TELEGRAM_SESSION_PROD) in Render Dashboard -> Environment Variables.\n');
+    } else {
+      console.log('✨ Local development is now configured. You can start SENTINEL without sharing session keys.\n');
+    }
 
     await client.disconnect();
   } catch (err) {
@@ -550,7 +890,6 @@ async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
   const msgId = parseInt(messageId, 10);
   if (isNaN(msgId) || msgId <= 0) return null;
 
-  // Security whitelist check: only allow configured channels
   const allowedChannels = getConfiguredChannels();
   if (!allowedChannels.includes(normalized)) {
     console.warn(`[telegram-monitor] Media request rejected for unconfigured channel: ${channel}`);
@@ -559,13 +898,11 @@ async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
 
   const cacheKey = `${normalized}:${msgId}`;
 
-  // Check demo mode
   if (demo) {
     const svgBuf = getDemoThumbnailSvg(normalized, 'photo');
     return { buffer: svgBuf, mimeType: 'image/svg+xml' };
   }
 
-  // Check memory cache
   const cached = mediaThumbnailCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < MEDIA_CACHE_TTL_MS)) {
     return { buffer: cached.buffer, mimeType: cached.mimeType };
@@ -582,7 +919,6 @@ async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
     const msg = messages && messages[0];
     if (!msg || !msg.media) return null;
 
-    // Download ONLY the small thumbnail
     let thumbBuffer = null;
     try {
       thumbBuffer = await client.downloadMedia(msg, {
@@ -590,7 +926,6 @@ async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
         workers: 1
       });
     } catch (e) {
-      // Fallback to smallest available photo size if thumb:1 is not indexed
       try {
         thumbBuffer = await client.downloadMedia(msg, {
           thumb: 0,
@@ -619,7 +954,7 @@ async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
 }
 
 /**
- * Generate simulated demo posts for standalone CLI testing
+ * Generate simulated demo posts for standalone testing
  */
 function getDemoData(channels = DEFAULT_CHANNELS) {
   const now = Date.now();
@@ -693,19 +1028,6 @@ function getDemoData(channels = DEFAULT_CHANNELS) {
 
 /**
  * Main skill entry point: Fetches recent posts from configured public Telegram channels
- * 
- * Returns normalized structure:
- * {
- *   skill: 'telegram-monitor',
- *   status: 'LIVE_DATA' | 'NO_POSTS' | 'NOT_CONFIGURED' | 'UNAVAILABLE' | 'INVALID_DATA',
- *   source: 'Telegram Official API',
- *   updatedAt: '...',
- *   channels: ['koridorsrb', 'srpskinat', 'istokinfo'],
- *   count: N,
- *   posts: [ ... ],
- *   message: '...',
- *   isCached: boolean
- * }
  */
 async function fetchTelegram({
   channels = null,
@@ -729,13 +1051,11 @@ async function fetchTelegram({
 
   const limit = Math.max(1, Math.min(20, parseInt(limitPerChannel || process.env.TELEGRAM_LIMIT_PER_CHANNEL || '10', 10)));
 
-  // Check if credentials are configured
-  const apiId = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
-  const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const sessionStr = getSavedSession();
+  // Validate environment configuration
+  const env = getTelegramEnvironment();
+  const validation = validateTelegramConfiguration(env);
 
-  if ((!apiId || !apiHash) && !botToken) {
+  if (!validation.valid) {
     return {
       skill: 'telegram-monitor',
       status: 'NOT_CONFIGURED',
@@ -744,21 +1064,8 @@ async function fetchTelegram({
       channels: targetChannels,
       count: 0,
       posts: [],
-      message: 'Telegram API is not configured. Set TELEGRAM_API_ID and TELEGRAM_API_HASH (or TELEGRAM_BOT_TOKEN) in environment variables.',
-      isCached: false
-    };
-  }
-
-  if (apiId && apiHash && !sessionStr && !botToken) {
-    return {
-      skill: 'telegram-monitor',
-      status: 'NOT_CONFIGURED',
-      source: 'Telegram Official API',
-      updatedAt: new Date().toISOString(),
-      channels: targetChannels,
-      count: 0,
-      posts: [],
-      message: 'Telegram API credentials configured, but session is not authenticated. Run "node skills/telegram-monitor/skill.js --auth" to log in.',
+      error: 'NOT_CONFIGURED',
+      message: validation.errors[0] || 'Telegram API is not configured.',
       isCached: false
     };
   }
@@ -766,6 +1073,9 @@ async function fetchTelegram({
   try {
     let posts = [];
     let fetchErrors = [];
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const apiId = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
+    const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
 
     // Approach 1: Telegram MTProto Official Client
     if (apiId && apiHash) {
@@ -776,15 +1086,26 @@ async function fetchTelegram({
           posts = result.posts;
           fetchErrors = result.errors;
         } else if (!botToken) {
-          fetchErrors.push({ general: 'Session not authenticated. Run "node skills/telegram-monitor/skill.js --auth" to authenticate.' });
+          fetchErrors.push({
+            general: env === TelegramEnvironment.PRODUCTION
+              ? 'Production session is not configured or unauthorized.'
+              : 'Local session not authenticated. Run "node skills/telegram-monitor/skill.js --auth" to authenticate.'
+          });
         }
       } catch (clientErr) {
-        console.warn('[telegram-monitor] MTProto fetch failed:', clientErr.message);
-        fetchErrors.push({ general: clientErr.message });
+        const msg = clientErr.message || '';
+        if (msg.includes('AUTH_KEY_DUPLICATED')) {
+          fetchErrors.push({
+            general: `406 AUTH_KEY_DUPLICATED: Session key collision between local and production. Ensure ${env === 'production' ? 'TELEGRAM_SESSION_PRODUCTION' : 'TELEGRAM_SESSION_LOCAL'} is unique to this environment.`
+          });
+        } else {
+          console.warn('[telegram-monitor] MTProto fetch failed:', msg);
+          fetchErrors.push({ general: msg });
+        }
       }
     }
 
-    // Approach 2: Telegram Bot API fallback if MTProto failed or not available
+    // Approach 2: Telegram Bot API fallback
     if (posts.length === 0 && botToken) {
       try {
         const result = await fetchViaBotApi(botToken, targetChannels);
@@ -858,6 +1179,16 @@ module.exports = {
   authenticateInteractive,
   getSavedSession,
   persistSession,
+  getTelegramEnvironment,
+  validateTelegramConfiguration,
+  getTelegramClient,
+  disconnectTelegramClient,
+  getClientLifecycleState,
+  acquireLocalLock,
+  releaseLocalLock,
+  _resetTelegramClientForTesting,
+  ClientLifecycleState,
+  TelegramEnvironment,
   DEFAULT_CHANNELS
 };
 

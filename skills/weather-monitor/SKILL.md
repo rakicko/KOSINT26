@@ -59,7 +59,14 @@ description: |
 - Weather code 95-99 → THUNDERSTORM
 - Visibility < 1km → LOW_VISIBILITY
 
+## Features & Resilience
+- **In-Memory Caching**: 15-minute TTL per normalized location/coordinates (`WEATHER_CACHE_TTL_MS`).
+- **In-Flight Request Deduplication**: Multiple parallel requests for the same city coalesce into a single outbound API call.
+- **Built-in Kosovo Geocoding Dictionary**: Direct coordinate lookup for standard Kosovo cities without rate-limited Nominatim requests.
+- **HTTP 429 Protection & Stale-Cache Fallback**: Never drops to demo data if previously cached data exists when Open-Meteo returns 429 Too Many Requests.
+- **Commercial API Key Support**: Supports `OPEN_METEO_API_KEY` for dedicated endpoints.
+
 ## Usage
 ```bash
-node skills/weather-monitor/skill.js --test --location "Mumbai"
+node skills/weather-monitor/skill.js --location "Mitrovica, Kosovo"
 ```

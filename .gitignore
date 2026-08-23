@@ -7,4 +7,5 @@ server/db.json
 # Runtime caches
 skills/*/.border_cache.json
 skills/*/.wildfire_cache.json
-skills/*/.telegram_session
+skills/*/.telegram_session*
+skills/*/.telegram*.lock
