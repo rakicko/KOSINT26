@@ -550,6 +550,16 @@ body {
   z-index: 0;
 }
 
+/* ── Guaranteed MapLibre Geographic Marker Anchoring ──────────────────────── */
+.maplibregl-marker,
+.mapbox-marker {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  will-change: transform;
+  pointer-events: auto !important;
+}
+
 /* ── OSIRIS AI Compact Map Controls (Right Side) ─────────────────────────── */
 .maplibregl-ctrl-top-right,
 .mapboxgl-ctrl-top-right {
