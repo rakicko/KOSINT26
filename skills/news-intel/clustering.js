@@ -55,11 +55,15 @@ function normalizeUrl(url) {
   }
 }
 
+const HEADLINE_NORM_CACHE = new Map();
+
 /**
- * Normalizes headline for similarity comparisons
+ * Normalizes headline for similarity comparisons (Memoized for high throughput)
  */
 function normalizeHeadline(title) {
   if (!title || typeof title !== 'string') return '';
+  if (HEADLINE_NORM_CACHE.has(title)) return HEADLINE_NORM_CACHE.get(title);
+
   let text = title.toLowerCase();
 
   text = text.replace(/\[(video|foto|e plotë|audio|live|pamje|lajm i fundit)\]/gi, '');
@@ -69,7 +73,11 @@ function normalizeHeadline(title) {
   text = text.replace(/^(rtk|express|koha|telegrafi|tanjug|indeksonline|reporteri|kossev|mitropol):\s*/gi, '');
 
   const norm = normalizeMultilingualText(text);
-  return norm.transliteratedText.replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().replace(/\s+/g, ' ');
+  const result = norm.transliteratedText.replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().replace(/\s+/g, ' ');
+  if (HEADLINE_NORM_CACHE.size < 10000) {
+    HEADLINE_NORM_CACHE.set(title, result);
+  }
+  return result;
 }
 
 /**
@@ -508,7 +516,15 @@ function explainEventMatch(articleA, articleB) {
 function clusterEventArticles(articles) {
   if (!Array.isArray(articles) || articles.length === 0) return [];
 
-  const dedupedInput = deduplicateNewsItems(articles);
+  // Deterministically sort chronologically so clustering is permutation invariant
+  const sortedArticles = [...articles].sort((a, b) => {
+    const tA = new Date(a.publishedAt || 0).getTime();
+    const tB = new Date(b.publishedAt || 0).getTime();
+    if (tA !== tB) return tA - tB;
+    return String(a.id || a.title || '').localeCompare(String(b.id || b.title || ''));
+  });
+
+  const dedupedInput = deduplicateNewsItems(sortedArticles);
   const clusters = [];
 
   for (const article of dedupedInput) {
@@ -526,23 +542,51 @@ function clusterEventArticles(articles) {
         continue;
       }
 
-      // 2. Reject match if explicit locations conflict (e.g. Pejë vs Prizren)
+      // 2. Separate case explicit declaration check
+      const artText = `${article.title || ''} ${article.description || ''}`.toLowerCase();
+      const isExplicitSeparateCase = /u drugom slučaju|u drugom slucaju|u odvojenom slučaju|u odvojenom slucaju|në një rast tjetër|ne nje rast tjeter|në rast tjetër|ne rast tjeter|in a separate case|in another case|in a different case/i.test(artText);
+      if (isExplicitSeparateCase) {
+        // If explicitly a separate case, do not merge with existing cluster unless identical unique people/topic
+        const sharedPeople = cluster.entities.filter(e => e.startsWith('person:') && allEntities.includes(e));
+        if (sharedPeople.length === 0) {
+          continue;
+        }
+      }
+
+      // 3. Location compatibility check
       const locsA = sig.locations.map(l => l.id);
       const locsB = cluster.signals.locations.map(l => l.id);
-      if (locsA.length > 0 && locsB.length > 0) {
+      const specificLocsA = locsA.filter(l => l !== 'loc:kosovo');
+      const specificLocsB = locsB.filter(l => l !== 'loc:kosovo');
+      if (specificLocsA.length > 0 && specificLocsB.length > 0) {
+        const hasCompatibleLoc = specificLocsA.some(la => specificLocsB.some(lb => areLocationsCompatible(la, lb)));
+        if (!hasCompatibleLoc) {
+          continue;
+        }
+      } else if (locsA.length > 0 && locsB.length > 0) {
         const hasCompatibleLoc = locsA.some(la => locsB.some(lb => areLocationsCompatible(la, lb)));
         if (!hasCompatibleLoc) {
           continue;
         }
       }
 
-      // 3. Reject match if distinct event types conflict (e.g. accident vs weapon seizure vs espionage)
+      // 4. Event Type compatibility check
       const typesA = sig.eventTypes.map(e => e.id);
       const typesB = cluster.signals.eventTypes.map(e => e.id);
       if (typesA.length > 0 && typesB.length > 0) {
         const hasCompatibleType = typesA.some(ta => typesB.some(tb => areEventTypesCompatible(ta, tb)));
         if (!hasCompatibleType) {
           continue;
+        }
+      }
+
+      // 5. Topic Conflict check
+      const topicsA = sig.topics.map(t => t.id);
+      const topicsB = cluster.entities.filter(e => e.startsWith('topic:'));
+      if (topicsA.length > 0 && topicsB.length > 0) {
+        const hasSharedTopic = topicsA.some(ta => topicsB.includes(ta));
+        if (!hasSharedTopic) {
+          continue; // Disjoint specific topics
         }
       }
 
@@ -609,6 +653,29 @@ function clusterEventArticles(articles) {
         const sim = calculateTitleSimilarity(article.title, cluster.primary.title);
         if (sim >= 0.55) {
           isMatch = true;
+        }
+      }
+
+      // Rule E: Compatible Location + Compatible Lifecycle Event Types
+      if (!isMatch) {
+        const hasCompatibleLoc = (locsA.length > 0 && locsB.length > 0 && locsA.some(la => locsB.some(lb => areLocationsCompatible(la, lb)))) ||
+          shared.some(e => e.startsWith('loc:'));
+
+        if (hasCompatibleLoc) {
+          const hasLifecycleCompatible = typesA.some(ta => typesB.some(tb => areEventTypesCompatible(ta, tb)));
+          if (hasLifecycleCompatible) {
+            const bothMentionWeapons = (typesA.some(t => t.includes('weapon')) && typesB.some(t => t.includes('weapon'))) ||
+              (/oruž|oruz|armë|arme|weapon/i.test(artText) && /oruž|oruz|armë|arme|weapon/i.test(`${cluster.primary.title} ${cluster.primary.description || ''}`));
+            const bothMentionArrestRelease = (typesA.some(t => t === 'event:arrest' || t === 'event:release') && typesB.some(t => t === 'event:arrest' || t === 'event:release')) ||
+              (/osumnjičen|uhapš|pušten|arrest|release/i.test(artText) && /osumnjičen|uhapš|pušten|arrest|release/i.test(`${cluster.primary.title} ${cluster.primary.description || ''}`));
+            const bothMentionDrugs = (typesA.some(t => t.includes('drug')) && typesB.some(t => t.includes('drug'))) ||
+              (/drog|kanabis|marihuan|narkotik/i.test(artText) && /drog|kanabis|marihuan|narkotik/i.test(`${cluster.primary.title} ${cluster.primary.description || ''}`));
+
+            const sim = calculateTitleSimilarity(article.title, cluster.primary.title);
+            if (bothMentionWeapons || bothMentionArrestRelease || bothMentionDrugs || sim >= 0.35) {
+              isMatch = true;
+            }
+          }
         }
       }
 

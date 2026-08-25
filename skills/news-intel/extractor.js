@@ -4,6 +4,7 @@ const {
   CANONICAL_ENTITIES,
   CANONICAL_EVENT_TYPES,
   NEGATION_LEXICON,
+  TEMPORAL_LEXICON,
   NUMBER_WORDS_MAP
 } = require('./ontology');
 const {
@@ -13,40 +14,198 @@ const {
 
 // Precompiled Regex Patterns for Entity and Event extraction
 const COMPILED_PATTERNS = new Map();
+const COMPILED_GLOBAL_PATTERNS = new Map();
 
 function getOrCreateRegex(phrase, exactWord = true) {
   const key = `${phrase}_${exactWord ? '1' : '0'}`;
-  if (!COMPILED_PATTERNS.has(key)) {
-    COMPILED_PATTERNS.set(key, buildPhraseRegex(phrase, { exactWord }));
+  let re = COMPILED_PATTERNS.get(key);
+  if (!re) {
+    re = buildPhraseRegex(phrase, { exactWord });
+    COMPILED_PATTERNS.set(key, re);
   }
-  return COMPILED_PATTERNS.get(key);
+  return re;
 }
 
+function getOrCreateGlobalRegex(phrase, exactWord = true) {
+  const key = `${phrase}_${exactWord ? '1' : '0'}`;
+  let re = COMPILED_GLOBAL_PATTERNS.get(key);
+  if (!re) {
+    const baseRe = getOrCreateRegex(phrase, exactWord);
+    re = new RegExp(baseRe.source, 'giu');
+    COMPILED_GLOBAL_PATTERNS.set(key, re);
+  }
+  return re;
+}
+
+// Flat fast lookup tables for negations
+const ALL_NEGATIONS = [
+  ...(NEGATION_LEXICON.sr || []),
+  ...(NEGATION_LEXICON.al || []),
+  ...(NEGATION_LEXICON.en || [])
+].map(neg => ({
+  word: neg,
+  re: getOrCreateRegex(neg, true)
+}));
+
+const DENIAL_SUBSTRINGS = [
+  'demantov', 'demantoi', 'demanton', 'moho', 'deni', 'odbac', 'netac', 'netač', 'false', 'refut'
+];
+
 /**
- * Checks for negation in the immediate window (up to 4 tokens) around a target match
+ * Pre-compiled and Pre-normalized Ontology Definitions for Zero Runtime Overhead
+ */
+const PREPARED_PEOPLE = Object.entries(CANONICAL_ENTITIES.people).map(([key, ent]) => ({
+  key,
+  ent,
+  disqualifiers: ent.disqualifiers || [],
+  patterns: [
+    ...(ent.variants.sr || []),
+    ...(ent.variants.al || []),
+    ...(ent.variants.en || []),
+    ...(ent.variants.cyrillic || [])
+  ].map(v => getOrCreateRegex(normalizeMultilingualText(v).transliteratedText, true))
+}));
+
+const PREPARED_INSTITUTIONS = Object.entries(CANONICAL_ENTITIES.institutions).map(([key, inst]) => ({
+  key,
+  inst,
+  disqualifiers: inst.disqualifiers || [],
+  patterns: [
+    ...(inst.variants.sr || []),
+    ...(inst.variants.al || []),
+    ...(inst.variants.en || []),
+    ...(inst.variants.cyrillic || [])
+  ].map(v => getOrCreateRegex(normalizeMultilingualText(v).transliteratedText, true))
+}));
+
+const PREPARED_LOCATIONS = Object.entries(CANONICAL_ENTITIES.locations).map(([key, loc]) => ({
+  key,
+  loc,
+  disqualifiers: loc.disqualifiers || [],
+  patterns: [
+    ...(loc.variants.sr || []),
+    ...(loc.variants.al || []),
+    ...(loc.variants.en || []),
+    ...(loc.variants.cyrillic || [])
+  ].map(v => getOrCreateRegex(normalizeMultilingualText(v).transliteratedText, true))
+}));
+
+const PREPARED_TOPICS = Object.entries(CANONICAL_ENTITIES.topics).map(([key, topic]) => ({
+  key,
+  topic,
+  disqualifiers: topic.disqualifiers || [],
+  patterns: [
+    ...(topic.variants.sr || []),
+    ...(topic.variants.al || []),
+    ...(topic.variants.en || [])
+  ].map(v => getOrCreateRegex(normalizeMultilingualText(v).transliteratedText, true))
+}));
+
+const PREPARED_EVENT_TYPES = Object.entries(CANONICAL_EVENT_TYPES).map(([key, ev]) => ({
+  key,
+  ev,
+  disqualifiers: ev.disqualifiers || [],
+  variants: [
+    ...(ev.variants.sr || []),
+    ...(ev.variants.al || []),
+    ...(ev.variants.en || []),
+    ...(ev.variants.cyrillic || [])
+  ].map(v => {
+    const vNorm = normalizeMultilingualText(v).transliteratedText;
+    return {
+      rawVariant: v,
+      normLength: vNorm.length,
+      regex: getOrCreateGlobalRegex(vNorm, true)
+    };
+  })
+}));
+
+/**
+ * Checks for negation in the immediate clause window around a target match
  */
 function checkScopedNegation(text, matchIndex, matchLength) {
-  const windowStart = Math.max(0, matchIndex - 35);
-  const windowEnd = Math.min(text.length, matchIndex + matchLength + 35);
-  const beforeWindow = text.slice(windowStart, matchIndex).toLowerCase();
-  const afterWindow = text.slice(matchIndex + matchLength, windowEnd).toLowerCase();
-  const context = `${beforeWindow} [TARGET] ${afterWindow}`;
+  const maxLookback = Math.max(0, matchIndex - 45);
+  let precedingText = text.slice(maxLookback, matchIndex);
 
-  const allNegations = [
-    ...NEGATION_LEXICON.sr,
-    ...NEGATION_LEXICON.al,
-    ...NEGATION_LEXICON.en
-  ];
+  const lastPunctIdx = Math.max(
+    precedingText.lastIndexOf('.'),
+    precedingText.lastIndexOf(';'),
+    precedingText.lastIndexOf('!'),
+    precedingText.lastIndexOf('?')
+  );
+  if (lastPunctIdx !== -1) {
+    precedingText = precedingText.slice(lastPunctIdx + 1);
+  }
 
-  for (const neg of allNegations) {
-    const negRe = getOrCreateRegex(neg, true);
-    if (negRe.test(beforeWindow) || negRe.test(afterWindow)) {
-      return { isNegated: true, negationWord: neg, context };
+  const lastContrastiveIdx = Math.max(
+    precedingText.lastIndexOf(' ali '),
+    precedingText.lastIndexOf(', ali '),
+    precedingText.lastIndexOf(' por '),
+    precedingText.lastIndexOf(', por '),
+    precedingText.lastIndexOf(' but '),
+    precedingText.lastIndexOf(', but '),
+    precedingText.lastIndexOf(' već '),
+    precedingText.lastIndexOf(', već '),
+    precedingText.lastIndexOf(' međutim '),
+    precedingText.lastIndexOf(', međutim '),
+    precedingText.lastIndexOf(' medjutim '),
+    precedingText.lastIndexOf(' however ')
+  );
+  if (lastContrastiveIdx !== -1) {
+    precedingText = precedingText.slice(lastContrastiveIdx);
+  }
+
+  const maxLookahead = Math.min(text.length, matchIndex + matchLength + 55);
+  let followingText = text.slice(matchIndex + matchLength, maxLookahead);
+
+  const hasDenialInFollowing = DENIAL_SUBSTRINGS.some(dp => followingText.includes(dp));
+
+  if (!hasDenialInFollowing) {
+    const nextPunctIdx = followingText.search(/[\.;!\?]|,\s*(?:ali|por|but|već|dok)/i);
+    if (nextPunctIdx !== -1) {
+      followingText = followingText.slice(0, nextPunctIdx);
     }
   }
 
-  return { isNegated: false, negationWord: null, context };
+  for (let i = 0; i < ALL_NEGATIONS.length; i++) {
+    const { word, re } = ALL_NEGATIONS[i];
+    if (re.test(precedingText) || re.test(followingText)) {
+      return {
+        isNegated: true,
+        negationWord: word,
+        context: `${precedingText} [TARGET] ${followingText}`.trim()
+      };
+    }
+  }
+
+  return {
+    isNegated: false,
+    negationWord: null,
+    context: `${precedingText} [TARGET] ${followingText}`.trim()
+  };
 }
+
+/**
+ * Checks whether an entity or event is disqualified by a known false-positive context (Fast substring lookup)
+ */
+function isDisqualified(disqualifiers, fullOriginalLower, fullTranslit) {
+  if (!disqualifiers || disqualifiers.length === 0) return false;
+  for (let i = 0; i < disqualifiers.length; i++) {
+    const dq = disqualifiers[i];
+    if (fullTranslit.includes(dq) || fullOriginalLower.includes(dq)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Pre-compiled global quantity regexes
+const WEIGHT_REGEX = /(?:^|[^\p{L}\p{N}])(\d+(?:[\.,]\d+)?)\s*(kg|kilogram|kilogramë|kilograma|kilograms|g|gram|gramë|grama|grams|tona|tonë|tone|ton|tonne|tonnes|t)(?=[^\p{L}\p{N}]|$)/giu;
+const MONEY_PREFIX_REGEX = /€\s*(\d{1,3}(?:[\.,]\d{3})*(?:[\.,]\d{2})?|\d+)/gi;
+const MONEY_WORD_REGEX = /(\d+(?:[\.,]\d+)?)\s*(mijë|mije|hiljada|hiljade|tisuca|tisuća|thousand|milion|miliona|milionë|milione|million)\s*(euro|eur|€|evra|evro|dinar|dinara)?/gi;
+const MONEY_STANDARD_REGEX = /(?:^|[^\p{L}\p{N}])(\d{1,3}(?:[\.,]\d{3})*(?:[\.,]\d{1,2})?|\d+)\s*(euro|eur|evra|evro|dinar|dinara)(?=[^\p{L}\p{N}]|$)/giu;
+const PERSON_CONTEXT_REGEX = /(?:^|[^\p{L}\p{N}])(\d+|[a-zçëčćžš]+)\s*(osumnjičen[a-z]*|osumnjicen[a-z]*|osob[a-z]*|lic[a-z]*|të\s*arrestuar[a-z]*|te\s*arrestuar[a-z]*|të\s*dyshuar[a-z]*|te\s*dyshuar[a-z]*|të\s*plagosur[a-z]*|të\s*vrarë|person[a-z]*|njerëz[a-z]*|suspect[a-z]*|people|persons|arrested|injured|killed)(?=[^\p{L}\p{N}]|$)/giu;
+const COMMENTARY_REGEX = /\b(rekao|izjavio|poručio|istakao|kaže|tvrdi|ocenio|ocenjuje|pisao|tražio|najavio|upozorio|apelovao|komentarisao|reagovao|saopštila|saopštio|saopšteno|thotë|deklaroi|deklaron|tha|paralajmëroi|vlerëson|kërkoi|kërkon|shkroi|njoftoi|komentoi|reagoi|analitičari|analistët|eksperti|ekspertët|opozita|opozicija|komentar|said|stated|warned|demanded|urged|announced)\b/iu;
 
 /**
  * Extracts Weights & Volumes from text using matchAll()
@@ -56,17 +215,21 @@ function extractQuantities(text) {
   const quantities = [];
   const normalized = text.toLowerCase();
 
-  // Pattern for weight: e.g. 80 kg, 80kg, 100 g, 1.5 tona, 2 tonë
-  const weightRegex = /(?:^|[^\p{L}\p{N}])(\d+(?:[\.,]\d+)?)\s*(kg|kilogram|kilogramë|kilograma|g|gram|gramë|grama|tona|tonë|tone|ton)(?=[^\p{L}\p{N}]|$)/giu;
-  for (const match of normalized.matchAll(weightRegex)) {
-    const rawVal = match[1].replace(',', '.');
-    const num = parseFloat(rawVal);
+  for (const match of normalized.matchAll(WEIGHT_REGEX)) {
+    const rawVal = match[1];
     const unit = match[2].toLowerCase();
+
+    let num;
+    if (/\.\d{3}$/.test(rawVal) && unit.startsWith('kg')) {
+      num = parseFloat(rawVal.replace('.', ''));
+    } else {
+      num = parseFloat(rawVal.replace(',', '.'));
+    }
 
     if (!isNaN(num)) {
       let valueInGrams = num;
       if (unit.startsWith('kg') || unit.startsWith('kilo')) valueInGrams = num * 1000;
-      else if (unit.startsWith('ton')) valueInGrams = num * 1000000;
+      else if (unit.startsWith('ton') || unit === 't') valueInGrams = num * 1000000;
 
       quantities.push({
         type: 'weight',
@@ -90,9 +253,7 @@ function extractMoney(text) {
   const moneyItems = [];
   const normalized = text.toLowerCase();
 
-  // Pattern 1: Symbol prefix e.g. €12,000, € 100.000
-  const prefixRegex = /€\s*(\d{1,3}(?:[\.,]\d{3})*(?:[\.,]\d{2})?|\d+)/gi;
-  for (const match of normalized.matchAll(prefixRegex)) {
+  for (const match of normalized.matchAll(MONEY_PREFIX_REGEX)) {
     const cleanDigits = match[1].replace(/[\.,](?=\d{3})/g, '').replace(',', '.');
     const amount = parseFloat(cleanDigits);
     if (!isNaN(amount)) {
@@ -105,9 +266,7 @@ function extractMoney(text) {
     }
   }
 
-  // Pattern 2: Word amounts e.g. 100 mijë euro, 1 milion euro, 50 hiljada evra
-  const wordAmountRegex = /(\d+(?:[\.,]\d+)?)\s*(mijë|mije|hiljada|hiljade|tisuca|tisuća|thousand|milion|miliona|milionë|milione|million)\s*(euro|eur|€|evra|evro|dinar|dinara)?/gi;
-  for (const match of normalized.matchAll(wordAmountRegex)) {
+  for (const match of normalized.matchAll(MONEY_WORD_REGEX)) {
     const baseNum = parseFloat(match[1].replace(',', '.'));
     const multWord = match[2].toLowerCase();
     const currWord = (match[3] || 'EUR').toUpperCase();
@@ -126,11 +285,8 @@ function extractMoney(text) {
     }
   }
 
-  // Pattern 3: Standard numeric e.g. 100.000 euro, 12,500 EUR, 5000 evra
-  const standardRegex = /(?:^|[^\p{L}\p{N}])(\d{1,3}(?:[\.,]\d{3})*(?:[\.,]\d{1,2})?|\d+)\s*(euro|eur|evra|evro|dinar|dinara)(?=[^\p{L}\p{N}]|$)/giu;
-  for (const match of normalized.matchAll(standardRegex)) {
+  for (const match of normalized.matchAll(MONEY_STANDARD_REGEX)) {
     const rawMatch = match[0].trim();
-    // Avoid double counting if already captured in word amounts
     if (!moneyItems.some(m => rawMatch.includes(m.raw) || m.raw.includes(rawMatch))) {
       const cleanDigits = match[1].replace(/[\.,](?=\d{3})/g, '').replace(',', '.');
       const amount = parseFloat(cleanDigits);
@@ -150,23 +306,23 @@ function extractMoney(text) {
 }
 
 /**
- * Extracts Person Count (arbitrary numbers, text numbers, bounds like at least 3)
+ * Extracts Person Count
  */
 function extractPersonsCount(text) {
   if (!text) return [];
   const counts = [];
   const normalized = text.toLowerCase();
 
-  // Pattern A: Bounded expressions ("at least 3", "najmanje 4", "më së paku 5", "dozens", "several")
   const boundedPatterns = [
     { re: /(?:najmanje|najmanje\s*od|at\s*least|më\s*së\s*paku|me\s*se\s*paku|jo\s*më\s*pak\s*se)\s*(\d+|[a-zçëčćžš]+)\s*(?:osoba|osobe|osumnjičen|osumnjičena|lica|të\s*arrestuar|të\s*dyshuar|persona|njerëz|suspects|people|persons|arrested)?/giu, type: 'min' },
-    { re: /(?:više\s*od|preko|more\s*than|më\s*shumë\s*se|me\s*shume\s*se)\s*(\d+|[a-zçëčćžš]+)\s*(?:osoba|osobe|osumnjičen|lica|persona|të\s*dyshuar|suspects|people|persons)?/giu, type: 'min' },
+    { re: /(?:više\s*od|preko|more\s*than|më\s*shumë\s*se|me\s*shume\s*se)\s*(\d+|[a-zçëčćžš]+)\s*(?:osoba|osobe|osumnjičen|lica|persona|të\s*dyshuar|suspects|people|persons)?/giu, type: 'more' },
     { re: /(?:do|maksimalno|up\s*to|deri\s*në|deri\s*ne)\s*(\d+|[a-zçëčćžš]+)\s*(?:osoba|osobe|osumnjičen|lica|persona|të\s*dyshuar|suspects|people|persons)?/giu, type: 'max' },
     { re: /\b(desetine|dhjetëra|dhjetera|dozens\s*of|dozens)\s*(?:osoba|persona|njerëzish|people|suspects)?\b/giu, type: 'approx_dozens' },
     { re: /\b(nekoliko|disa|several)\s*(?:osoba|persona|njerëz|people|suspects)?\b/giu, type: 'approx_several' }
   ];
 
-  for (const bp of boundedPatterns) {
+  for (let i = 0; i < boundedPatterns.length; i++) {
+    const bp = boundedPatterns[i];
     for (const match of normalized.matchAll(bp.re)) {
       if (bp.type === 'approx_dozens') {
         counts.push({ exact: false, min: 10, max: 99, raw: match[0].trim() });
@@ -181,7 +337,7 @@ function extractPersonsCount(text) {
         if (!isNaN(num)) {
           counts.push({
             exact: false,
-            min: bp.type === 'min' ? num : null,
+            min: bp.type === 'min' ? num : (bp.type === 'more' ? num + 1 : null),
             max: bp.type === 'max' ? num : null,
             raw: match[0].trim()
           });
@@ -190,9 +346,7 @@ function extractPersonsCount(text) {
     }
   }
 
-  // Pattern B: Exact counts with persons/suspects/arrested (e.g. "6 suspects", "12 injured", "tri osobe")
-  const personContextRegex = /(?:^|[^\p{L}\p{N}])(\d+|[a-zçëčćžš]+)\s*(osumnjičen[a-z]*|osumnjicen[a-z]*|osob[a-z]*|lic[a-z]*|të\s*arrestuar[a-z]*|te\s*arrestuar[a-z]*|të\s*dyshuar[a-z]*|te\s*dyshuar[a-z]*|të\s*plagosur[a-z]*|të\s*vrarë|person[a-z]*|njerëz[a-z]*|suspect[a-z]*|people|persons|arrested|injured|killed)(?=[^\p{L}\p{N}]|$)/giu;
-  for (const match of normalized.matchAll(personContextRegex)) {
+  for (const match of normalized.matchAll(PERSON_CONTEXT_REGEX)) {
     const rawMatch = match[0].trim();
     if (!counts.some(c => c.raw.includes(rawMatch) || rawMatch.includes(c.raw))) {
       const valToken = match[1].toLowerCase();
@@ -216,14 +370,13 @@ function extractPersonsCount(text) {
 
 /**
  * Central Intelligence Signal Extractor
- * Extracts canonical entities, events, locations, quantities, and modality signals from news content.
  */
 function extractIntelligenceSignals(title = '', description = '') {
   const normTitle = normalizeMultilingualText(title);
   const normDesc = normalizeMultilingualText(description);
   const fullOriginal = `${title} ${description}`.trim();
+  const fullOriginalLower = fullOriginal.toLowerCase();
   const fullTranslit = `${normTitle.transliteratedText} ${normDesc.transliteratedText}`.trim();
-  const fullFolded = `${normTitle.foldedText} ${normDesc.foldedText}`.trim();
 
   const entities = new Set();
   const people = [];
@@ -234,21 +387,16 @@ function extractIntelligenceSignals(title = '', description = '') {
   const negations = [];
   const actionSignals = [];
   const commentarySignals = [];
+  const temporalSignals = [];
 
   // 1. Extract People
-  for (const [key, ent] of Object.entries(CANONICAL_ENTITIES.people)) {
-    let matched = false;
-    const allVariants = [
-      ...(ent.variants.sr || []),
-      ...(ent.variants.al || []),
-      ...(ent.variants.en || []),
-      ...(ent.variants.cyrillic || [])
-    ];
+  for (let i = 0; i < PREPARED_PEOPLE.length; i++) {
+    const { key, ent, disqualifiers, patterns } = PREPARED_PEOPLE[i];
+    if (isDisqualified(disqualifiers, fullOriginalLower, fullTranslit)) continue;
 
-    for (const variant of allVariants) {
-      const vNorm = normalizeMultilingualText(variant).transliteratedText;
-      const re = getOrCreateRegex(vNorm, true);
-      if (re.test(fullTranslit)) {
+    let matched = false;
+    for (let j = 0; j < patterns.length; j++) {
+      if (patterns[j].test(fullTranslit)) {
         matched = true;
         break;
       }
@@ -261,19 +409,13 @@ function extractIntelligenceSignals(title = '', description = '') {
   }
 
   // 2. Extract Institutions
-  for (const [key, inst] of Object.entries(CANONICAL_ENTITIES.institutions)) {
-    let matched = false;
-    const allVariants = [
-      ...(inst.variants.sr || []),
-      ...(inst.variants.al || []),
-      ...(inst.variants.en || []),
-      ...(inst.variants.cyrillic || [])
-    ];
+  for (let i = 0; i < PREPARED_INSTITUTIONS.length; i++) {
+    const { key, inst, disqualifiers, patterns } = PREPARED_INSTITUTIONS[i];
+    if (isDisqualified(disqualifiers, fullOriginalLower, fullTranslit)) continue;
 
-    for (const variant of allVariants) {
-      const vNorm = normalizeMultilingualText(variant).transliteratedText;
-      const re = getOrCreateRegex(vNorm, true);
-      if (re.test(fullTranslit)) {
+    let matched = false;
+    for (let j = 0; j < patterns.length; j++) {
+      if (patterns[j].test(fullTranslit)) {
         matched = true;
         break;
       }
@@ -286,19 +428,13 @@ function extractIntelligenceSignals(title = '', description = '') {
   }
 
   // 3. Extract Locations with Hierarchy
-  for (const [key, loc] of Object.entries(CANONICAL_ENTITIES.locations)) {
-    let matched = false;
-    const allVariants = [
-      ...(loc.variants.sr || []),
-      ...(loc.variants.al || []),
-      ...(loc.variants.en || []),
-      ...(loc.variants.cyrillic || [])
-    ];
+  for (let i = 0; i < PREPARED_LOCATIONS.length; i++) {
+    const { key, loc, disqualifiers, patterns } = PREPARED_LOCATIONS[i];
+    if (isDisqualified(disqualifiers, fullOriginalLower, fullTranslit)) continue;
 
-    for (const variant of allVariants) {
-      const vNorm = normalizeMultilingualText(variant).transliteratedText;
-      const re = getOrCreateRegex(vNorm, true);
-      if (re.test(fullTranslit)) {
+    let matched = false;
+    for (let j = 0; j < patterns.length; j++) {
+      if (patterns[j].test(fullTranslit)) {
         matched = true;
         break;
       }
@@ -317,18 +453,13 @@ function extractIntelligenceSignals(title = '', description = '') {
   }
 
   // 4. Extract Topics
-  for (const [key, topic] of Object.entries(CANONICAL_ENTITIES.topics)) {
-    let matched = false;
-    const allVariants = [
-      ...(topic.variants.sr || []),
-      ...(topic.variants.al || []),
-      ...(topic.variants.en || [])
-    ];
+  for (let i = 0; i < PREPARED_TOPICS.length; i++) {
+    const { key, topic, disqualifiers, patterns } = PREPARED_TOPICS[i];
+    if (isDisqualified(disqualifiers, fullOriginalLower, fullTranslit)) continue;
 
-    for (const variant of allVariants) {
-      const vNorm = normalizeMultilingualText(variant).transliteratedText;
-      const re = getOrCreateRegex(vNorm, true);
-      if (re.test(fullTranslit)) {
+    let matched = false;
+    for (let j = 0; j < patterns.length; j++) {
+      if (patterns[j].test(fullTranslit)) {
         matched = true;
         break;
       }
@@ -341,45 +472,40 @@ function extractIntelligenceSignals(title = '', description = '') {
   }
 
   // 5. Extract Canonical Event Types with Scoped Negation & Modality
-  for (const [key, ev] of Object.entries(CANONICAL_EVENT_TYPES)) {
-    let matched = false;
-    let matchedVariant = null;
-    let isNegated = false;
-    let negationInfo = null;
+  for (let i = 0; i < PREPARED_EVENT_TYPES.length; i++) {
+    const { key, ev, disqualifiers, variants } = PREPARED_EVENT_TYPES[i];
+    if (isDisqualified(disqualifiers, fullOriginalLower, fullTranslit)) continue;
 
-    const allVariants = [
-      ...(ev.variants.sr || []),
-      ...(ev.variants.al || []),
-      ...(ev.variants.en || []),
-      ...(ev.variants.cyrillic || [])
-    ];
-
-    for (const variant of allVariants) {
-      const vNorm = normalizeMultilingualText(variant).transliteratedText;
-      const re = getOrCreateRegex(vNorm, true);
-      const match = fullTranslit.match(re);
-      if (match) {
-        matched = true;
-        matchedVariant = variant;
-        const matchIdx = match.index || fullTranslit.indexOf(vNorm);
-        const scoped = checkScopedNegation(fullTranslit, matchIdx, vNorm.length);
-        if (scoped.isNegated) {
-          isNegated = true;
-          negationInfo = scoped;
-        }
-        break;
+    const occurrences = [];
+    for (let j = 0; j < variants.length; j++) {
+      const { rawVariant, normLength, regex } = variants[j];
+      regex.lastIndex = 0;
+      let match;
+      while ((match = regex.exec(fullTranslit)) !== null) {
+        const matchIdx = match.index || 0;
+        const scoped = checkScopedNegation(fullTranslit, matchIdx, normLength);
+        occurrences.push({
+          variant: rawVariant,
+          matchIndex: matchIdx,
+          isNegated: scoped.isNegated,
+          negationInfo: scoped
+        });
+        if (!regex.global) break;
       }
     }
 
-    if (matched) {
-      // Determine Modality (MENTION, CONFIRMED, DENIED, RESOLVED)
+    if (occurrences.length > 0) {
+      const positiveOccurrences = occurrences.filter(o => !o.isNegated);
+      const isOverallNegated = positiveOccurrences.length === 0;
+      const primaryOcc = positiveOccurrences[0] || occurrences[0];
+
       let modality = 'CONFIRMED';
-      if (isNegated) {
+      if (isOverallNegated) {
         modality = 'DENIED';
         negations.push({
           eventType: key,
-          negationWord: negationInfo.negationWord,
-          context: negationInfo.context
+          negationWord: primaryOcc.negationInfo.negationWord,
+          context: primaryOcc.negationInfo.context
         });
       } else if (key === 'event:release' || key === 'event:meeting_held' || key === 'event:meeting_cancellation') {
         modality = 'RESOLVED';
@@ -392,7 +518,7 @@ function extractIntelligenceSignals(title = '', description = '') {
         baseSeverity: ev.baseSeverity,
         defaultScore: ev.defaultScore,
         actionType: ev.actionType,
-        matchedVariant,
+        matchedVariant: primaryOcc.variant,
         modality
       });
       actionSignals.push(key);
@@ -404,29 +530,51 @@ function extractIntelligenceSignals(title = '', description = '') {
   const money = extractMoney(fullOriginal);
   const personsCount = extractPersonsCount(fullOriginal);
 
-  // Add semantic quantity anchors into entities
-  quantities.forEach(q => {
+  for (let i = 0; i < quantities.length; i++) {
+    const q = quantities[i];
     if (q.unit === 'g') {
       const kg = Math.round(q.value / 1000);
       entities.add(`qty:${kg}kg`);
     }
-  });
+  }
 
-  money.forEach(m => {
-    entities.add(`qty:${Math.round(m.value)}eur`);
-  });
+  for (let i = 0; i < money.length; i++) {
+    entities.add(`qty:${Math.round(money[i].value)}eur`);
+  }
 
-  personsCount.forEach(p => {
+  for (let i = 0; i < personsCount.length; i++) {
+    const p = personsCount[i];
     if (p.exact && p.count) {
       entities.add(`qty:${p.count}persons`);
     } else if (p.min) {
       entities.add(`qty:min${p.min}persons`);
     }
-  });
+  }
 
-  // 7. Extract Commentary & Speech Signals
-  const commentaryRegex = /\b(rekao|izjavio|poručio|istakao|kaže|tvrdi|ocenio|ocenjuje|pisao|tražio|najavio|upozorio|apelovao|komentarisao|reagovao|thotë|deklaroi|deklaron|tha|paralajmëroi|vlerëson|kërkoi|kërkon|shkroi|njoftoi|komentoi|reagoi|analitičari|analistët|eksperti|ekspertët|opozita|opozicija|komentar|said|stated|warned|demanded|urged)\b/iu;
-  if (commentaryRegex.test(normTitle.transliteratedText)) {
+  // 7. Extract Temporal Signals
+  if (TEMPORAL_LEXICON) {
+    for (let i = 0; i < TEMPORAL_LEXICON.historical.length; i++) {
+      if (fullTranslit.includes(TEMPORAL_LEXICON.historical[i])) {
+        temporalSignals.push('HISTORICAL_REFERENCE');
+        break;
+      }
+    }
+    for (let i = 0; i < TEMPORAL_LEXICON.planned.length; i++) {
+      if (fullTranslit.includes(TEMPORAL_LEXICON.planned[i])) {
+        temporalSignals.push('FUTURE_PLANNED');
+        break;
+      }
+    }
+    for (let i = 0; i < TEMPORAL_LEXICON.completed.length; i++) {
+      if (fullTranslit.includes(TEMPORAL_LEXICON.completed[i])) {
+        temporalSignals.push('COMPLETED');
+        break;
+      }
+    }
+  }
+
+  // 8. Extract Commentary & Speech Signals
+  if (COMMENTARY_REGEX.test(normTitle.transliteratedText) || COMMENTARY_REGEX.test(normDesc.transliteratedText)) {
     commentarySignals.push('speech_statement');
   }
 
@@ -441,7 +589,7 @@ function extractIntelligenceSignals(title = '', description = '') {
     money,
     personsCount,
     negations,
-    temporalSignals: [],
+    temporalSignals,
     commentarySignals,
     actionSignals
   };

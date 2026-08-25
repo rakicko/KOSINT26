@@ -10,6 +10,7 @@ const CANONICAL_ENTITIES = {
       id: 'person:albin_kurti',
       label: 'Albin Kurti',
       role: 'Prime Minister of Kosovo',
+      disqualifiers: ['kurt miller', 'kurt cobain', 'kurt westergaard'],
       variants: {
         sr: ['albin kurti', 'kurti', 'kurtija', 'kurtiju', 'kurtijem', 'kurtit'],
         al: ['albin kurti', 'kurti', 'kurtit', 'kurti-t', 'kurtin', 'kryeministri kurti'],
@@ -43,6 +44,7 @@ const CANONICAL_ENTITIES = {
       id: 'person:aleksandar_vucic',
       label: 'Aleksandar Vučić',
       role: 'President of Serbia',
+      disqualifiers: ['vuk karadžić', 'vuk karadzic', 'vuk jeremić', 'vuk jeremic', 'vuk samotnjak', 'vuk je', 'vukovi'],
       variants: {
         sr: ['aleksandar vučić', 'vučić', 'vucic', 'vučića', 'vucica', 'vučiću'],
         al: ['aleksandar vuçiq', 'vuçiq', 'vucic', 'vuçiqit'],
@@ -183,14 +185,15 @@ const CANONICAL_ENTITIES = {
   locations: {
     'loc:mitrovica': {
       id: 'loc:mitrovica',
-      name: 'Mitrovica',
+      name: 'Mitrovicë / Mitrovica',
       municipality: 'Mitrovica',
       isNorth: true,
+      disqualifiers: ['mitropolija', 'mitropolit', 'mitropolije'],
       variants: {
-        sr: ['mitrovica', 'mitrovici', 'mitrovice', 'kosovska mitrovica'],
-        al: ['mitrovicë', 'mitrovica', 'mitrovice', 'mitrovicën'],
-        en: ['mitrovica'],
-        cyrillic: ['митровица', 'митровици', 'митровице']
+        sr: ['mitrovica', 'mitrovici', 'mitrovice', 'mitrovicom', 'kosovska mitrovica', 'kosovskoj mitrovici'],
+        al: ['mitrovicë', 'mitrovica', 'mitrovice', 'mitrovicës', 'mitrovicën'],
+        en: ['mitrovica', 'mitrovice'],
+        cyrillic: ['митровица', 'митровици', 'митровице', 'косовска митровица']
       }
     },
     'loc:mitrovica_north': {
@@ -236,6 +239,7 @@ const CANONICAL_ENTITIES = {
       name: 'Zvečan / Zveçan',
       municipality: 'Zvečan',
       isNorth: true,
+      disqualifiers: ['zvečarka', 'zvecarka', 'zvečarke', 'zvecarke'],
       variants: {
         sr: ['zvečan', 'zvećan', 'zvecan', 'zvečanu', 'zvečana'],
         al: ['zveçan', 'zveqan', 'zveçani', 'zveçanit'],
@@ -285,6 +289,7 @@ const CANONICAL_ENTITIES = {
       name: 'Zubin Potok',
       municipality: 'Zubin Potok',
       isNorth: true,
+      disqualifiers: ['zubna ordinacija', 'zubni lekar', 'zubne ordinacije', 'zubobolja'],
       variants: {
         sr: ['zubin potok', 'zubinom potoku', 'zubina potoka', 'zubin-potok'],
         al: ['zubin potok', 'zubin potokut', 'zubin-potok'],
@@ -333,11 +338,12 @@ const CANONICAL_ENTITIES = {
       name: 'Pejë / Peć',
       municipality: 'Peć',
       isNorth: false,
+      disqualifiers: ['pećina', 'pecina', 'pećine', 'pecine', 'pećini', 'pecini', 'pećinski', 'peć na drva', 'peć na pelet', 'peć za grejanje'],
       variants: {
         sr: ['peć', 'pec', 'peći', 'peci'],
         al: ['pejë', 'peja', 'peje', 'pejës', 'pejën'],
         en: ['pec', 'peja'],
-        cyrillic: ['пећ', 'пећи']
+        cyrillic: ['пећ', 'пеći']
       }
     },
     'loc:prizren': {
@@ -370,10 +376,34 @@ const CANONICAL_ENTITIES = {
       municipality: 'Gnjilane',
       isNorth: false,
       variants: {
-        sr: ['gnjilane', 'gnjilan', 'gnjilanu'],
+        sr: ['gnjilane', 'gnjilanu', 'gnjilana'],
         al: ['gjilan', 'gjilani', 'gjilanit'],
         en: ['gjilan', 'gnjilane'],
         cyrillic: ['гњилане', 'гњилану']
+      }
+    },
+    'loc:gracanica': {
+      id: 'loc:gracanica',
+      name: 'Gračanica / Graçanicë',
+      municipality: 'Gračanica',
+      isNorth: false,
+      variants: {
+        sr: ['gračanica', 'gracanica', 'gračanici'],
+        al: ['graçanicë', 'gracanice', 'graçanica'],
+        en: ['gracanica'],
+        cyrillic: ['грачаница', 'грачаници']
+      }
+    },
+    'loc:strpce': {
+      id: 'loc:strpce',
+      name: 'Štrpce / Shtërpcë',
+      municipality: 'Štrpce',
+      isNorth: false,
+      variants: {
+        sr: ['štrpce', 'strpce', 'štrpcu'],
+        al: ['shtërpcë', 'shterpce', 'shtërpca'],
+        en: ['strpce', 'shterpce'],
+        cyrillic: ['штрпце', 'штрпцу']
       }
     },
     'loc:gjakova': {
@@ -383,161 +413,21 @@ const CANONICAL_ENTITIES = {
       isNorth: false,
       variants: {
         sr: ['đakovica', 'djakovica', 'đakovici'],
-        al: ['gjakovë', 'gjakova', 'gjakove', 'gjakovës'],
+        al: ['gjakovë', 'gjakova', 'gjakovës'],
         en: ['gjakova', 'djakovica'],
         cyrillic: ['ђаковица', 'ђаковици']
       }
     },
-    'loc:podujevo': {
-      id: 'loc:podujevo',
-      name: 'Podujevë / Podujevo',
-      municipality: 'Podujevo',
+    'loc:kosovo': {
+      id: 'loc:kosovo',
+      name: 'Kosovo',
+      municipality: null,
       isNorth: false,
       variants: {
-        sr: ['podujevo', 'podujevu', 'podujeva'],
-        al: ['podujevë', 'podujeva', 'podujeve', 'podujevës'],
-        en: ['podujevo', 'podujeva'],
-        cyrillic: ['подујево', 'подујеву']
-      }
-    },
-    'loc:drenas': {
-      id: 'loc:drenas',
-      name: 'Drenas / Glogovac',
-      municipality: 'Glogovac',
-      isNorth: false,
-      variants: {
-        sr: ['glogovac', 'glogovcu'],
-        al: ['drenas', 'drenasi', 'gllogoc'],
-        en: ['drenas', 'glogovac'],
-        cyrillic: ['глоговац']
-      }
-    },
-    'loc:vushtrri': {
-      id: 'loc:vushtrri',
-      name: 'Vushtrri / Vučitrn',
-      municipality: 'Vučitrn',
-      isNorth: false,
-      variants: {
-        sr: ['vučitrn', 'vucitrn', 'vučitrnu'],
-        al: ['vushtrri', 'vushtrria', 'vushtrrisë'],
-        en: ['vushtrri', 'vucitrn'],
-        cyrillic: ['вучитрн', 'вучитрну']
-      }
-    },
-    'loc:decan': {
-      id: 'loc:decan',
-      name: 'Deçan / Dečani',
-      municipality: 'Dečani',
-      isNorth: false,
-      variants: {
-        sr: ['dečani', 'decani', 'dečanima'],
-        al: ['deçan', 'deqan', 'deçani', 'deçanit'],
-        en: ['decan', 'decani'],
-        cyrillic: ['дечани', 'дечанима']
-      }
-    },
-    'loc:kamenica': {
-      id: 'loc:kamenica',
-      name: 'Kamenicë / Kamenica',
-      municipality: 'Kamenica',
-      isNorth: false,
-      variants: {
-        sr: ['kamenica', 'kosovska kamenica'],
-        al: ['kamenicë', 'kamenica', 'dardanë'],
-        en: ['kamenica'],
-        cyrillic: ['каменица', 'косовска каменица']
-      }
-    },
-    'loc:rahovec': {
-      id: 'loc:rahovec',
-      name: 'Rahovec / Orahovac',
-      municipality: 'Orahovac',
-      isNorth: false,
-      variants: {
-        sr: ['orahovac', 'orahovcu'],
-        al: ['rahovec', 'rahoveci', 'rahovecit'],
-        en: ['rahovec', 'orahovac'],
-        cyrillic: ['ораховац', 'ораховцу']
-      }
-    },
-    'loc:shtime': {
-      id: 'loc:shtime',
-      name: 'Shtime / Štimlje',
-      municipality: 'Štimlje',
-      isNorth: false,
-      variants: {
-        sr: ['štimlje', 'stimlje', 'štimlju'],
-        al: ['shtime', 'shtimja', 'shtimes'],
-        en: ['shtime', 'stimlje'],
-        cyrillic: ['штимље', 'штимљу']
-      }
-    },
-    'loc:kacanik': {
-      id: 'loc:kacanik',
-      name: 'Kaçanik / Kačanik',
-      municipality: 'Kačanik',
-      isNorth: false,
-      variants: {
-        sr: ['kačanik', 'kacanik', 'kačaniku'],
-        al: ['kaçanik', 'kacanik', 'kaçaniku'],
-        en: ['kacanik'],
-        cyrillic: ['качаник']
-      }
-    },
-    'loc:skenderaj': {
-      id: 'loc:skenderaj',
-      name: 'Skenderaj / Srbica',
-      municipality: 'Srbica',
-      isNorth: false,
-      variants: {
-        sr: ['srbica', 'srbici'],
-        al: ['skenderaj', 'skenderaji'],
-        en: ['skenderaj', 'srbica'],
-        cyrillic: ['србица', 'србици']
-      }
-    },
-    'loc:durres': {
-      id: 'loc:durres',
-      name: 'Durrës / Drač',
-      isNorth: false,
-      variants: {
-        sr: ['drač', 'drac', 'draču'],
-        al: ['durrës', 'durres', 'durrësi', 'porti i durrësit'],
-        en: ['durres'],
-        cyrillic: ['драч', 'драчу']
-      }
-    },
-    'loc:merdare': {
-      id: 'loc:merdare',
-      name: 'Merdare',
-      isNorth: false,
-      variants: {
-        sr: ['merdare', 'merdara', 'prelaz merdare'],
-        al: ['merdarë', 'merdare', 'pika në merdarë'],
-        en: ['merdare', 'merdare crossing'],
-        cyrillic: ['мердаре']
-      }
-    },
-    'loc:dheu_i_bardhe': {
-      id: 'loc:dheu_i_bardhe',
-      name: 'Dheu i Bardhë / Bela Zemlja',
-      isNorth: false,
-      variants: {
-        sr: ['bela zemlja', 'beloj zemlji', 'prelaz bela zemlja'],
-        al: ['dheu i bardhë', 'dheu i bardhe', 'dheun e bardhë'],
-        en: ['dheu i bardhe', 'bela zemlja'],
-        cyrillic: ['бела земља']
-      }
-    },
-    'loc:kek': {
-      id: 'loc:kek',
-      name: 'KEK (Obiliq)',
-      isNorth: false,
-      variants: {
-        sr: ['kek', 'obilić', 'obilic', 'termoelektrana obilić'],
-        al: ['kek', 'korporata energjetike e kosovës', 'obiliq', 'kastriot', 'tc kosova'],
-        en: ['kek', 'obiliq', 'kosovo energy corporation'],
-        cyrillic: ['кек', 'обилић']
+        sr: ['kosovo', 'kosova', 'kosovu', 'kosovom', 'kosovo i metohija', 'kim'],
+        al: ['kosovë', 'kosova', 'kosovës', 'republikës së kosovës'],
+        en: ['kosovo', 'republic of kosovo'],
+        cyrillic: ['косово', 'косову', 'косова', 'косово и метохија', 'ким']
       }
     }
   },
@@ -545,38 +435,38 @@ const CANONICAL_ENTITIES = {
   topics: {
     'topic:ibar_bridge': {
       id: 'topic:ibar_bridge',
-      label: 'Ibar Bridge Opening/Inspection',
+      label: 'Ibar Bridge Opening / Status',
       variants: {
-        sr: ['otvaranje mosta na ibru', 'revitalizacija mosta', 'inspekcija mosta na ibru'],
-        al: ['hapja e urës së ibrit', 'rihapja e urës', 'testimi i urës së ibrit'],
-        en: ['opening of ibar bridge', 'ibar bridge inspection']
+        sr: ['otvaranje mosta', 'otvaranje ibarskog mosta', 'revitalizacija mosta', 'glavni most'],
+        al: ['hapja e urës', 'hapja e urës së ibrit', 'ura kryesore'],
+        en: ['opening of the bridge', 'ibar bridge opening', 'main bridge']
       }
     },
-    'topic:thaci_2004': {
-      id: 'topic:thaci_2004',
-      label: 'March 2004 Unrest Commemoration',
+    'topic:dinar': {
+      id: 'topic:dinar',
+      label: 'Dinar Currency / CBK Regulation',
       variants: {
-        sr: ['nasilje marta 2004', 'martovski nemiri 2004'],
-        al: ['trazirat e 2004', 'mars 2004'],
-        en: ['march 2004 unrest']
-      }
-    },
-    'topic:cia_agent': {
-      id: 'topic:cia_agent',
-      label: 'Intelligence Agent / Infiltration',
-      variants: {
-        sr: ['agent cia', 'infiltracija al kaide', 'deportacija agenta'],
-        al: ['agjenti i cia-s', 'infiltrim i al kaidës', 'deportim agjenti'],
-        en: ['cia agent', 'al qaeda infiltration', 'agent deportation']
+        sr: ['dinar', 'dinara', 'ukidanje dinara', 'isplata u dinarima', 'cbk regulativa'],
+        al: ['dinari', 'rregullorja e bqk', 'pagesat me dinar', 'valuta serbe'],
+        en: ['dinar', 'serbian dinar', 'cbk regulation']
       }
     },
     'topic:ticket_fraud': {
       id: 'topic:ticket_fraud',
-      label: 'Airline Ticket Fraud',
+      label: 'Ticket Fraud / Travel Agency Scam',
       variants: {
-        sr: ['prevara sa avionskim kartama', 'prevara avionske karte'],
-        al: ['mashtrim me bileta', 'mashtrim me bileta aeroplani'],
-        en: ['airline ticket fraud', 'flight ticket scam']
+        sr: ['prevara sa kartama', 'lažne avionske karte', 'turistička agencija prevara'],
+        al: ['mashtrim me bileta', 'bileta false', 'agjenci turistike mashtrim'],
+        en: ['ticket fraud', 'fake airline tickets', 'travel agency scam']
+      }
+    },
+    'topic:elections': {
+      id: 'topic:elections',
+      label: 'Elections / Voting',
+      variants: {
+        sr: ['izbori', 'izborima', 'glasanje', 'birački spisak'],
+        al: ['zgjedhje', 'zgjedhjet', 'votim', 'procesi zgjedhor'],
+        en: ['elections', 'voting', 'election process']
       }
     }
   }
@@ -589,11 +479,12 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'high',
     defaultScore: 8,
     actionType: 'ENFORCEMENT',
+    disqualifiers: ['cardiac arrest', 'respiratory arrest', 'heart arrest', 'respiratory failure'],
     variants: {
-      sr: ['uhapšen', 'uhapšeni', 'uhapšena', 'uhapšene', 'uhapšeno', 'uhapsila', 'uhapsili', 'uhapšenog', 'uhapšenih', 'hapšenje', 'hapšenja', 'priveden', 'privedeni', 'privedena', 'privedene', 'privođenje', 'pritvoren', 'pritvoreni', 'pritvor', 'lišen slobode', 'lišeni slobode', 'liseni slobode'],
+      sr: ['uhapšen', 'uhapšeni', 'uhapšena', 'uhapšene', 'uhapšeno', 'uhapsila', 'uhapsili', 'uhapšenog', 'uhapšenih', 'hapšenje', 'hapšenja', 'hapšenju', 'hapšenjem', 'priveden', 'privedeni', 'privedena', 'privedene', 'privođenje', 'privodjenje', 'privođenja', 'privodjenja', 'privođenju', 'privodjenju', 'pritvoren', 'pritvoreni', 'pritvor', 'pritvora', 'pritvoru', 'lišen slobode', 'lišeni slobode', 'liseni slobode'],
       al: ['arrestohet', 'arrestuar', 'arrestuan', 'arrestimi', 'ndalohet', 'ndaluar', 'ndaluan', 'ndalimi', 'prangoset', 'prangosur', 'në paraburgim'],
       en: ['arrested', 'arrest', 'detained', 'detain', 'taken into custody', 'in custody', 'arresting', 'detention'],
-      cyrillic: ['ухапшен', 'ухапшени', 'ухапшена', 'ухапшене', 'ухапсила', 'хапшење', 'приведен', 'приведени', 'притвор', 'лишен слободе']
+      cyrillic: ['ухапшен', 'ухапшени', 'ухапшена', 'ухапшене', 'ухапсила', 'хапшење', 'хапшењу', 'приведен', 'приведени', 'притвор', 'лишен слободе']
     }
   },
   'event:release': {
@@ -615,6 +506,7 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'high',
     defaultScore: 7,
     actionType: 'ENFORCEMENT',
+    disqualifiers: ['policijska akademija', 'policijske akademije', 'police academy', 'zakletva'],
     variants: {
       sr: ['pretres', 'pretresi', 'pretreseno', 'pretresaju', 'racija', 'racije', 'akcija', 'akciji', 'akciju', 'akcije', 'policijska akcija', 'policijska operacija', 'upad policije'],
       al: ['bastisje', 'bastisur', 'bastisën', 'aksion', 'aksioni', 'aksionit', 'aksionin', 'operacion', 'operacioni', 'kontroll policor', 'aksion policor', 'operacion policor', 'bastisje në veri'],
@@ -631,26 +523,27 @@ const CANONICAL_EVENT_TYPES = {
     variants: {
       sr: [
         'zaplena oružja', 'zaplenjeno oružje', 'zaplenjenog oružja', 'zaplenjenom oružju', 'zaplenjenim oružjem',
+        'oružje zaplenjeno', 'oružje je zaplenjeno', 'oružje oduzeto', 'oružje je oduzeto',
         'zaplenjena oružja', 'zaplenjenih oružja', 'zaplenila oružje', 'zaplenili oružje', 'zaplenio oružje',
         'oduzeto oružje', 'oduzetog oružja', 'oduzetom oružju', 'oduzeli oružje', 'oduzela oružje', 'oduzeli arsenal',
         'zaplena naoružanja', 'zaplenjena municija', 'zaplenjene municije', 'zaplenjenoj municiji', 'konfiskovano oružje', 'konfiskovanog oružja'
       ],
-      al: ['konfiskim i armëve', 'konfiskon armë', 'konfiskojnë armë', 'konfiskohen armë', 'konfiskohet armë', 'konfiskuar armë', 'konfiskuan armë', 'konfiskohet armatim', 'sekuestrim armësh', 'sekuestron armë', 'sekuestrojnë armë', 'sekuestrohen armë', 'sekuestrohet armë', 'sekuestruar armë', 'sekuestruan armatim', 'kapen armë', 'sekuestrohet arsenal', 'u konfiskuan armë', 'u sekuestruan armë'],
+      al: ['konfiskim i armëve', 'konfiskon armë', 'konfiskojnë armë', 'konfiskohen armë', 'konfiskohet armë', 'konfiskuar armë', 'konfiskuan armë', 'armë të konfiskuara', 'armët e konfiskuara', 'armë të sekuestruara', 'konfiskohet armatim', 'sekuestrim armësh', 'sekuestron armë', 'sekuestrojnë armë', 'sekuestrohen armë', 'sekuestrohet armë', 'sekuestruar armë', 'sekuestruan armatim', 'kapen armë', 'sekuestrohet arsenal', 'u konfiskuan armë', 'u sekuestruan armë'],
       en: ['weapons were seized', 'weapons seized', 'arms were seized', 'arms seized', 'weapons confiscated', 'weapons were confiscated', 'arms confiscation', 'seizure of weapons', 'seized ammunition', 'seized weapons', 'confiscated weapons', 'police seized weapons', 'police seized arms'],
-      cyrillic: ['заплена оружја', 'заплењено оружје', 'заплењеног оружја', 'заплењеном оружју', 'запленила оружје', 'запленили оружје', 'одузето оружје']
+      cyrillic: ['заплена оружја', 'заплењено оружје', 'заплењеног оружја', 'заплењеном оружју', 'оружје заплењено', 'запленила оружје', 'запленили оружје', 'одузето оружје']
     }
   },
   'event:weapon_discovery': {
     id: 'event:weapon_discovery',
     name: 'Weapon Discovery',
     baseSeverity: 'high',
-    defaultScore: 7,
+    defaultScore: 8,
     actionType: 'DISCOVERY',
     variants: {
-      sr: ['pronađeno oružje', 'pronašli oružje', 'otkriveno oružje', 'otkriven arsenal', 'pronađena municija', 'otkriveno skladište oružja'],
-      al: ['gjetje e armëve', 'gjetën armë', 'zbulim i armëve', 'u gjetën armë', 'zbuluan arsenal', 'depo armësh'],
-      en: ['weapons found', 'weapons discovered', 'arms cache discovered', 'weapons cache found', 'found ammunition'],
-      cyrillic: ['пронађено оружје', 'пронашли оружје', 'откривено оружје']
+      sr: ['pronađeno oružje', 'pronadjeno oruzje', 'oružje pronađeno', 'oružje je pronađeno', 'otkriven arsenal', 'otkriveno oružje', 'pronađena municija', 'otkriveni meci'],
+      al: ['gjetur armë', 'u gjetën armë', 'armë të gjetura', 'zbulim armësh', 'zbuluan armatim', 'u gjet municion'],
+      en: ['weapons found', 'arms discovered', 'discovered arsenal', 'weapons cache found', 'ammunition found'],
+      cyrillic: ['пронађено оружје', 'откривен арсенал', 'откривено оружје']
     }
   },
   'event:weapon_use': {
@@ -659,6 +552,7 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'critical',
     defaultScore: 9,
     actionType: 'VIOLENCE',
+    disqualifiers: ['screenshot', 'screen shot', 'photo shoot', 'photoshoot', 'novogodišnji vatromet', 'vatromet', 'vatrometa'],
     variants: {
       sr: ['pucnjava', 'pucnjave', 'pucnjavi', 'pucnjavu', 'pucnjavom', 'pucano', 'ispaljeni hici', 'pucali', 'pucao', 'otvorena vatra', 'upotreba vatrenog oružja', 'rafal'],
       al: ['të shtëna', 'te shtena', 'gjuajtje me armë', 'të shtëna me armë', 'të shtënave', 'hapën zjarr', 'krisma'],
@@ -672,6 +566,7 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'high',
     defaultScore: 7,
     actionType: 'SEIZURE',
+    disqualifiers: ['drugstore', 'drug store', 'apoteka', 'apoteke', 'nabavilo lekove', 'lekovi za apoteke'],
     variants: {
       sr: ['zaplena droge', 'zaplenjena droga', 'zaplenjen kanabis', 'zaplenjena marihuana', 'zaplena narkotika', 'oduzet kokain'],
       al: ['konfiskim i drogës', 'konfiskuan drogë', 'konfiskohet kanabis', 'sekuestrim i narkotikëve', 'kapen drogë', 'sekuestrohet marihuanë'],
@@ -685,11 +580,12 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'high',
     defaultScore: 7,
     actionType: 'CRIME',
+    disqualifiers: ['drugstore', 'drug store', 'apoteka', 'apoteke'],
     variants: {
       sr: ['šverc droge', 'sverc droge', 'krijumčarenje narkotika', 'trgovina drogom', 'narko diler', 'laboratorija droge'],
       al: ['kontrabandë droge', 'trafikim me drogë', 'trafikim i narkotikëve', 'laborator droge'],
       en: ['drug trafficking', 'drug smuggling', 'narcotics trafficking', 'drug lab'],
-      cyrillic: ['шверц дроге', 'кријумчарење наркотика']
+      cyrillic: ['шверц droge', 'кријумчарење наркотика']
     }
   },
   'event:shooting': {
@@ -698,11 +594,12 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'critical',
     defaultScore: 9,
     actionType: 'VIOLENCE',
+    disqualifiers: ['screenshot', 'screen shot', 'photoshoot', 'novogodišnji vatromet', 'vatromet'],
     variants: {
-      sr: ['oružani napad', 'oružani incident', 'oružani sukob', 'ranjen iz vatrenog', 'upucan', 'upucana'],
+      sr: ['oružani napad', 'oružani incident', 'oružani sukob', 'ranjen iz vatrenog', 'upucan', 'upucana', 'pucnjava', 'pucnjavi'],
       al: ['sulm me armë', 'incident me armë', 'konflikt i armatosur', 'plagosur me armë', 'u plagos nga të shtënat'],
       en: ['shooting incident', 'armed conflict', 'shot and wounded', 'gun attack'],
-      cyrillic: ['оружани напад', 'оружани инцидент', 'упуцан']
+      cyrillic: ['оружани напад', 'оружани инцидент', 'упуцан', 'пуцњава', 'пуцњави']
     }
   },
   'event:explosion': {
@@ -711,6 +608,7 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'critical',
     defaultScore: 9,
     actionType: 'VIOLENCE',
+    disqualifiers: ['novogodišnji vatromet', 'vatromet', 'vatrometa', 'fireworks'],
     variants: {
       sr: ['eksplozija', 'eksplodirala bomba', 'bačena bomba', 'eksplodirala naprava', 'detonacija', 'šok bomba'],
       al: ['shpërthim', 'shperthim', 'mjet shpërthyes', 'shpërtheu bomba', 'hedhje e bombës', 'shok bombë'],
@@ -724,9 +622,10 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'medium',
     defaultScore: 6,
     actionType: 'EMERGENCY',
+    disqualifiers: ['firefighter was awarded', 'firefighter award', 'fire extinguisher', 'gašenje požara vatrogasnoj', 'dodeljena oprema'],
     variants: {
       sr: ['požar', 'pozar', 'podmetnut požar', 'zapaljen automobil', 'paljevina', 'izbio požar', 'vatrena stihija'],
-      al: ['zjarr', 'zjarrvënie', 'digjet vetura', 'u përfshi nga zjarri', 'zjarrfikësit'],
+      al: ['zjarr', 'zjarrvënie', 'digjet vetura', 'u përfshi nga zjarri'],
       en: ['fire', 'wildfire', 'arson', 'vehicle burned', 'car set on fire', 'blaze'],
       cyrillic: ['пожар', 'подметнут пожар', 'запаљен аутомобил']
     }
@@ -763,6 +662,7 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'medium',
     defaultScore: 5,
     actionType: 'ACCIDENT',
+    disqualifiers: ['popravljen je semafor', 'popravljen semafor', 'traffic light'],
     variants: {
       sr: ['saobraćajna nesreća', 'saobracajna nesreca', 'udes', 'sudar', 'saobraćajni udes', 'lančani sudar'],
       al: ['aksident trafiku', 'aksident rrugor', 'aksident me fatalitet', 'u përplasën dy vetura', 'aksidentohen'],
@@ -789,6 +689,7 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'low',
     defaultScore: 3,
     actionType: 'DIPLOMACY',
+    disqualifiers: ['meetingpoint', 'meeting point', 'sportska dvorana', 'sportski trening', 'treningu'],
     variants: {
       sr: ['sastanak', 'sastanka', 'sastanku', 'sastankom', 'sastanci', 'sastao', 'sastala', 'sastali', 'sastaće', 'susret', 'susreta', 'susretu', 'razgovor', 'razgovori', 'razgovarali', 'dijalog'],
       al: ['takim', 'takimi', 'takimit', 'takimin', 'takime', 'takimet', 'takohet', 'takuan', 'u takua', 'janë takuar', 'bisedime'],
@@ -815,6 +716,7 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'medium',
     defaultScore: 5,
     actionType: 'JUDICIAL',
+    disqualifiers: ['sudbina', 'sudbine', 'sudbini', 'sudbinom', 'zgrada suda', 'rekonstrukcija zgrade suda', 'tender za rekonstrukciju'],
     variants: {
       sr: ['suđenje', 'optužnica', 'podignuta optužnica', 'određen pritvor', 'ročište', 'presuda'],
       al: ['seancë gjyqësore', 'aktakuzë', 'u ngrit aktakuzë', 'paraburgim', 'vendim i gjykatës', 'dënohet'],
@@ -854,6 +756,7 @@ const CANONICAL_EVENT_TYPES = {
     baseSeverity: 'low',
     defaultScore: 4,
     actionType: 'CRIME',
+    disqualifiers: ['osiguranje od krađe', 'osiguranje od kradje', 'theft insurance'],
     variants: {
       sr: ['krađa', 'kradja', 'krađe', 'kradje', 'krađu', 'kradju', 'krađom', 'kradjom', 'obijanje', 'obijena', 'ukrao', 'ukrala', 'ukrali', 'ukraden', 'ukradeni', 'ukradena', 'ukradeno', 'ukradene', 'ukradena stoka', 'obijena kuća'],
       al: ['vjedhje', 'vjedhja', 'vjedhjes', 'vjedhjet', 'vjedhur', 'hajdut', 'vodhën', 'vjedhje e rëndë', 'vjedhje në shtëpi'],
@@ -878,25 +781,38 @@ const CANONICAL_EVENT_TYPES = {
 
 // Compatibility Matrix for Event Types (true = can be part of same event story)
 const EVENT_COMPATIBILITY_MATRIX = {
-  'event:weapon_seizure': ['event:arrest', 'event:raid', 'event:weapon_discovery', 'event:drug_seizure', 'event:court'],
-  'event:weapon_discovery': ['event:weapon_seizure', 'event:raid', 'event:arrest', 'event:court'],
-  'event:weapon_use': ['event:shooting', 'event:clash', 'event:arrest', 'event:court'],
-  'event:drug_seizure': ['event:arrest', 'event:raid', 'event:drug_trafficking', 'event:weapon_seizure', 'event:court'],
-  'event:drug_trafficking': ['event:drug_seizure', 'event:arrest', 'event:raid', 'event:court'],
-  'event:shooting': ['event:weapon_use', 'event:arrest', 'event:clash', 'event:court'],
-  'event:explosion': ['event:arrest', 'event:clash', 'event:court'],
-  'event:fire': ['event:accident', 'event:arrest'],
-  'event:protest': ['event:clash', 'event:arrest'],
-  'event:clash': ['event:protest', 'event:shooting', 'event:arrest', 'event:weapon_use'],
+  'event:arrest': [
+    'event:release', 'event:court', 'event:raid', 'event:weapon_seizure', 'event:weapon_discovery',
+    'event:weapon_use', 'event:shooting', 'event:drug_seizure', 'event:drug_trafficking',
+    'event:theft', 'event:robbery', 'event:espionage', 'event:border_incident', 'event:clash', 'event:protest', 'event:fire'
+  ],
+  'event:release': [
+    'event:arrest', 'event:court', 'event:raid', 'event:weapon_seizure', 'event:weapon_discovery',
+    'event:drug_seizure', 'event:theft', 'event:robbery', 'event:espionage'
+  ],
+  'event:raid': [
+    'event:arrest', 'event:release', 'event:weapon_seizure', 'event:weapon_discovery',
+    'event:drug_seizure', 'event:drug_trafficking', 'event:court'
+  ],
+  'event:weapon_seizure': ['event:arrest', 'event:release', 'event:raid', 'event:weapon_discovery', 'event:weapon_use', 'event:shooting', 'event:drug_seizure', 'event:court'],
+  'event:weapon_discovery': ['event:weapon_seizure', 'event:raid', 'event:arrest', 'event:release', 'event:court'],
+  'event:weapon_use': ['event:shooting', 'event:clash', 'event:arrest', 'event:release', 'event:weapon_seizure', 'event:court'],
+  'event:drug_seizure': ['event:arrest', 'event:release', 'event:raid', 'event:drug_trafficking', 'event:weapon_seizure', 'event:court'],
+  'event:drug_trafficking': ['event:drug_seizure', 'event:arrest', 'event:release', 'event:raid', 'event:court'],
+  'event:shooting': ['event:weapon_use', 'event:arrest', 'event:release', 'event:clash', 'event:weapon_seizure', 'event:court'],
+  'event:explosion': ['event:arrest', 'event:release', 'event:clash', 'event:court'],
+  'event:fire': ['event:accident', 'event:arrest', 'event:release'],
+  'event:protest': ['event:clash', 'event:arrest', 'event:release'],
+  'event:clash': ['event:protest', 'event:shooting', 'event:arrest', 'event:release', 'event:weapon_use'],
   'event:accident': ['event:fire'],
-  'event:espionage': ['event:arrest', 'event:court'],
+  'event:espionage': ['event:arrest', 'event:release', 'event:court'],
   'event:meeting': ['event:meeting_cancellation'],
   'event:meeting_cancellation': ['event:meeting'],
-  'event:court': ['event:arrest', 'event:release', 'event:weapon_seizure', 'event:drug_seizure', 'event:espionage', 'event:theft', 'event:robbery'],
-  'event:border_incident': ['event:clash', 'event:arrest', 'event:military_activity'],
+  'event:court': ['event:arrest', 'event:release', 'event:weapon_seizure', 'event:drug_seizure', 'event:espionage', 'event:theft', 'event:robbery', 'event:shooting'],
+  'event:border_incident': ['event:clash', 'event:arrest', 'event:release', 'event:military_activity'],
   'event:military_activity': ['event:border_incident', 'event:meeting'],
-  'event:theft': ['event:arrest', 'event:court'],
-  'event:robbery': ['event:arrest', 'event:court', 'event:weapon_use']
+  'event:theft': ['event:arrest', 'event:release', 'event:court'],
+  'event:robbery': ['event:arrest', 'event:release', 'event:court', 'event:weapon_use']
 };
 
 /**
@@ -936,9 +852,28 @@ function areEventTypesCompatible(typeA, typeB) {
 }
 
 const NEGATION_LEXICON = {
-  sr: ['nije', 'nisu', 'nema', 'bez', 'demantovao', 'demantovala', 'negirao', 'negirala', 'odbacuje', 'porekao', 'nijedan', 'nikakav', 'netačno'],
-  al: ['nuk', 'nuk ka', 'nuk pati', 'mohojnë', 'mohon', 'demantoi', 'demanton', 'ska', "s'ka", 'pa', 'mohim', 'nuk është', 'nuk jane'],
-  en: ['not', 'no', 'never', 'denied', 'denies', 'did not', "wasn't", "weren't", 'without', 'rejected', 'false', 'refutes']
+  sr: ['nije', 'nisu', 'nema', 'bez', 'demantovao', 'demantovala', 'negirao', 'negirala', 'odbacuje', 'porekao', 'nijedan', 'nikakav', 'netačno', 'netacno', 'nema dokaza', 'nije bilo'],
+  al: ['nuk', 'nuk ka', 'nuk pati', 'mohojnë', 'mohon', 'demantoi', 'demanton', 'ska', "s'ka", 'pa', 'mohim', 'nuk është', 'nuk jane', 'pa prova'],
+  en: ['not', 'no', 'never', 'denied', 'denies', 'did not', "wasn't", "weren't", 'without', 'rejected', 'false', 'refutes', 'no evidence', 'no proof']
+};
+
+const TEMPORAL_LEXICON = {
+  historical: [
+    'godine 2023', 'u 2023', 'u 2024', 'u 2022', 'tokom 2023', 'tokom 2022', 'prošle godine', 'prosle godine',
+    'vitin e kaluar', 'në vitin 2023', 'në vitin 2022', 'last year', 'in 2023', 'in 2022', 'in 2024',
+    'podseća se na', 'podseca se na', 'kujtojmë se', 'kujtojme se', 'recalling the', 'reminded of'
+  ],
+  planned: [
+    'će se sastati', 'ce se sastati', 'planira', 'planiran', 'najavljen', 'najavljeno', 'zakazan',
+    'do të takohet', 'do te takohet', 'planifikohet', 'paralajmërohet', 'pritet të', 'pritet te',
+    'will meet', 'scheduled to meet', 'planned to meet', 'expected to meet'
+  ],
+  completed: [
+    'održan je', 'odrzan je', 'održana', 'održani', 'održan sastanak', 'u mbajt', 'janë takuar', 'met today', 'meeting held', 'concluded'
+  ],
+  cancelled: [
+    'otkazan', 'otkazana', 'otkazano', 'odložen', 'odlozen', 'dështon', 'dështoi', 'anulohet', 'anuluar', 'cancelled', 'canceled', 'called off'
+  ]
 };
 
 const NUMBER_WORDS_MAP = {
