@@ -32,6 +32,25 @@ const ENV_FILE = path.join(__dirname, '../../.env');
 // Default public channels if not configured
 const DEFAULT_CHANNELS = ['koridorsrb', 'srpskinat', 'istokinfo'];
 
+// Dynamic map of resolved channel entities: normalized identifier -> { username, title, id, canonical }
+const resolvedChannelMap = new Map();
+
+// Known aliases mapping for canonical channel usernames
+const KNOWN_CHANNEL_ALIASES = {
+  'istokinfo': 'istokinfo',
+  'istok_info': 'istokinfo',
+  'istok info': 'istokinfo',
+  'исток инфо': 'istokinfo',
+  'koridorsrb': 'koridorsrb',
+  'koridor_srb': 'koridorsrb',
+  'koridor srbija': 'koridorsrb',
+  'коридор србија': 'koridorsrb',
+  'srpskinat': 'srpskinat',
+  'srpski_nat': 'srpskinat',
+  'srpski nacionalni info': 'srpskinat',
+  'српски национални инфо': 'srpskinat'
+};
+
 // In-memory cache
 let telegramCache = null;
 let lastFetchTime = 0;
@@ -310,19 +329,21 @@ function askQuestion(promptText) {
 }
 
 /**
- * Clean and normalize channel usernames
+ * Clean and normalize channel identifier to lowercase handle
  */
 function normalizeChannelName(rawName) {
   if (!rawName || typeof rawName !== 'string') return '';
   let cleaned = rawName.trim();
+  cleaned = cleaned.replace(/^https?:\/\/t\.me\/s\//i, '');
   cleaned = cleaned.replace(/^https?:\/\/t\.me\//i, '');
+  cleaned = cleaned.replace(/^t\.me\//i, '');
   cleaned = cleaned.replace(/^@/, '');
   cleaned = cleaned.replace(/\/$/, '');
-  return cleaned.trim();
+  return cleaned.trim().toLowerCase();
 }
 
 /**
- * Parse configured channels from environment or defaults
+ * Parse configured channels from environment or defaults (normalized lowercase list)
  */
 function getConfiguredChannels() {
   const envChannels = process.env.TELEGRAM_CHANNELS;
@@ -334,6 +355,67 @@ function getConfiguredChannels() {
     if (list.length > 0) return list;
   }
   return [...DEFAULT_CHANNELS];
+}
+
+/**
+ * Register a resolved channel entity for bidirectional alias & media authorization matching
+ */
+function registerResolvedChannel(rawIdentifier, { username, title, id, canonical }) {
+  const meta = {
+    username: username || '',
+    title: title || '',
+    id: id ? String(id) : '',
+    canonical: canonical || normalizeChannelName(username || rawIdentifier)
+  };
+  const normRaw = normalizeChannelName(rawIdentifier);
+  if (normRaw) resolvedChannelMap.set(normRaw, meta);
+  if (username) {
+    const normUser = normalizeChannelName(username);
+    if (normUser) resolvedChannelMap.set(normUser, meta);
+  }
+  if (title) {
+    const normTitle = normalizeChannelName(title);
+    if (normTitle) resolvedChannelMap.set(normTitle, meta);
+  }
+  if (id) {
+    resolvedChannelMap.set(String(id), meta);
+  }
+}
+
+/**
+ * Check if a channel identifier is authorized against configured channels and resolved entities
+ * Supports case-insensitivity, display names, and canonical aliases without allowing arbitrary channels
+ */
+function isChannelConfigured(channelIdentifier) {
+  if (!channelIdentifier || typeof channelIdentifier !== 'string') return false;
+  const target = normalizeChannelName(channelIdentifier);
+  if (!target) return false;
+
+  const configured = getConfiguredChannels();
+  if (configured.includes(target)) {
+    return true;
+  }
+
+  // Check alias map
+  if (KNOWN_CHANNEL_ALIASES[target] && configured.includes(KNOWN_CHANNEL_ALIASES[target])) {
+    return true;
+  }
+
+  // Check dynamically resolved channel map
+  if (resolvedChannelMap.has(target)) {
+    const meta = resolvedChannelMap.get(target);
+    if (meta && meta.canonical && configured.includes(meta.canonical)) {
+      return true;
+    }
+  }
+
+  for (const [key, meta] of resolvedChannelMap.entries()) {
+    if (meta.username && normalizeChannelName(meta.username) === target && configured.includes(meta.canonical)) return true;
+    if (meta.title && normalizeChannelName(meta.title) === target && configured.includes(meta.canonical)) return true;
+    if (meta.id && String(meta.id) === target && configured.includes(meta.canonical)) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -631,6 +713,10 @@ function _resetTelegramClientForTesting() {
   clientDisconnectingPromise = null;
   lifecycleState = ClientLifecycleState.IDLE;
   isShutdownRegistered = false;
+  resolvedChannelMap.clear();
+  mediaThumbnailCache.clear();
+  telegramCache = null;
+  lastFetchTime = 0;
   releaseLocalLock();
 }
 
@@ -752,11 +838,19 @@ async function fetchViaMTProto(client, channels, limitPerChannel) {
   const posts = [];
   const errors = [];
 
-  for (const channelName of channels) {
+  for (const rawChannel of channels) {
+    const channelName = normalizeChannelName(rawChannel);
+    if (!channelName) continue;
+
     try {
       const entity = await client.getEntity(channelName);
-      const channelTitle = entity?.title || channelName;
+      const channelTitle = entity?.title || rawChannel;
       const username = entity?.username || channelName;
+      const entityId = entity?.id ? String(entity.id) : null;
+
+      // Register in resolved channel map so media retrieval recognizes any variations
+      registerResolvedChannel(rawChannel, { username, title: channelTitle, id: entityId, canonical: channelName });
+      registerResolvedChannel(username, { username, title: channelTitle, id: entityId, canonical: channelName });
 
       const messages = await client.getMessages(entity, {
         limit: limitPerChannel
@@ -773,7 +867,7 @@ async function fetchViaMTProto(client, channels, limitPerChannel) {
           const media = extractMediaInfo(msg, username);
 
           posts.push({
-            id: `tg-${username}-${msgId}`,
+            id: `tg-${channelName}-${msgId}`,
             messageId: msgId,
             channel: `@${username}`,
             channelUsername: username,
@@ -789,7 +883,7 @@ async function fetchViaMTProto(client, channels, limitPerChannel) {
       }
     } catch (err) {
       console.warn(`[telegram-monitor] Error fetching channel @${channelName}:`, err.message);
-      errors.push({ channel: channelName, error: err.message });
+      errors.push({ channel: rawChannel, error: err.message });
     }
   }
 
@@ -803,7 +897,10 @@ async function fetchViaBotApi(botToken, channels) {
   const posts = [];
   const errors = [];
 
-  for (const channelName of channels) {
+  for (const rawChannel of channels) {
+    const channelName = normalizeChannelName(rawChannel);
+    if (!channelName) continue;
+
     try {
       const chatId = `@${channelName}`;
       const url = `https://api.telegram.org/bot${botToken}/getChat`;
@@ -815,6 +912,8 @@ async function fetchViaBotApi(botToken, channels) {
       if (res.data && res.data.ok && res.data.result) {
         const chat = res.data.result;
         const pinned = chat.pinned_message;
+
+        registerResolvedChannel(rawChannel, { username: chat.username || channelName, title: chat.title || rawChannel, id: chat.id, canonical: channelName });
 
         if (pinned && pinned.message_id) {
           const msgDate = pinned.date ? new Date(pinned.date * 1000).toISOString() : new Date().toISOString();
@@ -843,7 +942,7 @@ async function fetchViaBotApi(botToken, channels) {
       }
     } catch (err) {
       console.warn(`[telegram-monitor] Bot API error for @${channelName}:`, err.message);
-      errors.push({ channel: channelName, error: err.message });
+      errors.push({ channel: rawChannel, error: err.message });
     }
   }
 
@@ -886,16 +985,15 @@ function getDemoThumbnailSvg(channel, type = 'photo') {
 async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
   if (!channel || !messageId) return null;
 
-  const normalized = normalizeChannelName(channel);
   const msgId = parseInt(messageId, 10);
   if (isNaN(msgId) || msgId <= 0) return null;
 
-  const allowedChannels = getConfiguredChannels();
-  if (!allowedChannels.includes(normalized)) {
+  if (!isChannelConfigured(channel)) {
     console.warn(`[telegram-monitor] Media request rejected for unconfigured channel: ${channel}`);
     return null;
   }
 
+  const normalized = normalizeChannelName(channel);
   const cacheKey = `${normalized}:${msgId}`;
 
   if (demo) {
@@ -1176,6 +1274,8 @@ module.exports = {
   normalizeChannelName,
   extractMediaInfo,
   getConfiguredChannels,
+  isChannelConfigured,
+  registerResolvedChannel,
   authenticateInteractive,
   getSavedSession,
   persistSession,
@@ -1189,7 +1289,8 @@ module.exports = {
   _resetTelegramClientForTesting,
   ClientLifecycleState,
   TelegramEnvironment,
-  DEFAULT_CHANNELS
+  DEFAULT_CHANNELS,
+  KNOWN_CHANNEL_ALIASES
 };
 
 if (require.main === module) {

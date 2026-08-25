@@ -1871,6 +1871,50 @@ function renderEarthquakes(data) {
     : '<div class="empty-state">No seismic activity in range</div>';
 }
 
+function logSeismicMarkerDebug(eq, element) {
+  if (!state.map) return;
+  const projected = state.map.project([eq.lon, eq.lat]);
+  const container = state.map.getContainer();
+  const containerRect = container ? container.getBoundingClientRect() : { left: 0, top: 0 };
+  const markerRect = element ? element.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+
+  const mapProjectedX = projected.x.toFixed(2);
+  const mapProjectedY = projected.y.toFixed(2);
+  const containerX = (containerRect.left + projected.x).toFixed(2);
+  const containerY = (containerRect.top + projected.y).toFixed(2);
+  const finalMarkerX = (markerRect.left + markerRect.width / 2).toFixed(2);
+  const finalMarkerY = (markerRect.top + markerRect.height / 2).toFixed(2);
+
+  console.log(`[seismic-marker]\n` +
+    `eventId=${eq.id || 'N/A'}\n` +
+    `latitude=${eq.lat}\n` +
+    `longitude=${eq.lon}\n` +
+    `country=${eq.place || 'Unknown'}\n` +
+    `mapProjectedX=${mapProjectedX}\n` +
+    `mapProjectedY=${mapProjectedY}\n` +
+    `containerX=${containerX}\n` +
+    `containerY=${containerY}\n` +
+    `finalMarkerX=${finalMarkerX}\n` +
+    `finalMarkerY=${finalMarkerY}`
+  );
+}
+
+function debugSeismicMarkers() {
+  if (!moduleLayers.earthquake?.markers || moduleLayers.earthquake.markers.length === 0) {
+    console.log('[seismic-marker] No active seismic markers on map.');
+    return;
+  }
+  console.log(`=== SEISMIC MARKERS COORDINATE AUDIT (${moduleLayers.earthquake.markers.length} MARKERS) ===`);
+  moduleLayers.earthquake.markers.forEach((m, idx) => {
+    const eq = m._eqData;
+    const el = m.getElement ? m.getElement() : m._element;
+    if (eq && el) {
+      console.log(`--- Marker #${idx + 1} ---`);
+      logSeismicMarkerDebug(eq, el);
+    }
+  });
+}
+
 function renderEarthquakeMapMarkers(eqData) {
   if (!state.map || state.activeMapModule !== 'earthquake') return;
   clearMarkerList(moduleLayers.earthquake.markers);
@@ -1880,6 +1924,9 @@ function renderEarthquakeMapMarkers(eqData) {
     updateMapBadgeAndMeta();
     return;
   }
+
+  const isDebug = window._DEBUG_SEISMIC || 
+    (typeof window.location !== 'undefined' && (window.location.search.includes('debug=seismic') || window.location.search.includes('debug=true')));
 
   data.earthquakes.filter(eq => eq.magnitude >= 2.5).forEach(eq => {
     if (!eq.lat || !eq.lon) return;
@@ -1910,13 +1957,18 @@ function renderEarthquakeMapMarkers(eqData) {
       footer: `REPORTED: ${formatTimeAgo(eq.time).toUpperCase()} · SOURCE: USGS / EMSC`
     });
 
-    const marker = new maplibregl.Marker({ element })
+    const marker = new maplibregl.Marker({ element, anchor: 'center' })
       .setLngLat([eq.lon, eq.lat])
       .setPopup(createMapPopup(popupHtml))
       .addTo(state.map);
 
     marker._module = 'earthquake';
+    marker._eqData = eq;
     moduleLayers.earthquake.markers.push(marker);
+
+    if (isDebug) {
+      logSeismicMarkerDebug(eq, element);
+    }
   });
   updateMapBadgeAndMeta();
 }
@@ -3292,7 +3344,7 @@ function createMapMarkerElement(color, size = 16, border = 3, severity = null) {
   marker.style.backgroundColor = color;
   marker.style.boxShadow = `0 0 14px ${color}`;
   marker.style.cursor = 'pointer';
-  marker.style.position = 'relative';
+  // Position is managed by MapLibre's .maplibregl-marker (position: absolute) to prevent layout flow drift and scroll misalignment.
 
   const sev = String(severity || '').toUpperCase();
   if (sev === 'CRITICAL') {
@@ -5865,6 +5917,8 @@ window.classifyTrafficIncident = classifyTrafficIncident;
 window.TRAFFIC_RELEVANCE_TERMS = TRAFFIC_RELEVANCE_TERMS;
 window.renderRadiationMapMarkers = renderRadiationMapMarkers;
 window.renderEarthquakeMapMarkers = renderEarthquakeMapMarkers;
+window.debugSeismicMarkers = debugSeismicMarkers;
+window.logSeismicMarkerDebug = logSeismicMarkerDebug;
 window.renderNewsMapMarkers = renderNewsMapMarkers;
 window.extractNewsLocation = extractNewsLocation;
 window.cleanTextForNewsLocation = cleanTextForNewsLocation;

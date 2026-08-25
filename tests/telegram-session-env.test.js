@@ -309,17 +309,74 @@ function createMockClientClass() {
   assert.strictEqual(fetchResult.status, 'NOT_CONFIGURED', 'fetchTelegram must return NOT_CONFIGURED in production when session is missing');
   assert.strictEqual(fetchResult.error, 'NOT_CONFIGURED');
   assert.strictEqual(fetchResult.message.includes('TELEGRAM_SESSION_PRODUCTION'), true, 'Error message must specify required production variable');
-
   console.log('✓ Passed: fetchTelegram handles missing production session safely and informatively.\n');
+
+  // ── Test L: Channel normalization and handle cleaning ───────────────────────
+  console.log('Test L: Verifying channel normalization handles all cases, prefixes, and URLs...');
+  assert.strictEqual(skill.normalizeChannelName('Istokinfo'), 'istokinfo', 'Istokinfo should normalize to lowercase istokinfo');
+  assert.strictEqual(skill.normalizeChannelName('@Istokinfo'), 'istokinfo', '@Istokinfo should strip @ and lowercase');
+  assert.strictEqual(skill.normalizeChannelName('https://t.me/Istokinfo'), 'istokinfo', 'URL should be stripped');
+  assert.strictEqual(skill.normalizeChannelName('https://t.me/s/Istokinfo/'), 'istokinfo', 'Preview URL and trailing slash should be stripped');
+  assert.strictEqual(skill.normalizeChannelName('  @KoridorSrb  '), 'koridorsrb', 'Whitespace and uppercase should be normalized');
+  assert.strictEqual(skill.normalizeChannelName('SrpskiNat'), 'srpskinat', 'CamelCase should be normalized');
+  console.log('✓ Passed: Channel normalization robust across cases, handles, and URLs.\n');
+
+  // ── Test M: Channel authorization for media retrieval (isChannelConfigured) ──
+  console.log('Test M: Verifying channel authorization for media requests with Istokinfo and security protection against unconfigured channels...');
+  resetEnv();
+  process.env.TELEGRAM_CHANNELS = 'koridorsrb,srpskinat,istokinfo';
+
+  assert.strictEqual(skill.isChannelConfigured('Istokinfo'), true, 'Istokinfo must be accepted (case-insensitive)');
+  assert.strictEqual(skill.isChannelConfigured('istokinfo'), true, 'istokinfo must be accepted');
+  assert.strictEqual(skill.isChannelConfigured('@Istokinfo'), true, '@Istokinfo must be accepted');
+  assert.strictEqual(skill.isChannelConfigured('https://t.me/Istokinfo'), true, 'https://t.me/Istokinfo must be accepted');
+  assert.strictEqual(skill.isChannelConfigured('Istok Info'), true, 'Istok Info display name alias must be accepted');
+  assert.strictEqual(skill.isChannelConfigured('исток инфо'), true, 'Cyrillic title alias must be accepted');
+  assert.strictEqual(skill.isChannelConfigured('KoridorSrb'), true, 'KoridorSrb must be accepted');
+  assert.strictEqual(skill.isChannelConfigured('SrpskiNat'), true, 'SrpskiNat must be accepted');
+
+  // Verify strict security: unconfigured channels are rejected
+  assert.strictEqual(skill.isChannelConfigured('malicious_channel_attack'), false, 'Arbitrary unconfigured channel must be rejected');
+  assert.strictEqual(skill.isChannelConfigured('random_crypto_spam'), false, 'Random unconfigured channel must be rejected');
+  assert.strictEqual(skill.isChannelConfigured(''), false, 'Empty channel must be rejected');
+  console.log('✓ Passed: Istokinfo is authorized for media retrieval while unconfigured channels remain strictly blocked.\n');
+
+  // ── Test N: Dynamically resolved channel entity registration ─────────────────
+  console.log('Test N: Verifying dynamic channel entity resolution registers metadata for media authorization...');
+  skill.registerResolvedChannel('istokinfo', {
+    username: 'Istokinfo',
+    title: 'Исток Инфо',
+    id: 1987654321,
+    canonical: 'istokinfo'
+  });
+
+  assert.strictEqual(skill.isChannelConfigured('Istokinfo'), true, 'Resolved username Istokinfo must be authorized');
+  assert.strictEqual(skill.isChannelConfigured('1987654321'), true, 'Resolved channel numeric ID must be authorized');
+  console.log('✓ Passed: Dynamically resolved channel metadata is safely registered and queryable.\n');
+
+  // ── Test O: Media thumbnail retrieval for configured Istokinfo channel ───────
+  console.log('Test O: Verifying media thumbnail endpoint authorizes configured Istokinfo and rejects unconfigured channels...');
+  const validThumb = await skill.fetchMediaThumbnail({ channel: 'Istokinfo', messageId: 1042, demo: true });
+  assert.ok(validThumb, 'fetchMediaThumbnail must return thumbnail for configured Istokinfo channel');
+  assert.ok(validThumb.buffer, 'Thumbnail buffer must be present');
+  assert.strictEqual(validThumb.mimeType, 'image/svg+xml', 'MIME type must be image/svg+xml for demo thumbnail');
+
+  const lowerThumb = await skill.fetchMediaThumbnail({ channel: 'istokinfo', messageId: 1042, demo: true });
+  assert.ok(lowerThumb, 'fetchMediaThumbnail must return thumbnail for lowercase istokinfo channel');
+
+  const unconfiguredThumb = await skill.fetchMediaThumbnail({ channel: 'unconfigured_hacker_channel', messageId: 1042, demo: true });
+  assert.strictEqual(unconfiguredThumb, null, 'fetchMediaThumbnail must reject unconfigured channel with null');
+  console.log('✓ Passed: Media thumbnail endpoint successfully authorizes Istokinfo and blocks unconfigured channels.\n');
 
   // Clean up
   resetEnv();
   skill._resetTelegramClientForTesting();
 
   console.log('─────────────────────────────────────────────────────────────────');
-  console.log('🎉 ALL TELEGRAM CLIENT LIFECYCLE & SESSION TESTS PASSED!');
+  console.log('🎉 ALL TELEGRAM CLIENT LIFECYCLE & MEDIA AUTHORIZATION TESTS PASSED!');
   console.log('─────────────────────────────────────────────────────────────────\n');
 })().catch(err => {
   console.error('\n❌ TEST RUN FAILED:', err);
   process.exit(1);
 });
+

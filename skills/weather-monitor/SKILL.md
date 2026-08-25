@@ -60,10 +60,11 @@ description: |
 - Visibility < 1km → LOW_VISIBILITY
 
 ## Features & Resilience
+- **Multi-Provider Resilience**: Primary Open-Meteo with automatic seamless failover to MET Norway (Yr.no / `api.met.no`) when rate-limited (HTTP 429) on cloud deployments (e.g., Render).
 - **In-Memory Caching**: 15-minute TTL per normalized location/coordinates (`WEATHER_CACHE_TTL_MS`).
 - **In-Flight Request Deduplication**: Multiple parallel requests for the same city coalesce into a single outbound API call.
 - **Built-in Kosovo Geocoding Dictionary**: Direct coordinate lookup for standard Kosovo cities without rate-limited Nominatim requests.
-- **HTTP 429 Protection & Stale-Cache Fallback**: Never drops to demo data if previously cached data exists when Open-Meteo returns 429 Too Many Requests.
+- **HTTP 429 Protection & Stale-Cache Fallback**: Never drops to demo data if previously cached data exists when weather APIs return 429 Too Many Requests.
 - **Commercial API Key Support**: Supports `OPEN_METEO_API_KEY` for dedicated endpoints.
 
 ## Usage

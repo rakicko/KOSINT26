@@ -247,6 +247,62 @@ function createMockOpenMeteoResponse(temp = 25) {
   delete process.env.OPEN_METEO_API_KEY;
   console.log('✓ Passed: Commercial API key targets customer endpoint correctly.\n');
 
+  // ── Test 8: Automatic Failover to Yr.no / MET Norway on Open-Meteo 429 ───────────
+  console.log('Test 8: Verifying automatic failover to Yr.no / MET Norway on Open-Meteo 429...');
+  skill._resetWeatherCacheForTesting();
+
+  const failoverClient = {
+    get: async (url, config) => {
+      if (url.includes('open-meteo')) {
+        const err = new Error('Request failed with status code 429');
+        err.response = { status: 429 };
+        throw err;
+      }
+      if (url.includes('met.no')) {
+        return {
+          status: 200,
+          data: {
+            properties: {
+              timeseries: [
+                {
+                  time: '2026-08-26T12:00:00Z',
+                  data: {
+                    instant: {
+                      details: {
+                        air_temperature: 23.4,
+                        relative_humidity: 60,
+                        wind_speed: 4.5,
+                        wind_from_direction: 180
+                      }
+                    },
+                    next_1_hours: {
+                      summary: { symbol_code: 'clearsky_day' },
+                      details: { precipitation_amount: 0 }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    }
+  };
+
+  const yrNoResult = await skill.fetchWeather({
+    location: 'Mitrovicë',
+    lat: 42.8914,
+    lon: 20.8660,
+    _httpClient: failoverClient
+  });
+
+  assert.strictEqual(yrNoResult.source, 'Yr.no / MET Norway', 'Source must be Yr.no / MET Norway');
+  assert.strictEqual(yrNoResult.current.temp, 23, 'Temp must be 23');
+  assert.strictEqual(yrNoResult.current.windSpeed, 16, 'Wind speed must be 4.5 * 3.6 = 16 km/h');
+  assert.strictEqual(yrNoResult.isCached, false, 'First call is fresh');
+  console.log('✓ Passed: Open-Meteo 429 seamlessly fails over to live Yr.no data instead of demo.\n');
+
   console.log('─────────────────────────────────────────────────────────────────');
   console.log('🎉 ALL WEATHER MONITOR CACHING & 429 RESILIENCE TESTS PASSED!');
   console.log('─────────────────────────────────────────────────────────────────\n');

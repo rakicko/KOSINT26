@@ -136,13 +136,35 @@ async function fetchFromFIRMS({ period, apiKey }) {
     { name: 'MODIS_NRT', label: 'MODIS (Terra/Aqua)' }
   ];
 
+  const attemptedSources = [];
+  const successfulSources = [];
+  const failedSources = [];
+
   const requests = sources.map(s => {
+    attemptedSources.push(s.name);
     const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${apiKey}/${s.name}/${areaBbox}/${dayCount}`;
+    const start = Date.now();
     return axios.get(url, {
       timeout: 3500, // short timeout to fail fast if network filters connection
       headers: { 'User-Agent': 'SENTINEL-Intelligence/1.0' }
-    }).then(res => ({ source: s.label, data: res.data }))
-      .catch(err => ({ source: s.label, error: err.message, status: err.response?.status, code: err.code }));
+    }).then(res => {
+      const duration = Date.now() - start;
+      if (res.data && typeof res.data === 'string' && res.data.includes('Invalid MAP_KEY')) {
+        console.warn(`[wildfire-monitor] FIRMS ${s.name} failed: code=INVALID_MAP_KEY status=${res.status} duration=${duration}ms`);
+        failedSources.push({ source: s.name, status: res.status, code: 'INVALID_MAP_KEY', duration });
+        return { source: s.label, sourceName: s.name, data: null, error: 'Invalid MAP_KEY', status: 403 };
+      }
+      const parsed = parseCsvFires(res.data, s.label);
+      console.log(`[wildfire-monitor] FIRMS ${s.name} succeeded: status=${res.status} duration=${duration}ms detections=${parsed.length}`);
+      successfulSources.push(s.name);
+      return { source: s.label, sourceName: s.name, data: res.data, status: res.status, parsed };
+    }).catch(err => {
+      const duration = Date.now() - start;
+      const code = err.code || (err.response ? `HTTP_${err.response.status}` : 'ERR_UNKNOWN');
+      console.warn(`[wildfire-monitor] FIRMS ${s.name} failed: code=${code} duration=${duration}ms`);
+      failedSources.push({ source: s.name, status: err.response?.status, code, message: err.message, duration });
+      return { source: s.label, sourceName: s.name, error: err.message, status: err.response?.status, code: err.code };
+    });
   });
 
   const responses = await Promise.all(requests);
@@ -152,23 +174,32 @@ async function fetchFromFIRMS({ period, apiKey }) {
   let authFailed = false;
 
   for (const resp of responses) {
-    if (resp.status === 403 || resp.status === 401) {
+    if (resp.status === 403 || resp.status === 401 || resp.error === 'Invalid MAP_KEY') {
       authFailed = true;
       continue;
     }
-    if (resp.data && typeof resp.data === 'string' && !resp.data.includes('Invalid MAP_KEY')) {
+    if (resp.parsed && Array.isArray(resp.parsed)) {
       successCount++;
-      const parsed = parseCsvFires(resp.data, resp.source);
-      allDetections = allDetections.concat(parsed);
+      allDetections = allDetections.concat(resp.parsed);
     }
   }
 
   if (authFailed && successCount === 0) {
-    return { success: false, error: 'FIRMS_AUTH_FAILED', message: 'NASA FIRMS API authentication failed (401/403).' };
+    return {
+      success: false,
+      error: 'FIRMS_AUTH_FAILED',
+      message: 'NASA FIRMS API authentication failed (401/403).',
+      firmsDiagnostic: { attemptedSources, successfulSources, failedSources }
+    };
   }
 
   if (successCount === 0) {
-    return { success: false, error: 'FIRMS_FETCH_FAILED', message: 'NASA FIRMS API connection timed out or unreachable.' };
+    return {
+      success: false,
+      error: 'FIRMS_FETCH_FAILED',
+      message: 'NASA FIRMS API connection timed out or unreachable.',
+      firmsDiagnostic: { attemptedSources, successfulSources, failedSources }
+    };
   }
 
   return {
@@ -176,7 +207,8 @@ async function fetchFromFIRMS({ period, apiKey }) {
     detections: allDetections,
     source: 'NASA FIRMS (MODIS/VIIRS)',
     sourceUrl: 'https://firms.modaps.eosdis.nasa.gov/',
-    provider: 'nasa_firms'
+    provider: 'nasa_firms',
+    firmsDiagnostic: { attemptedSources, successfulSources, failedSources }
   };
 }
 
@@ -257,10 +289,34 @@ async function fetchFromEONET({ period }) {
  * 3. Stale Cache Fallback: previously cached live detections (marked as isCached: true)
  * 4. Fallback: UNAVAILABLE
  */
-async function fetchWildfire({ period = '24h', lat, lon, forceRefresh = false } = {}) {
+async function fetchWildfire({ period = '24h', lat, lon, forceRefresh = false, debug = false } = {}) {
   // Check fresh in-memory cache
-  if (!forceRefresh && wildfireCache[period] && (Date.now() - (lastFetchTimes[period] || 0) < WILDFIRE_CACHE_TTL_MS)) {
+  const isFreshCache = !forceRefresh && wildfireCache[period] && (Date.now() - (lastFetchTimes[period] || 0) < WILDFIRE_CACHE_TTL_MS);
+  if (isFreshCache) {
     const cached = wildfireCache[period];
+    const ageSec = Math.round((Date.now() - (lastFetchTimes[period] || 0)) / 1000);
+    const cacheSource = (cached.provider === 'nasa_firms' || cached.source?.includes('FIRMS')) ? 'firms' : ((cached.provider === 'nasa_eonet' || cached.source?.includes('EONET')) ? 'eonet' : 'cache');
+    console.log(`[wildfire-monitor] Cache HIT period=${period} source=${cacheSource} age=${ageSec}s`);
+
+    if (debug) {
+      return {
+        period,
+        source: cached.source,
+        detectionCount: cached.count || cached.detections?.length || 0,
+        cache: {
+          used: true,
+          age: ageSec,
+          source: cacheSource,
+          stale: false
+        },
+        firms: cached.firmsDiagnostic || {
+          attemptedSources: [],
+          successfulSources: [],
+          failedSources: []
+        }
+      };
+    }
+
     if (lat && lon && Array.isArray(cached.detections)) {
       const withDistance = cached.detections.map(d => ({
         ...d,
@@ -271,21 +327,39 @@ async function fetchWildfire({ period = '24h', lat, lon, forceRefresh = false } 
     return { ...cached, isCached: true };
   }
 
+  console.log(`[wildfire-monitor] Cache MISS period=${period}`);
+
   const firmsKey = process.env.FIRMS_MAP_KEY;
   let fetchResult = null;
+  let firmsDiag = {
+    attemptedSources: ['VIIRS_SNPP_NRT', 'VIIRS_NOAA20_NRT', 'MODIS_NRT'],
+    successfulSources: [],
+    failedSources: []
+  };
 
   // 1. Primary Source: NASA FIRMS
   if (firmsKey && firmsKey !== 'YOUR_NASA_FIRMS_KEY' && firmsKey.trim() !== '') {
     try {
       const firmsRes = await fetchFromFIRMS({ period, apiKey: firmsKey.trim() });
+      if (firmsRes.firmsDiagnostic) {
+        firmsDiag = firmsRes.firmsDiagnostic;
+      }
       if (firmsRes.success) {
         fetchResult = firmsRes;
       } else {
-        console.warn(`[wildfire-monitor] Primary NASA FIRMS failed: ${firmsRes.message}. Falling back to secondary source.`);
+        console.warn(`[wildfire-monitor] period=${period} FIRMS unavailable, falling back to EONET`);
       }
     } catch (err) {
-      console.warn(`[wildfire-monitor] Primary NASA FIRMS error: ${err.message}. Falling back to secondary source.`);
+      console.warn(`[wildfire-monitor] period=${period} FIRMS unavailable, falling back to EONET`);
+      firmsDiag.failedSources.push({ code: 'EXCEPTION', message: err.message });
     }
+  } else {
+    console.warn(`[wildfire-monitor] period=${period} FIRMS unavailable, falling back to EONET`);
+    firmsDiag.failedSources = firmsDiag.attemptedSources.map(s => ({
+      source: s,
+      code: 'FIRMS_KEY_MISSING',
+      message: 'FIRMS_MAP_KEY is not configured in environment'
+    }));
   }
 
   // 2. Secondary Source: NASA EONET / Copernicus EFFIS
@@ -303,6 +377,24 @@ async function fetchWildfire({ period = '24h', lat, lon, forceRefresh = false } 
   // Handle successful live fetch from Primary or Secondary
   if (fetchResult && fetchResult.success) {
     let detections = fetchResult.detections || [];
+    const sourceLabel = fetchResult.provider === 'nasa_firms' ? 'FIRMS' : 'EONET';
+    console.log(`[wildfire-monitor] period=${period} source=${sourceLabel} detections=${detections.length}`);
+
+    if (debug) {
+      const cacheSource = fetchResult.provider === 'nasa_firms' ? 'firms' : 'eonet';
+      return {
+        period,
+        source: fetchResult.source,
+        detectionCount: detections.length,
+        cache: {
+          used: false,
+          age: 0,
+          source: cacheSource,
+          stale: false
+        },
+        firms: firmsDiag
+      };
+    }
 
     if (lat && lon) {
       detections = detections.map(d => ({
@@ -335,6 +427,7 @@ async function fetchWildfire({ period = '24h', lat, lon, forceRefresh = false } 
       updatedAt: new Date().toISOString(),
       count: detections.length,
       detections,
+      firmsDiagnostic: firmsDiag,
       message,
       isCached: false
     };
@@ -346,6 +439,25 @@ async function fetchWildfire({ period = '24h', lat, lon, forceRefresh = false } 
   // 3. Stale Cache Fallback: return previously cached live data during transient upstream outage
   if (wildfireCache[period] && wildfireCache[period].status !== 'UNAVAILABLE') {
     const cached = wildfireCache[period];
+    const cacheAgeSec = cached.fetchedAt ? Math.round((Date.now() - new Date(cached.fetchedAt).getTime()) / 1000) : 0;
+    const cacheSource = (cached.provider === 'nasa_firms' || cached.source?.includes('FIRMS')) ? 'firms' : ((cached.provider === 'nasa_eonet' || cached.source?.includes('EONET')) ? 'eonet' : 'cache');
+    console.log(`[wildfire-monitor] Cache STALE period=${period} source=${cacheSource} age=${cacheAgeSec}s`);
+
+    if (debug) {
+      return {
+        period,
+        source: cached.source,
+        detectionCount: cached.count || cached.detections?.length || 0,
+        cache: {
+          used: true,
+          age: cacheAgeSec,
+          source: cacheSource,
+          stale: true
+        },
+        firms: firmsDiag
+      };
+    }
+
     let detections = cached.detections || [];
     if (lat && lon) {
       detections = detections.map(d => ({
@@ -361,6 +473,22 @@ async function fetchWildfire({ period = '24h', lat, lon, forceRefresh = false } 
   }
 
   // 4. Fallback: UNAVAILABLE
+  console.log(`[wildfire-monitor] period=${period} source=UNAVAILABLE detections=0`);
+  if (debug) {
+    return {
+      period,
+      source: 'UNAVAILABLE',
+      detectionCount: 0,
+      cache: {
+        used: false,
+        age: 0,
+        source: 'none',
+        stale: false
+      },
+      firms: firmsDiag
+    };
+  }
+
   return {
     skill: 'wildfire-monitor',
     status: 'UNAVAILABLE',

@@ -109,13 +109,14 @@ app.get('/api/weather', async (req, res) => {
 
 // ── API: Wildfire detections ─────────────────────────────────────────────────────
 app.get('/api/wildfire', async (req, res) => {
-  const { period = '24h', lat, lon, forceRefresh = 'false' } = req.query;
+  const { period = '24h', lat, lon, forceRefresh = 'false', debug = 'false' } = req.query;
   try {
     const data = await fetchWildfire({
       period,
       lat: lat ? parseFloat(lat) : undefined,
       lon: lon ? parseFloat(lon) : undefined,
-      forceRefresh: forceRefresh === 'true'
+      forceRefresh: forceRefresh === 'true',
+      debug: debug === 'true'
     });
     res.json(data);
   } catch (err) {
