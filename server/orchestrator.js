@@ -118,8 +118,10 @@ async function orchestrate({ location, lat, lon, timeline = '24h', forceRefresh 
   const alertResult = evaluate({ location, ...result });
   result.alerts = alertResult;
 
-  // Persist to memory bank
-  memoryBank.setCache(result);
+  // Persist to memory bank only if news items were successfully populated
+  if (result.news?.items?.length > 0) {
+    memoryBank.setCache(result);
+  }
   memoryBank.addLocation({ name: location, lat, lon });
   if (alertResult.hasNewAlerts) memoryBank.addAlerts(alertResult.alerts);
 

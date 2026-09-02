@@ -4,6 +4,8 @@ require('dotenv').config({
   path: require('path').join(__dirname, '../../.env')
 });
 
+const fs = require('fs');
+const path = require('path');
 const axios = require('axios');
 const xml2js = require('xml2js');
 
@@ -167,9 +169,12 @@ function analyzeArticle(title = '', description = '', publishedAt = null) {
 async function fetchRSS(source) {
   try {
     const response = await axios.get(source.url, {
-      timeout: 8000,
+      timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 SENTINEL Intelligence'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,sr;q=0.8,sq;q=0.7',
+        'Cache-Control': 'no-cache'
       }
     });
 
@@ -264,12 +269,18 @@ async function fetchNews({
     '7d':  7 * 24 * 60 * 60 * 1000
   }[timeline] || (24 * 60 * 60 * 1000);
 
-  let allArticles = feeds.flat().filter(a => {
+  const rawFeeds = feeds.flat();
+  let allArticles = rawFeeds.filter(a => {
     const pubTime = new Date(a.publishedAt).getTime();
     if (isNaN(pubTime)) return false;
     const diff = now - pubTime;
-    return diff >= -3600000 && diff <= timelineMs;
+    return diff >= -86400000 && diff <= timelineMs;
   });
+
+  // If timeline filtering yielded zero articles but feeds returned data, use rawFeeds
+  if (allArticles.length === 0 && rawFeeds.length > 0) {
+    allArticles = rawFeeds;
+  }
 
   // Deduplicate syndicated news items before clustering across all scanned articles
   const deduplicatedArticles = deduplicateNewsItems(allArticles);
@@ -302,7 +313,26 @@ async function fetchNews({
     return new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime();
   });
 
-  return {
+  const CACHE_FILE = path.join(__dirname, '.news_cache.json');
+
+  // Fallback to disk cache if live RSS returned 0 events (e.g. cloud datacenter IP blocked or timeout)
+  if (deduplicatedEvents.length === 0 && fs.existsSync(CACHE_FILE)) {
+    try {
+      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
+        console.log(`[news-intel] Live RSS returned 0 items; using fallback cache with ${cached.items.length} items`);
+        return {
+          ...cached,
+          fetchedAt: new Date().toISOString(),
+          isCachedFallback: true
+        };
+      }
+    } catch (err) {
+      console.warn('[news-intel] cache read error:', err.message);
+    }
+  }
+
+  const result = {
     skill: 'news-intel',
     location,
     fetchedAt: new Date().toISOString(),
@@ -316,6 +346,17 @@ async function fetchNews({
       maxScore: deduplicatedEvents[0]?.intensityScore || 0
     }
   };
+
+  // Persist successful live results to cache file
+  if (deduplicatedEvents.length > 0) {
+    try {
+      fs.writeFileSync(CACHE_FILE, JSON.stringify(result, null, 2));
+    } catch (err) {
+      console.warn('[news-intel] cache write error:', err.message);
+    }
+  }
+
+  return result;
 }
 
 module.exports = {
