@@ -271,11 +271,8 @@ async function fetchNews({
     return diff >= -3600000 && diff <= timelineMs;
   });
 
-  // Filter out non-security articles from main dashboard
-  const securityArticles = allArticles.filter(a => a.isSecurityRelevant);
-
-  // Deduplicate syndicated news items before clustering
-  const deduplicatedArticles = deduplicateNewsItems(securityArticles);
+  // Deduplicate syndicated news items before clustering across all scanned articles
+  const deduplicatedArticles = deduplicateNewsItems(allArticles);
 
   // Multi-Factor Event Clustering Engine (groups articles into unified Event Objects)
   const deduplicatedEvents = clusterEventArticles(deduplicatedArticles);
@@ -284,18 +281,18 @@ async function fetchNews({
   const severityRank = { critical: 4, high: 3, medium: 2, low: 1 };
   deduplicatedEvents.sort((a, b) => {
     if (severityRank[b.severity] !== severityRank[a.severity]) {
-      return severityRank[b.severity] - severityRank[a.severity];
+      return (severityRank[b.severity] || 1) - (severityRank[a.severity] || 1);
     }
     if (b.intensityScore !== a.intensityScore) {
-      return b.intensityScore - a.intensityScore;
+      return (b.intensityScore || 0) - (a.intensityScore || 0);
     }
-    if (Math.abs(b.confidence - a.confidence) >= 0.01) {
-      return b.confidence - a.confidence;
+    if (Math.abs((b.confidence || 0) - (a.confidence || 0)) >= 0.01) {
+      return (b.confidence || 0) - (a.confidence || 0);
     }
-    if (b.independentSourceCount !== a.independentSourceCount) {
-      return b.independentSourceCount - a.independentSourceCount;
+    if ((b.independentSourceCount || 0) !== (a.independentSourceCount || 0)) {
+      return (b.independentSourceCount || 0) - (a.independentSourceCount || 0);
     }
-    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    return new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime();
   });
 
   return {
@@ -303,11 +300,11 @@ async function fetchNews({
     location,
     fetchedAt: new Date().toISOString(),
     source: 'kosovo-local-rss',
-    items: deduplicatedEvents.slice(0, 50),
+    items: deduplicatedEvents.slice(0, 100),
     summary: {
       total: deduplicatedEvents.length,
       rawScanned: allArticles.length,
-      discardedOther: allArticles.length - securityArticles.length,
+      discardedOther: 0,
       highIntensity: deduplicatedEvents.filter(a => a.intensityScore >= 7).length,
       maxScore: deduplicatedEvents[0]?.intensityScore || 0
     }
