@@ -188,6 +188,13 @@ async function fetchRSS(source) {
       const title = getRawText(item.title);
       const description = getRawText(item.description || item.summary || item.content).replace(/<[^>]+>/g, '');
 
+      // Filter out automated placeholder promotional livestream broadcasts
+      const isLivestream = /^(transmetim\s+live\b|live\s*[:–-]|ndiqeni\s+live\b|shikoni\s+live\b|pratite\s+uživo\b|uzivo\s+prenos\b)/i.test(title) ||
+        /live\s+në\s+indeksonline|transmetim\s+live\s+dhe\s+lajme\s+në\s+kohë\s+reale/i.test(`${title} ${description}`);
+      if (isLivestream) {
+        return null;
+      }
+
       let link = '#';
       if (typeof item.link?.[0] === 'string') {
         link = item.link[0];
@@ -229,7 +236,7 @@ async function fetchRSS(source) {
         _signals: analysis.signals,
         multilingualEntities: analysis.signals.entities
       };
-    });
+    }).filter(Boolean);
   } catch (error) {
     console.log(`[news-intel] ${source.name} failed: ${error.message}`);
     return [];

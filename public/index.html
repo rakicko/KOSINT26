@@ -214,14 +214,15 @@
                 </div>
                 <div class="panel-meta" id="newsMeta"></div>
               </div>
-              <div class="panel-filter-row">
-                <button class="filter-btn active" onclick="filterNews('all', this)">All</button>
-                <button class="filter-btn" onclick="filterNews('critical', this)">Critical</button>
-                <button class="filter-btn" onclick="filterNews('high', this)">High</button>
-                <button class="filter-btn" onclick="filterNews('medium', this)">Medium</button>
-                <button class="filter-btn" onclick="filterNews('north_kosovo', this)">North Kosovo</button>
-                <button class="filter-btn" onclick="filterNews('event', this)">Events</button>
-                <button class="filter-btn" onclick="filterNews('commentary', this)">Commentary</button>
+              <div class="news-triage-controls">
+                <div class="panel-filter-row news-triage-tabs">
+                  <button class="filter-btn active" id="tabNewsOperational" onclick="switchNewsTab('operational', this)">🛡️ Operational</button>
+                  <button class="filter-btn" id="tabNewsNorth" onclick="switchNewsTab('north_kosovo', this)">📍 North Kosovo</button>
+                  <button class="filter-btn" id="tabNewsOther" onclick="switchNewsTab('other', this)">📋 Other</button>
+                </div>
+                <button class="news-urgent-toggle-btn" id="btnNewsUrgentToggle" onclick="toggleNewsUrgent(this)" title="Filter Critical & High alerts only">
+                  <span class="urgent-pulse-dot">●</span> Urgent Only
+                </button>
               </div>
               <div class="news-list" id="newsList"></div>
             </div>

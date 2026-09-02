@@ -38,8 +38,9 @@ function calculateSecurityScore(signals, title = '', description = '', published
   }
 
   // 2. Identify Event vs Commentary
-  const isSpeech = signals.commentarySignals.length > 0;
-  const hasDirectAction = signals.eventTypes.some(e => ['VIOLENCE', 'ENFORCEMENT', 'SEIZURE', 'DISCOVERY', 'EMERGENCY'].includes(e.actionType) && e.modality !== 'DENIED');
+  const isStudioDebate = /aludon|opinionist|analist|në\s*studio|ne\s*studio|pressing|debat\s*plus|rubikon|shtron\s*pyetjen/i.test(fullText);
+  const isSpeech = signals.commentarySignals.length > 0 || isStudioDebate;
+  const hasDirectAction = !isStudioDebate && signals.eventTypes.some(e => ['VIOLENCE', 'ENFORCEMENT', 'SEIZURE', 'DISCOVERY', 'EMERGENCY'].includes(e.actionType) && e.modality !== 'DENIED');
   const eventType = (isSpeech && !hasDirectAction) ? 'commentary' : 'event';
 
   // 3. Base Score & Severity from Canonical Event Types
@@ -90,6 +91,11 @@ function calculateSecurityScore(signals, title = '', description = '', published
     if (severity === 'critical') severity = 'high';
     else if (severity === 'high') severity = 'medium';
     else if (severity === 'medium') severity = 'low';
+    if (isStudioDebate) {
+      severity = 'medium';
+      baseScore = Math.min(5, baseScore);
+      category = 'commentary';
+    }
   }
 
   // 5. North Kosovo Detection & Boost

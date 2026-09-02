@@ -790,9 +790,9 @@ function renderNews(news) {
     badge.style.display = 'none';
   }
 
-  $('newsMeta').textContent = `${totalEvents} Security Events`;
+  $('newsMeta').textContent = `${totalEvents} Events`;
 
-  filterNewsItems(items, state.newsFilter || 'all');
+  filterNewsItems(items, state.newsTab || state.newsFilter || 'operational');
 }
 
 /**
@@ -838,96 +838,184 @@ function sortNewsByChronological(items) {
   });
 }
 
+function isOperationalNewsItem(item) {
+  if (!item) return false;
+  if (item.eventType === 'commentary' || item.category === 'commentary' || item.category === 'other') {
+    return false;
+  }
+  const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+  // TV talk show punditry & studio debates
+  if (/aludon|opinionist|analist|në\s*studio|ne\s*studio|pressing|debat\s*plus|rubikon|dpt\s*te\s*fidani|shtron\s*pyetjen|polemik|replikë|replike|debat\s*politik/i.test(text)) {
+    return false;
+  }
+  // Administrative council / procedural voting without operational security incident
+  if (/nuk\s*miratohet\s*raporti|raporti\s*i\s*punës|raportin\s*e\s*punës|prokurorial\s*i\s*kosovës|këshilli\s*prokurorial|keshilli\s*prokurorial|kpk\b|seancë\s*solemne|mbledhje\s*e\s*rregullt/i.test(text)) {
+    return false;
+  }
+  return true;
+}
+
+function isNorthKosovoItem(item) {
+  if (!item) return false;
+  if (item.category === 'north_kosovo') return true;
+  const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+  return /mitrovicë\s*e\s*veriut|severna\s*mitrovica|leposaviq|leposavić|zveçan|zvečan|zubin\s*potok|jarinj|jaranja|bërnjak|brnjak|banjsk|banjska|gazivod|ujman/i.test(text);
+}
+
 function filterNewsItems(items, filter) {
-  state.newsFilter = filter || 'all';
+  state.newsTab = filter || state.newsTab || 'operational';
+  state.newsFilter = state.newsTab;
   items = items || [];
+
   let filtered = items;
-  if (filter === 'critical') {
+
+  // 1. Primary Triage Tabs
+  if (state.newsTab === 'operational') {
+    filtered = items.filter(i => isOperationalNewsItem(i));
+  } else if (state.newsTab === 'north_kosovo') {
+    filtered = items.filter(i => isNorthKosovoItem(i));
+  } else if (state.newsTab === 'other') {
+    filtered = items.filter(i => !isOperationalNewsItem(i));
+  } else if (state.newsTab === 'critical') {
     filtered = items.filter(i => i.severity === 'critical' || i.intensityScore >= 9);
-  } else if (filter === 'high') {
+  } else if (state.newsTab === 'high') {
     filtered = items.filter(i => i.severity === 'high' || (i.intensityScore >= 7 && i.intensityScore <= 8));
-  } else if (filter === 'medium') {
+  } else if (state.newsTab === 'medium') {
     filtered = items.filter(i => i.severity === 'medium' || (i.intensityScore >= 4 && i.intensityScore <= 6));
-  } else if (filter === 'north_kosovo') {
-    filtered = items.filter(i => i.category === 'north_kosovo');
-  } else if (filter === 'event') {
-    filtered = items.filter(i => (i.eventType || 'event') === 'event');
-  } else if (filter === 'commentary') {
-    filtered = items.filter(i => i.eventType === 'commentary');
+  } else if (state.newsTab === 'commentary') {
+    filtered = items.filter(i => !isOperationalNewsItem(i));
+  } else if (state.newsTab === 'event') {
+    filtered = items.filter(i => isOperationalNewsItem(i));
+  } else if (state.newsTab === 'all') {
+    filtered = items;
+  }
+
+  // 2. Urgent Only Toggle (Filter Critical & High)
+  if (state.newsUrgentOnly) {
+    filtered = filtered.filter(i => {
+      const s = i.intensityScore || 1;
+      const sev = (i.severity || '').toLowerCase();
+      return sev === 'critical' || sev === 'high' || s >= 7;
+    });
   }
 
   const sorted = sortNewsByChronological(filtered);
 
   const list = $('newsList');
-  if (!sorted.length) { list.innerHTML = '<div class="empty-state">No matching security events</div>'; return; }
-  list.innerHTML = sorted.map(item => {
-    const s = item.intensityScore || 1;
-    const sev = (item.severity || (s >= 9 ? 'critical' : s >= 7 ? 'high' : 'medium')).toLowerCase();
-    const cls = sev === 'critical' ? 'score-critical' : sev === 'high' ? 'score-high' : 'score-medium';
-    const eventType = (item.eventType || 'event').toUpperCase();
-    const catLabel = (item.category || 'security').replace(/_/g, ' ').toUpperCase();
-    const confPercent = Math.round((item.confidence || 0.7) * 100);
-    const status = item.status || 'DEVELOPING';
-    const statusClass = `status-${status.toLowerCase()}`;
-    const sourceCount = item.sourceCount || (Array.isArray(item.sources) ? item.sources.length : 1);
-    const indCount = item.independentSourceCount || item.uniqueSourceCount || 1;
-    const devCount = item.developmentCount || (Array.isArray(item.developments) ? item.developments.length : 1);
-    const allSourcesList = (item.sources || [item.source]).join(', ');
-    const tags = (item.tags || []).slice(0, 3).map(t => `<span class="news-tag">${escHtml(t.replace(/_/g, ' '))}</span>`).join('');
-    const url = isValidArticleUrl(item.url) ? item.url.trim() : '';
+  if (!list) return;
 
+  if (!sorted.length) {
+    list.innerHTML = `<div class="empty-state">No ${state.newsUrgentOnly ? 'urgent ' : ''}events in ${state.newsTab === 'other' ? 'Other / General' : state.newsTab === 'north_kosovo' ? 'North Kosovo' : 'Operational'} feed</div>`;
+    return;
+  }
+
+  list.innerHTML = sorted.map((item, idx) => {
+    const s = item.intensityScore || 1;
+    const sev = (item.severity || (s >= 9 ? 'critical' : s >= 7 ? 'high' : s >= 4 ? 'medium' : 'low')).toLowerCase();
+    const sevClass = sev === 'critical' ? 'sev-critical' : sev === 'high' ? 'sev-high' : sev === 'medium' ? 'sev-medium' : 'sev-low';
+    const sevLabel = sev === 'critical' ? 'CRIT' : sev === 'high' ? 'HIGH' : sev === 'medium' ? 'MED' : 'LOW';
+
+    // Location extraction
+    const loc = extractNewsLocation(item);
+    const locationBadge = loc?.city ? `<span class="news-row-location">📍 ${escHtml(loc.city)}</span>` : '';
+
+    // Category tag
+    const rawCat = (item.category || (isOperationalNewsItem(item) ? 'Security' : 'Commentary')).replace(/_/g, ' ');
+    const catLabel = rawCat.charAt(0).toUpperCase() + rawCat.slice(1);
+
+    const title = item.title || item.canonicalTitle || 'Untitled Intelligence Item';
+    const desc = item.description || '';
+    const source = item.primarySource || item.source || 'Intelligence Feed';
+    const timeAgo = formatTimeAgo(item.publishedAt);
+    const url = (item.url && isValidArticleUrl(item.url)) ? item.url.trim() : '';
+    const rowId = `news-row-${idx}-${Math.random().toString(36).substring(2, 7)}`;
+
+    // Sources verification (Only show if >= 2 sources)
+    const sourcesList = item.sources || (item.source ? [item.source] : []);
+    const uniqueSources = [...new Set(sourcesList)];
+    const multiSourceHtml = uniqueSources.length >= 2 ? `
+      <div class="news-multi-source-pill">
+        <span class="pill-icon">📰</span> Verified by ${uniqueSources.length} sources: <strong>${escHtml(uniqueSources.join(', '))}</strong>
+      </div>
+    ` : '';
+
+    // Developments Timeline (STRICTLY ONLY if >= 2 developments)
     const developments = Array.isArray(item.developments) ? item.developments : [];
-    const devTimelineHtml = developments.length > 0 ? `
-      <div class="news-event-developments" style="margin-top: 6px; padding-top: 6px;">
-        <div class="news-developments-title" style="font-size: 9px; margin-bottom: 4px;">TIMELINE (${devCount} DEVELOPMENTS)</div>
-        <div class="news-developments-list" style="gap: 4px;">
+    const timelineHtml = developments.length >= 2 ? `
+      <div class="news-timeline-container">
+        <div class="news-timeline-title">TIMELINE (${developments.length} DEVELOPMENTS)</div>
+        <div class="news-timeline-items">
           ${developments.map(d => `
-            <div class="news-dev-item" style="padding: 4px 6px;">
-              <div class="news-dev-header">
-                <span class="news-dev-type news-dev-${(d.type || 'update').toLowerCase()}">${escHtml(d.type || 'UPDATE')}</span>
-                <span class="news-dev-time">${d.timestamp ? escHtml(formatTimeAgo(d.timestamp)) : ''}</span>
+            <div class="news-timeline-item">
+              <div class="news-tl-header">
+                <span class="news-tl-type">${escHtml(d.type || 'UPDATE')}</span>
+                <span class="news-tl-time">${d.timestamp ? escHtml(formatTimeAgo(d.timestamp)) : ''}</span>
               </div>
-              <div class="news-dev-summary" style="font-size: 10.5px;">${escHtml(d.title || d.summary || '')}</div>
-              <div class="news-dev-source" style="font-size: 9px; color: var(--text-dim); font-family: var(--font-mono);">
-                Sources: ${escHtml(Array.isArray(d.sources) ? d.sources.join(', ') : d.source || '')}
-              </div>
+              <div class="news-tl-text">${escHtml(d.title || d.summary || '')}</div>
+              ${d.sources?.length ? `<div class="news-tl-sources">Sources: ${escHtml(Array.isArray(d.sources) ? d.sources.join(', ') : d.sources)}</div>` : ''}
             </div>
           `).join('')}
         </div>
       </div>
     ` : '';
 
-    const card = `<div class="news-item ${cls}">
-      <div class="news-item-header">
-        <span class="news-score score-${s}">${s}/10</span>
-        <span class="news-severity sev-${sev}">${sev.toUpperCase()}</span>
-        <span class="news-event-status-badge ${statusClass}">STATUS: ${escHtml(status)}</span>
-        <span class="news-category">${catLabel}</span>
-        <span class="news-confidence">${confPercent}% Conf</span>
-        <span class="news-time">${formatTimeAgo(item.publishedAt)}</span>
+    return `
+      <div class="news-compact-row ${sevClass}" id="${rowId}" data-sev="${sev}">
+        <div class="news-compact-header" onclick="toggleNewsCompactDetails('${rowId}')">
+          <div class="news-compact-left">
+            <span class="news-pill-sev ${sevClass}">${sevLabel}</span>
+            ${locationBadge}
+            <span class="news-pill-cat">${escHtml(catLabel)}</span>
+          </div>
+          <div class="news-compact-title" title="${escHtml(title)}">${escHtml(title)}</div>
+          <div class="news-compact-right">
+            <span class="news-compact-source">${escHtml(source)}</span>
+            <span class="news-compact-time">${timeAgo}</span>
+            <span class="news-compact-chevron" id="${rowId}-chevron">▼</span>
+          </div>
+        </div>
+        <div class="news-compact-details" id="${rowId}-details" style="display:none;">
+          ${desc ? `<div class="news-details-summary">${escHtml(desc)}</div>` : ''}
+          ${multiSourceHtml}
+          ${timelineHtml}
+          <div class="news-details-actions">
+            ${url ? `<a class="news-direct-link-btn" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Open Original Article ↗</a>` : ''}
+          </div>
+        </div>
       </div>
-      <div class="news-event-metrics-bar" style="font-size: 9px; margin-top: 4px; margin-bottom: 4px;">
-        <span>${sourceCount} SOURCES</span>
-        <span>·</span>
-        <span>${indCount} INDEPENDENT</span>
-        <span>·</span>
-        <span>${devCount} DEVELOPMENTS</span>
-      </div>
-      <div class="news-title">${escHtml(item.title || item.canonicalTitle || '')}</div>
-      ${item.description ? `<div class="news-desc">${escHtml(item.description)}</div>` : ''}
-      ${devTimelineHtml}
-      <div class="news-footer" style="margin-top: 6px;">
-        <span class="news-source" title="${escHtml(allSourcesList)}">Primary: ${escHtml(item.primarySource || item.source || '')}</span>
-        <div class="news-tags">${tags}</div>
-      </div>
-    </div>`;
-    return url ? `<a class="news-item-link" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${card}</a>` : card;
+    `;
   }).join('');
 }
-function filterNews(cat, btn) {
-  document.querySelectorAll('.panel-filter-row .filter-btn').forEach(b => b.classList.remove('active'));
+
+function switchNewsTab(tab, btn) {
+  state.newsTab = tab;
+  document.querySelectorAll('.news-triage-tabs .filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  if (state.data?.news) filterNewsItems(state.data.news.items || [], cat);
+  if (state.data?.news) filterNewsItems(state.data.news.items || [], tab);
+}
+
+function toggleNewsUrgent(btn) {
+  state.newsUrgentOnly = !state.newsUrgentOnly;
+  if (btn) {
+    btn.classList.toggle('active', !!state.newsUrgentOnly);
+  }
+  if (state.data?.news) filterNewsItems(state.data.news.items || [], state.newsTab || 'operational');
+}
+
+function toggleNewsCompactDetails(rowId) {
+  const details = document.getElementById(`${rowId}-details`);
+  const chevron = document.getElementById(`${rowId}-chevron`);
+  if (!details) return;
+  const isExpanded = details.style.display !== 'none';
+  details.style.display = isExpanded ? 'none' : 'block';
+  if (chevron) {
+    chevron.textContent = isExpanded ? '▼' : '▲';
+    chevron.classList.toggle('expanded', !isExpanded);
+  }
+}
+
+function filterNews(cat, btn) {
+  switchNewsTab(cat, btn);
 }
 
 function renderWeather(weather, explicitCityName) {
