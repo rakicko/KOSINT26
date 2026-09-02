@@ -856,22 +856,29 @@ function isOperationalNewsItem(item) {
 }
 
 const SERBIAN_NEWS_SOURCES = ['kossev', 'radio mitrovica sever', 'radio kim', 'kosova.info'];
+const ALBANIAN_NEWS_SOURCES = ['koha', 'gazeta express', 'indeks online', 'lajmi', 'jepize', 'mitropol', 'mitrovicasot', 'telegrafi', 'kallxo'];
 
 function isSerbianNewsItem(item) {
   if (!item) return false;
-  if (item.language === 'sr' || item.language === 'serbian') return true;
+  if (item.language === 'al' || item.language === 'sq') return false;
   const src = String(item.primarySource || item.source || '').toLowerCase();
+  if (ALBANIAN_NEWS_SOURCES.some(s => src.includes(s))) return false;
+
+  // Strict Albanian character and word detection in title
+  const text = `${item.title || ''} ${item.description || ''}`;
+  if (/[ëËçÇ]/.test(text)) return false;
+  if (/\b(në|dhe|për|nga|është|një|së|të|ka|me|pas\s+takimit|marrëveshja|lajme|aksidenti|policisë)\b/i.test(item.title || '')) return false;
+
+  if (item.language === 'sr' || item.language === 'serbian') return true;
   if (SERBIAN_NEWS_SOURCES.some(s => src.includes(s))) return true;
   const sources = Array.isArray(item.sources) ? item.sources : [];
   if (sources.some(s => SERBIAN_NEWS_SOURCES.some(ss => String(s).toLowerCase().includes(ss)))) return true;
-  const text = `${item.title || ''} ${item.description || ''}`;
   if (/[\u0400-\u04FF]/.test(text)) return true;
   return false;
 }
 
 function isAlbanianNewsItem(item) {
   if (!item) return false;
-  if (item.language === 'al' || item.language === 'sq' || item.language === 'albanian') return true;
   return !isSerbianNewsItem(item);
 }
 

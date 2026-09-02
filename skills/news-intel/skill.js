@@ -274,8 +274,15 @@ async function fetchNews({
   // Deduplicate syndicated news items before clustering across all scanned articles
   const deduplicatedArticles = deduplicateNewsItems(allArticles);
 
-  // Multi-Factor Event Clustering Engine (groups articles into unified Event Objects)
-  const deduplicatedEvents = clusterEventArticles(deduplicatedArticles);
+  // Partition articles by language to strictly prevent cross-language headline contamination
+  const serbianArticles = deduplicatedArticles.filter(a => a.language === 'sr' || ['KoSSev', 'Radio Mitrovica Sever', 'Radio KIM', 'Kosova.info'].includes(a.source));
+  const albanianArticles = deduplicatedArticles.filter(a => !serbianArticles.includes(a));
+
+  const serbianEvents = clusterEventArticles(serbianArticles).map(e => ({ ...e, language: 'sr' }));
+  const albanianEvents = clusterEventArticles(albanianArticles).map(e => ({ ...e, language: 'al' }));
+
+  // Multi-Factor Event Clustering Engine output combined
+  const deduplicatedEvents = [...serbianEvents, ...albanianEvents];
 
   // Sort Order: 1. Severity, 2. Score, 3. Confidence, 4. IndependentSourceCount, 5. PublishedAt
   const severityRank = { critical: 4, high: 3, medium: 2, low: 1 };
