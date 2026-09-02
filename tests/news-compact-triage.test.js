@@ -25,22 +25,21 @@ const appJs = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8');
 assert(appJs.includes('function isOperationalNewsItem'), 'app.js must define isOperationalNewsItem');
 assert(appJs.includes('function switchNewsTab'), 'app.js must define switchNewsTab');
 assert(appJs.includes('function toggleNewsUrgent'), 'app.js must define toggleNewsUrgent');
-assert(appJs.includes('function toggleNewsCompactDetails'), 'app.js must define toggleNewsCompactDetails');
-assert(appJs.includes('news-compact-row'), 'app.js must render news-compact-row');
-assert(appJs.includes('developments.length >= 2'), 'app.js must strictly guard timeline for >= 2 developments');
-assert(appJs.includes('uniqueSources.length >= 2'), 'app.js must strictly guard multi-source verification for >= 2 sources');
-console.log('✓ Passed: app.js contains Option B compact row renderer and progressive disclosure logic');
+assert(appJs.includes('news-simple-card'), 'app.js must render news-simple-card');
+assert(appJs.includes('news-badge-sev'), 'app.js must render severity badge');
+assert(appJs.includes('news-badge-cat'), 'app.js must render category badge');
+console.log('✓ Passed: app.js contains clean news card renderer and triage logic');
 
 // 3. Check CSS rules in public/style.css
-console.log('Test 3: Verifying public/style.css styling for Option B...');
+console.log('Test 3: Verifying public/style.css styling for simplified news cards...');
 const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
 
-assert(styleCss.includes('.news-compact-row'), 'style.css must style .news-compact-row');
-assert(styleCss.includes('.news-compact-header'), 'style.css must style .news-compact-header');
-assert(styleCss.includes('.news-compact-details'), 'style.css must style .news-compact-details');
+assert(styleCss.includes('.news-simple-card'), 'style.css must style .news-simple-card');
+assert(styleCss.includes('.news-badge-sev'), 'style.css must style .news-badge-sev');
+assert(styleCss.includes('.news-badge-cat'), 'style.css must style .news-badge-cat');
 assert(styleCss.includes('.news-urgent-toggle-btn'), 'style.css must style .news-urgent-toggle-btn');
 assert(styleCss.includes('.news-triage-tabs'), 'style.css must style .news-triage-tabs');
-console.log('✓ Passed: style.css contains all Option B tactical row and toggle styles');
+console.log('✓ Passed: style.css contains all simplified card and toggle styles');
 
 // 4. Test Operational Triage Logic directly
 console.log('Test 4: Testing operational vs other separation logic...');

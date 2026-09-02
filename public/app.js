@@ -909,79 +909,40 @@ function filterNewsItems(items, filter) {
     return;
   }
 
-  list.innerHTML = sorted.map((item, idx) => {
+  list.innerHTML = sorted.map((item) => {
     const s = item.intensityScore || 1;
     const sev = (item.severity || (s >= 9 ? 'critical' : s >= 7 ? 'high' : s >= 4 ? 'medium' : 'low')).toLowerCase();
     const sevClass = sev === 'critical' ? 'sev-critical' : sev === 'high' ? 'sev-high' : sev === 'medium' ? 'sev-medium' : 'sev-low';
-    const sevLabel = sev === 'critical' ? 'CRIT' : sev === 'high' ? 'HIGH' : sev === 'medium' ? 'MED' : 'LOW';
+    const sevLabel = sev.toUpperCase();
 
-    // Location extraction
-    const loc = extractNewsLocation(item);
-    const locationBadge = loc?.city ? `<span class="news-row-location">📍 ${escHtml(loc.city)}</span>` : '';
-
-    // Category tag
+    // Category / news type tag
     const rawCat = (item.category || (isOperationalNewsItem(item) ? 'Security' : 'Commentary')).replace(/_/g, ' ');
-    const catLabel = rawCat.charAt(0).toUpperCase() + rawCat.slice(1);
+    const catLabel = rawCat.toUpperCase();
 
     const title = item.title || item.canonicalTitle || 'Untitled Intelligence Item';
-    const desc = item.description || '';
-    const source = item.primarySource || item.source || 'Intelligence Feed';
-    const timeAgo = formatTimeAgo(item.publishedAt);
-    const url = (item.url && isValidArticleUrl(item.url)) ? item.url.trim() : '';
-    const rowId = `news-row-${idx}-${Math.random().toString(36).substring(2, 7)}`;
+    const rawUrl = item.url ? String(item.url).trim() : '';
+    const validUrl = (rawUrl && isValidArticleUrl(rawUrl)) ? rawUrl : '';
 
-    // Sources verification (Only show if >= 2 sources)
-    const sourcesList = item.sources || (item.source ? [item.source] : []);
-    const uniqueSources = [...new Set(sourcesList)];
-    const multiSourceHtml = uniqueSources.length >= 2 ? `
-      <div class="news-multi-source-pill">
-        <span class="pill-icon">📰</span> Verified by ${uniqueSources.length} sources: <strong>${escHtml(uniqueSources.join(', '))}</strong>
-      </div>
-    ` : '';
-
-    // Developments Timeline (STRICTLY ONLY if >= 2 developments)
-    const developments = Array.isArray(item.developments) ? item.developments : [];
-    const timelineHtml = developments.length >= 2 ? `
-      <div class="news-timeline-container">
-        <div class="news-timeline-title">TIMELINE (${developments.length} DEVELOPMENTS)</div>
-        <div class="news-timeline-items">
-          ${developments.map(d => `
-            <div class="news-timeline-item">
-              <div class="news-tl-header">
-                <span class="news-tl-type">${escHtml(d.type || 'UPDATE')}</span>
-                <span class="news-tl-time">${d.timestamp ? escHtml(formatTimeAgo(d.timestamp)) : ''}</span>
-              </div>
-              <div class="news-tl-text">${escHtml(d.title || d.summary || '')}</div>
-              ${d.sources?.length ? `<div class="news-tl-sources">Sources: ${escHtml(Array.isArray(d.sources) ? d.sources.join(', ') : d.sources)}</div>` : ''}
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    ` : '';
+    if (validUrl) {
+      return `
+        <a class="news-simple-card ${sevClass}" href="${escHtml(validUrl)}" target="_blank" rel="noopener noreferrer" title="${escHtml(title)}">
+          <div class="news-card-meta">
+            <span class="news-badge-sev ${sevClass}">${sevLabel}</span>
+            <span class="news-badge-cat">${escHtml(catLabel)}</span>
+          </div>
+          <div class="news-card-title">${escHtml(title)}</div>
+          <span class="news-card-ext">↗</span>
+        </a>
+      `;
+    }
 
     return `
-      <div class="news-compact-row ${sevClass}" id="${rowId}" data-sev="${sev}">
-        <div class="news-compact-header" onclick="toggleNewsCompactDetails('${rowId}')">
-          <div class="news-compact-left">
-            <span class="news-pill-sev ${sevClass}">${sevLabel}</span>
-            ${locationBadge}
-            <span class="news-pill-cat">${escHtml(catLabel)}</span>
-          </div>
-          <div class="news-compact-title" title="${escHtml(title)}">${escHtml(title)}</div>
-          <div class="news-compact-right">
-            <span class="news-compact-source">${escHtml(source)}</span>
-            <span class="news-compact-time">${timeAgo}</span>
-            <span class="news-compact-chevron" id="${rowId}-chevron">▼</span>
-          </div>
+      <div class="news-simple-card ${sevClass}" title="${escHtml(title)}">
+        <div class="news-card-meta">
+          <span class="news-badge-sev ${sevClass}">${sevLabel}</span>
+          <span class="news-badge-cat">${escHtml(catLabel)}</span>
         </div>
-        <div class="news-compact-details" id="${rowId}-details" style="display:none;">
-          ${desc ? `<div class="news-details-summary">${escHtml(desc)}</div>` : ''}
-          ${multiSourceHtml}
-          ${timelineHtml}
-          <div class="news-details-actions">
-            ${url ? `<a class="news-direct-link-btn" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Open Original Article ↗</a>` : ''}
-          </div>
-        </div>
+        <div class="news-card-title">${escHtml(title)}</div>
       </div>
     `;
   }).join('');
@@ -1000,18 +961,6 @@ function toggleNewsUrgent(btn) {
     btn.classList.toggle('active', !!state.newsUrgentOnly);
   }
   if (state.data?.news) filterNewsItems(state.data.news.items || [], state.newsTab || 'operational');
-}
-
-function toggleNewsCompactDetails(rowId) {
-  const details = document.getElementById(`${rowId}-details`);
-  const chevron = document.getElementById(`${rowId}-chevron`);
-  if (!details) return;
-  const isExpanded = details.style.display !== 'none';
-  details.style.display = isExpanded ? 'none' : 'block';
-  if (chevron) {
-    chevron.textContent = isExpanded ? '▼' : '▲';
-    chevron.classList.toggle('expanded', !isExpanded);
-  }
 }
 
 function filterNews(cat, btn) {
@@ -6079,6 +6028,8 @@ window.startMonitor = startMonitor;
 window.toggleMap = toggleMap;
 window.updatePollInterval = updatePollInterval;
 window.filterNews = filterNews;
+window.switchNewsTab = switchNewsTab;
+window.toggleNewsUrgent = toggleNewsUrgent;
 window.closeModulePanel = closeModulePanel;
 window.exportReport = exportReport;
 window.markAllRead = markAllRead;
