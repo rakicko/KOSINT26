@@ -16,6 +16,7 @@ const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(cors());
+app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public'), {
   etag: false,
   setHeaders: (res, filePath) => {
@@ -54,9 +55,9 @@ app.get('/events', (req, res) => {
 
 // ── API: Fetch status for a location ────────────────────────────────────────
 app.post('/api/status', async (req, res) => {
-  const { location, lat, lon, timeline = '24h', forceRefresh = false, customKeywords = [] } = req.body;
-  if (!location) return res.status(400).json({ error: 'location is required' });
   try {
+    const { location, lat, lon, timeline = '24h', forceRefresh = false, customKeywords = [] } = req.body || {};
+    if (!location) return res.status(400).json({ error: 'location is required' });
     const result = await orchestrate({ location, lat, lon, timeline, forceRefresh, customKeywords });
     // Broadcast any new alerts via SSE
     if (result.alerts?.hasNewAlerts) {
@@ -94,7 +95,7 @@ app.get('/api/preferences', (req, res) => {
 
 app.post('/api/preferences', (req, res) => {
   const current = memoryBank.get('preferences');
-  memoryBank.set('preferences', { ...current, ...req.body });
+  memoryBank.set('preferences', { ...current, ...(req.body || {}) });
   res.json({ ok: true, preferences: memoryBank.get('preferences') });
 });
 

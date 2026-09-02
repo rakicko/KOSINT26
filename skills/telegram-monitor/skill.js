@@ -949,6 +949,78 @@ async function fetchViaBotApi(botToken, channels) {
   return { posts, errors };
 }
 
+/**
+ * Fallback to Telegram public web preview (https://t.me/s/<channel>) for public channels
+ * Provides clean, real-time read-only posts without requiring active MTProto session or bot tokens
+ */
+async function fetchViaPublicWeb(channels, limitPerChannel = 10) {
+  const posts = [];
+  const errors = [];
+
+  for (const rawChannel of channels) {
+    const channelName = normalizeChannelName(rawChannel);
+    if (!channelName) continue;
+
+    try {
+      const url = `https://t.me/s/${encodeURIComponent(channelName)}`;
+      const res = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        },
+        timeout: 10000
+      });
+
+      const html = res.data || '';
+      const blockRegex = /<div class="tgme_widget_message\b[^>]*data-post="([^"]+)"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/g;
+      let blockMatch;
+      const channelPosts = [];
+
+      while ((blockMatch = blockRegex.exec(html)) !== null) {
+        const postPath = blockMatch[1];
+        const blockHtml = blockMatch[2];
+
+        const textMatch = blockHtml.match(/<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/);
+        const rawText = textMatch
+          ? textMatch[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim()
+          : '';
+
+        const timeMatch = blockHtml.match(/<time\s+datetime="([^"]+)"/);
+        const timestamp = timeMatch ? timeMatch[1] : new Date().toISOString();
+
+        const viewsMatch = blockHtml.match(/<span class="tgme_widget_message_views">([^<]+)<\/span>/);
+        const viewsStr = viewsMatch ? viewsMatch[1].trim() : null;
+
+        const idParts = postPath.split('/');
+        const msgId = idParts[1] ? parseInt(idParts[1], 10) : Date.now();
+
+        if (rawText) {
+          channelPosts.push({
+            id: `tg-${channelName}-${msgId}`,
+            messageId: msgId,
+            channel: `@${channelName}`,
+            channelUsername: channelName,
+            channelTitle: `@${channelName}`,
+            timestamp,
+            text: rawText,
+            url: `https://t.me/${postPath}`,
+            media: { hasMedia: false, type: null, description: null, hasPreview: false, previewUrl: null },
+            views: viewsStr,
+            forwards: null
+          });
+        }
+      }
+
+      const recent = channelPosts.slice(-limitPerChannel).reverse();
+      posts.push(...recent);
+    } catch (err) {
+      console.warn(`[telegram-monitor] Public web fetch failed for @${channelName}:`, err.message);
+      errors.push({ channel: rawChannel, error: err.message });
+    }
+  }
+
+  return { posts, errors };
+}
+
 // In-memory media thumbnail cache
 const mediaThumbnailCache = new Map();
 const MEDIA_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -1215,6 +1287,22 @@ async function fetchTelegram({
       }
     }
 
+    // Approach 3: Telegram Public Web Preview fallback for public channels
+    let source = 'Telegram Official API';
+    if (posts.length === 0 && targetChannels.length > 0) {
+      try {
+        console.log(`[telegram-monitor] Attempting public web preview fallback for: ${targetChannels.join(', ')}`);
+        const webResult = await fetchViaPublicWeb(targetChannels, limit);
+        if (webResult.posts.length > 0) {
+          posts = webResult.posts;
+          source = 'Telegram Public Web';
+          console.log(`[telegram-monitor] Successfully fetched ${posts.length} posts via Telegram Public Web fallback.`);
+        }
+      } catch (webErr) {
+        console.warn('[telegram-monitor] Public web preview fallback failed:', webErr.message);
+      }
+    }
+
     // Sort posts chronologically descending (newest first)
     posts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -1234,7 +1322,7 @@ async function fetchTelegram({
     const payload = {
       skill: 'telegram-monitor',
       status,
-      source: 'Telegram Official API',
+      source,
       updatedAt: new Date().toISOString(),
       channels: targetChannels,
       count: posts.length,

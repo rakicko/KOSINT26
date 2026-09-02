@@ -190,14 +190,30 @@ const CCTV_CAMERAS = [
   }
 ];
 
+const CARTO_API_KEY = (typeof window !== 'undefined' && (window.CARTO_API_KEY || window.CARTO_KEY)) || '';
+const OPENFREEMAP_DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
+
+const DARK_MAP_TILES = CARTO_API_KEY
+  ? [`https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`]
+  : ['https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'];
+const DARK_REF_TILES = CARTO_API_KEY
+  ? [`https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`]
+  : ['https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'];
+
 const OSM_STYLE = {
   version: 8,
   sources: {
     'osm-tiles': {
       type: 'raster',
-      tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
+      tiles: DARK_MAP_TILES,
       tileSize: 256,
-      attribution: '© OpenStreetMap contributors'
+      attribution: '© OpenStreetMap contributors, Esri'
+    },
+    'osm-ref-tiles': {
+      type: 'raster',
+      tiles: DARK_REF_TILES,
+      tileSize: 256,
+      attribution: '© Esri'
     },
     'satellite-tiles': {
       type: 'raster',
@@ -216,7 +232,21 @@ const OSM_STYLE = {
       id: 'osm-basemap',
       type: 'raster',
       source: 'osm-tiles',
-      paint: { 'raster-opacity': 1 }
+      paint: {
+        'raster-opacity': 1,
+        'raster-brightness-max': 0.22,
+        'raster-contrast': 0.65,
+        'raster-saturation': -1
+      }
+    },
+    {
+      id: 'osm-ref-basemap',
+      type: 'raster',
+      source: 'osm-ref-tiles',
+      paint: {
+        'raster-opacity': 0.85,
+        'raster-contrast': 0.35
+      }
     },
     {
       id: 'satellite-basemap',
@@ -281,10 +311,12 @@ function switchBasemap(basemapId) {
 
   if (basemapId === 'dark') {
     if (map.getLayer('osm-basemap')) map.setLayoutProperty('osm-basemap', 'visibility', 'visible');
+    if (map.getLayer('osm-ref-basemap')) map.setLayoutProperty('osm-ref-basemap', 'visibility', 'visible');
     if (map.getLayer('satellite-basemap')) map.setLayoutProperty('satellite-basemap', 'visibility', 'none');
   } else if (basemapId === 'satellite') {
     if (map.getLayer('satellite-basemap')) map.setLayoutProperty('satellite-basemap', 'visibility', 'visible');
     if (map.getLayer('osm-basemap')) map.setLayoutProperty('osm-basemap', 'visibility', 'none');
+    if (map.getLayer('osm-ref-basemap')) map.setLayoutProperty('osm-ref-basemap', 'visibility', 'none');
   }
 
   const buttons = document.querySelectorAll('.basemap-btn');
@@ -3698,9 +3730,13 @@ function initMap() {
   if (state.mapInitialized) return;
   state.mapInitialized = true;
 
+  const mapStyle = CARTO_API_KEY
+    ? OSM_STYLE
+    : OPENFREEMAP_DARK_STYLE;
+
   state.map = new maplibregl.Map({
     container: 'leafletMap',
-    style: OSM_STYLE,
+    style: mapStyle,
     center: [DEFAULT_MAP_CENTER.lon, DEFAULT_MAP_CENTER.lat],
     zoom: DEFAULT_MAP_ZOOM,
     pitch: 35,
@@ -3708,11 +3744,70 @@ function initMap() {
     attributionControl: false
   });
 
+  state.map.once('error', (err) => {
+    if (err && (err.dataType === 'style' || err.sourceId === 'openmaptiles')) {
+      console.warn('[map] Falling back to pitch-black tactical raster style:', err);
+      try { state.map.setStyle(OSM_STYLE); } catch (e) {}
+    }
+  });
+
   state.map.addControl(new BasemapControl(), 'top-right');
   state.map.addControl(new MapModeControl(), 'top-right');
   state.map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'bottom-right');
 
   state.map.on('load', () => {
+    // Ensure satellite raster source and layer exist
+    if (!state.map.getSource('satellite-tiles')) {
+      state.map.addSource('satellite-tiles', {
+        type: 'raster',
+        tiles: ['https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: '© Esri Clarity Archive'
+      });
+    }
+    if (!state.map.getLayer('satellite-basemap')) {
+      state.map.addLayer({
+        id: 'satellite-basemap',
+        type: 'raster',
+        source: 'satellite-tiles',
+        layout: { visibility: 'none' }
+      });
+    }
+
+    // Ensure wildfire GeoJSON source and circle layer exist
+    if (!state.map.getSource('wildfire-source')) {
+      state.map.addSource('wildfire-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+    }
+    if (!state.map.getLayer('wildfire-layer')) {
+      state.map.addLayer({
+        id: 'wildfire-layer',
+        type: 'circle',
+        source: 'wildfire-source',
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['get', 'frp'],
+            0, 4,
+            5, 6,
+            20, 10,
+            100, 16
+          ],
+          'circle-color': '#ff4500',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#fff',
+          'circle-stroke-opacity': 0.9,
+          'circle-opacity': 0.85,
+          'circle-blur': 1
+        }
+      });
+    }
+
     if (state.data) updateMap(state.data);
     setTimeout(() => { if (state.map) state.map.resize(); }, 200);
 

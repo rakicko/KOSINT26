@@ -545,9 +545,13 @@ body {
   inset: 0;
   width: 100%;
   height: 100%;
-  background: #070b12;
+  background: #05070c !important;
   border-radius: 0;
   z-index: 0;
+}
+
+.maplibregl-canvas {
+  background: #05070c !important;
 }
 
 /* ── Guaranteed MapLibre Geographic Marker Anchoring ──────────────────────── */
