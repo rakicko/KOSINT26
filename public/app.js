@@ -1410,6 +1410,7 @@ const TRAFFIC_RELEVANCE_TERMS = {
 };
 
 const NON_TRAFFIC_ACCIDENTAL = /kallash|armë zjarri|arme zjarri|fishek|shkrep.*armë|shkrepur fishek|plagos.*me armë|u vetëvra|vetevra|ubistvo iz nehata|pucanje iz nehata/i;
+const NON_TRAFFIC_DISPUTE = /kpk\b|kuvend|parlament|komision|seanc|këshill|keshill|prokuror|gjykat|gjyqës|deputet|ministr|parti\b|parti politike|politik|zgjedh|koalicion|votim|raport.*pun|debat.*politik|përplasje verbale|perplasje verbale/i;
 
 function classifyTrafficIncident(title, description) {
   const text = `${title || ''} ${description || ''}`.toLowerCase();
@@ -1434,6 +1435,15 @@ function classifyTrafficIncident(title, description) {
           return { isTraffic: true, type: 'accident', label: 'Traffic Accident' };
         }
         continue;
+      }
+      // Ambiguous collision terms ('përplasje', 'përplasur', 'u përplasën', 'sudar'):
+      // Must have vehicular/road context and not be an institutional/political clash
+      if (termLower === 'përplasje' || termLower === 'përplasur' || termLower === 'u përplasën' || termLower === 'sudar') {
+        const hasVehicleContext = /vetur|automjet|makin|kerr|kamion|autobus|motor|biçiklet|trotinet|këmbësor|kembesor|trafik|komunikacion|magjistral|autostrad|autoudh|korsi|rrug|qarkullim|vozil|automobil|pešak|pesak|kolovoz/i.test(text);
+        const isDispute = NON_TRAFFIC_DISPUTE.test(text);
+        if (!hasVehicleContext || isDispute) {
+          continue;
+        }
       }
       if (text.includes(termLower)) {
         return { isTraffic: true, type: 'accident', label: 'Traffic Accident' };
@@ -1489,13 +1499,13 @@ const KOSOVO_LOCATIONS = [
   { city: 'Prishtinë', lat: 42.6629, lon: 21.1655, keywords: ['prishtin', 'prištin', 'pristina', 'veternik', 'çagllavic', 'caglavic', 'hajvali', 'hajvalia'] },
   { city: 'Graçanicë', lat: 42.6000, lon: 21.1930, keywords: ['graçanic', 'gračanica', 'gracanica'] },
   { city: 'Fushë Kosovë', lat: 42.6340, lon: 21.0960, keywords: ['fushë kosov', 'fushe kosov', 'kosovo polje'] },
-  { city: 'Obiliq', lat: 42.6870, lon: 21.0770, keywords: ['obiliq', 'obilić', 'kastriot', 'kek'] },
+  { city: 'Obiliq', lat: 42.6870, lon: 21.0770, keywords: ['obiliq', 'obilić', 'kastriot'] },
   { city: 'Podujevë', lat: 42.9100, lon: 21.1900, keywords: ['podujev', 'podujevo', 'besian', 'lluzhan'] },
   { city: 'Vushtrri', lat: 42.8250, lon: 20.9660, keywords: ['vushtrr', 'vučitrn', 'vucitrn', 'smrekonic', 'smrekovnic'] },
   { city: 'Drenas', lat: 42.6250, lon: 20.8920, keywords: ['drenas', 'gllogoc', 'glogovac', 'komoran'] },
   { city: 'Skenderaj', lat: 42.7480, lon: 20.7890, keywords: ['skenderaj', 'srbica', 'prekaz'] },
-  { city: 'Pejë', lat: 42.6593, lon: 20.2887, keywords: ['pejë', 'peje', 'peć', 'pec', 'rugov'] },
-  { city: 'Istog', lat: 42.7800, lon: 20.4900, keywords: ['istog', 'istok', 'burim'] },
+  { city: 'Pejë', lat: 42.6593, lon: 20.2887, keywords: ['pejë', 'peje', 'peja', 'peć', 'peći', 'peci', 'pec', 'rugov'] },
+  { city: 'Istog', lat: 42.7800, lon: 20.4900, keywords: ['istog', 'istok'] },
   { city: 'Klinë', lat: 42.6210, lon: 20.5780, keywords: ['klinë', 'kline', 'klina'] },
   { city: 'Deçan', lat: 42.5410, lon: 20.2880, keywords: ['deçan', 'decan', 'dečani', 'decani'] },
   { city: 'Gjakovë', lat: 42.3810, lon: 20.4320, keywords: ['gjakov', 'đakovic', 'djakovic'] },
@@ -1509,10 +1519,23 @@ const KOSOVO_LOCATIONS = [
   { city: 'Lipjan', lat: 42.5220, lon: 21.1250, keywords: ['lipjan', 'lipljan', 'janjev'] },
   { city: 'Gjilan', lat: 42.4635, lon: 21.4694, keywords: ['gjilan', 'gnjilan', 'gavran'] },
   { city: 'Kamenicë', lat: 42.5780, lon: 21.5800, keywords: ['kamenic', 'kamenica', 'dardan'] },
-  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['viti', 'vitina', 'kllokot', 'klokot'] },
+  { city: 'Viti', lat: 42.3210, lon: 21.3580, keywords: ['vitisë', 'vitise', 'vitia', 'vitinë', 'vitina', 'kllokot', 'klokot'] },
   { city: 'Kaçanik', lat: 42.2300, lon: 21.2600, keywords: ['kaçanik', 'kacanik'] }
 ];
 const KOSOVO_TRAFFIC_LOCATIONS = KOSOVO_LOCATIONS;
+
+function matchesLocationKeyword(text, kw) {
+  if (!text || !kw) return false;
+  const t = text.toLowerCase();
+  const k = kw.toLowerCase();
+  const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (k.length <= 4) {
+    const regex = new RegExp(`(?<![a-z0-9ëçčćžšđ])${escaped}(?![a-z0-9ëçčćžšđ])`, 'i');
+    return regex.test(t);
+  }
+  const regex = new RegExp(`(?<![a-z0-9ëçčćžšđ])${escaped}`, 'i');
+  return regex.test(t);
+}
 
 function extractNewsLocation(item) {
   if (!item) return null;
@@ -1553,7 +1576,7 @@ function extractNewsLocation(item) {
     const cleanedExplicit = cleanTextForNewsLocation(explicitCityStr);
     for (const loc of KOSOVO_LOCATIONS) {
       for (const kw of loc.keywords) {
-        if (cleanedExplicit.includes(kw.toLowerCase())) {
+        if (matchesLocationKeyword(cleanedExplicit, kw)) {
           return { city: loc.city, lat: loc.lat, lon: loc.lon };
         }
       }
@@ -1565,7 +1588,7 @@ function extractNewsLocation(item) {
   if (cleanTitle) {
     for (const loc of KOSOVO_LOCATIONS) {
       for (const kw of loc.keywords) {
-        if (cleanTitle.includes(kw.toLowerCase())) {
+        if (matchesLocationKeyword(cleanTitle, kw)) {
           return { city: loc.city, lat: loc.lat, lon: loc.lon };
         }
       }
@@ -1577,7 +1600,7 @@ function extractNewsLocation(item) {
   if (cleanDesc) {
     for (const loc of KOSOVO_LOCATIONS) {
       for (const kw of loc.keywords) {
-        if (cleanDesc.includes(kw.toLowerCase())) {
+        if (matchesLocationKeyword(cleanDesc, kw)) {
           return { city: loc.city, lat: loc.lat, lon: loc.lon };
         }
       }
@@ -1593,12 +1616,12 @@ function extractTrafficLocation(title, description) {
   const cleanDesc = cleanTextForNewsLocation(description);
   for (const loc of KOSOVO_LOCATIONS) {
     for (const kw of loc.keywords) {
-      if (cleanTitle.includes(kw.toLowerCase())) return { city: loc.city, lat: loc.lat, lon: loc.lon };
+      if (matchesLocationKeyword(cleanTitle, kw)) return { city: loc.city, lat: loc.lat, lon: loc.lon };
     }
   }
   for (const loc of KOSOVO_LOCATIONS) {
     for (const kw of loc.keywords) {
-      if (cleanDesc.includes(kw.toLowerCase())) return { city: loc.city, lat: loc.lat, lon: loc.lon };
+      if (matchesLocationKeyword(cleanDesc, kw)) return { city: loc.city, lat: loc.lat, lon: loc.lon };
     }
   }
   return null;

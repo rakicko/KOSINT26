@@ -102,4 +102,23 @@ assert(!styleCss.includes('.route-threat-banner'), 'style.css must not contain r
 assert(appJs.includes('ROUTING SERVICE UNAVAILABLE'), 'app.js must show ROUTING SERVICE UNAVAILABLE when routing fails');
 console.log('✓ Passed: Route Intelligence architecture is strictly clean, decoupled from news threat analysis');
 
+// Test 8: Political/institutional dispute rejection & substring location false positive prevention
+console.log('Test 8: Verifying political clash rejection & substring location prevention...');
+const kpkClash = classifyTrafficIncident(
+  'Përplasje në KPK, nuk miratohet raporti për punën e Prokurorisë Speciale',
+  'Këshilli Prokurorial i Kosovës, në takimin e 301-të të saj, ka refuzuar miratimin e raportit të punës për Prokurorinë Speciale për vitin 2025.'
+);
+assert(!kpkClash.isTraffic, 'Political/institutional clash in KPK must NOT be classified as traffic');
+
+const kuvendClash = classifyTrafficIncident('Përplasje në Kuvend mes deputetëve të pozitës dhe opozitës për buxhetin');
+assert(!kuvendClash.isTraffic, 'Parliamentary debate clash must NOT be classified as traffic');
+
+const locKpk = extractLocation(
+  'Përplasje në KPK, nuk miratohet raporti për punën e Prokurorisë Speciale',
+  'Prokuroria Speciale raporton për vitin 2025.'
+);
+assert.strictEqual(locKpk, null, 'Word "Speciale" must NOT trigger false positive Pejë location via "pec" substring');
+console.log('✓ Passed: Political disputes rejected from traffic and location substring false positives prevented');
+
 console.log('--- ALL TRAFFIC & ROUTE INTELLIGENCE TESTS PASSED ---');
+
