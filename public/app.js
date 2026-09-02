@@ -1,4 +1,11 @@
 import * as maplibregl from './vendor/maplibre-gl.mjs';
+import {
+  ABL_GEOJSON,
+  MUNICIPALITIES_NORTH_GEOJSON,
+  MUNICIPALITIES_CENTROIDS_GEOJSON,
+  KFOR_BASES_GEOJSON,
+  SENSITIVE_CORRIDORS_GEOJSON
+} from './operational-zones.js';
 
 'use strict';
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -401,6 +408,10 @@ const state = {
   weatherPopup: null,
   borderPopup: null,
   activeMapPopup: null,
+  staffToken: typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('staff_warden_token') : null,
+  staffLocations: [],
+  staffFilteredLocations: [],
+  staffInactivityTimer: null
 };
 
 function clearMarkerList(markerList) {
@@ -500,6 +511,14 @@ const moduleLayers = {
     render: () => renderCCTVMapMarkers(),
     clear: () => {
       clearMarkerList(moduleLayers.cctv.markers);
+      closeMapPopup();
+    }
+  },
+  staff: {
+    markers: [],
+    render: (data) => renderStaffMapMarkers(data || state.staffLocations),
+    clear: () => {
+      clearMarkerList(moduleLayers.staff.markers);
       closeMapPopup();
     }
   },
@@ -3308,6 +3327,11 @@ function toggleModule(panelId) {
     return;
   }
 
+  if (panelId === 'staffPanel' && !state.staffToken) {
+    openStaffLoginModal();
+    return;
+  }
+
   const panel = $(panelId);
   if (!panel) return;
 
@@ -3325,7 +3349,8 @@ function toggleModule(panelId) {
     'cctvIntelligencePanel': 'cctv',
     'routePanel': 'route',
     'alertPanel': 'alert',
-    'settingsPanel': 'settings'
+    'settingsPanel': 'settings',
+    'staffPanel': 'staff'
   };
 
   const targetModule = panelToModule[panelId] || null;
@@ -3403,6 +3428,8 @@ function toggleModule(panelId) {
       if (!state.borderData) {
         fetchBorder();
       }
+    } else if (targetModule === 'staff') {
+      fetchStaffLocations();
     }
   }
 
@@ -3994,6 +4021,8 @@ function initMap() {
         }
       });
     }
+
+    initTacticalLayers(state.map);
   });
 
   state.map.on('zoomend', () => {
@@ -4023,6 +4052,304 @@ function initMap() {
   });
 
   setTimeout(() => { if (state.map) state.map.resize(); }, 200);
+}
+
+// ─── Tactical Operational Zones & Boundaries (ABL, Municipalities, KFOR) ───────
+
+let tacticalKforMarkers = [];
+let tacticalMunLabels = [];
+
+function renderTacticalKforBases(visible) {
+  tacticalKforMarkers.forEach(m => m.remove());
+  tacticalKforMarkers = [];
+  if (!visible || !state.map) return;
+
+  KFOR_BASES_GEOJSON.features.forEach(base => {
+    const p = base.properties;
+    const coords = base.geometry.coordinates;
+
+    const el = document.createElement('div');
+    el.className = 'kfor-marker-pin';
+    const shortName = p.name.replace('Camp ', '');
+    el.innerHTML = `
+      <div class="kfor-marker-shield">🛡️</div>
+      <div class="kfor-marker-tag">${shortName}</div>
+    `;
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const html = `
+        <div class="tactical-layer-popup">
+          <div class="layer-popup-badge badge-kfor">KFOR MILITARY BASE · ${p.typeLabel}</div>
+          <div class="layer-popup-title">${p.name}</div>
+          <div class="layer-popup-meta">Command: <strong>${p.command}</strong></div>
+          <div class="layer-popup-row"><span>Lead Nation:</span> <strong>${p.leadNation}</strong></div>
+          <div class="layer-popup-row"><span>Sector:</span> ${p.sector}</div>
+          <div class="layer-popup-row"><span>Units:</span> ${p.units}</div>
+          <div class="layer-popup-row"><span>Status:</span> ${p.status}</div>
+          <div class="layer-popup-notes"><strong>Capabilities:</strong> ${p.capabilities}</div>
+        </div>
+      `;
+      openMapPopup(coords, html);
+    });
+
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat(coords)
+      .addTo(state.map);
+
+    tacticalKforMarkers.push(marker);
+  });
+}
+
+function renderTacticalMunLabels(visible) {
+  tacticalMunLabels.forEach(m => m.remove());
+  tacticalMunLabels = [];
+  if (!visible || !state.map) return;
+
+  MUNICIPALITIES_CENTROIDS_GEOJSON.features.forEach(feat => {
+    const p = feat.properties;
+    const coords = feat.geometry.coordinates;
+
+    const el = document.createElement('div');
+    el.className = 'mun-tactical-label';
+    el.style.borderColor = p.color || '#38bdf8';
+    el.innerHTML = `<span class="mun-label-text">${p.nameSr}</span>`;
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const parentMun = MUNICIPALITIES_NORTH_GEOJSON.features.find(f => f.properties.id === p.id.replace('-label', ''));
+      if (parentMun) {
+        const mp = parentMun.properties;
+        const html = `
+          <div class="tactical-layer-popup">
+            <div class="layer-popup-badge badge-mun">NORTH MUNICIPALITY · ${mp.code}</div>
+            <div class="layer-popup-title">${mp.name}</div>
+            <div class="layer-popup-meta">Area: <strong>${mp.areaKm2} km²</strong> · Population: <strong>~${mp.populationEst}</strong></div>
+            <div class="layer-popup-row"><span>HQ:</span> ${mp.hq}</div>
+            <div class="layer-popup-row"><span>Police:</span> ${mp.policeStation}</div>
+            <div class="layer-popup-row"><span>Access:</span> ${mp.primaryAccess}</div>
+            <div class="layer-popup-row"><span>Key Sectors:</span> ${mp.keyLocations}</div>
+          </div>
+        `;
+        openMapPopup(coords, html);
+      }
+    });
+
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat(coords)
+      .addTo(state.map);
+
+    tacticalMunLabels.push(marker);
+  });
+}
+
+function initTacticalLayers(map) {
+  if (!map) return;
+
+  // 1. ABL (Administrative Boundary Line)
+  if (!map.getSource('abl-source')) {
+    map.addSource('abl-source', {
+      type: 'geojson',
+      data: ABL_GEOJSON
+    });
+  }
+  if (!map.getLayer('abl-glow')) {
+    map.addLayer({
+      id: 'abl-glow',
+      type: 'line',
+      source: 'abl-source',
+      layout: { visibility: 'visible' },
+      paint: {
+        'line-color': '#f59e0b',
+        'line-width': 7,
+        'line-opacity': 0.38,
+        'line-blur': 2.5
+      }
+    });
+  }
+  if (!map.getLayer('abl-line')) {
+    map.addLayer({
+      id: 'abl-line',
+      type: 'line',
+      source: 'abl-source',
+      layout: { visibility: 'visible', 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#f59e0b',
+        'line-width': 2.8,
+        'line-dasharray': [3, 2],
+        'line-opacity': 0.95
+      }
+    });
+  }
+
+  // 2. Municipalities (4 Northern Kosovo Municipalities)
+  if (!map.getSource('municipalities-source')) {
+    map.addSource('municipalities-source', {
+      type: 'geojson',
+      data: MUNICIPALITIES_NORTH_GEOJSON
+    });
+  }
+  if (!map.getLayer('municipalities-fill')) {
+    map.addLayer({
+      id: 'municipalities-fill',
+      type: 'fill',
+      source: 'municipalities-source',
+      layout: { visibility: 'visible' },
+      paint: {
+        'fill-color': ['get', 'color'],
+        'fill-opacity': 0.16
+      }
+    });
+  }
+  if (!map.getLayer('municipalities-line')) {
+    map.addLayer({
+      id: 'municipalities-line',
+      type: 'line',
+      source: 'municipalities-source',
+      layout: { visibility: 'visible' },
+      paint: {
+        'line-color': ['get', 'borderColor'],
+        'line-width': 2.2,
+        'line-opacity': 0.9
+      }
+    });
+  }
+
+  // Render initial municipal center labels
+  renderTacticalMunLabels(true);
+
+  // 3. Sensitive Corridors & Bridges
+  if (!map.getSource('corridors-source')) {
+    map.addSource('corridors-source', {
+      type: 'geojson',
+      data: SENSITIVE_CORRIDORS_GEOJSON
+    });
+  }
+  if (!map.getLayer('corridors-line')) {
+    map.addLayer({
+      id: 'corridors-line',
+      type: 'line',
+      source: 'corridors-source',
+      filter: ['==', '$type', 'LineString'],
+      layout: { visibility: 'none' },
+      paint: {
+        'line-color': '#ec4899',
+        'line-width': 3.5,
+        'line-dasharray': [2, 2],
+        'line-opacity': 0.9
+      }
+    });
+  }
+  if (!map.getLayer('corridors-points')) {
+    map.addLayer({
+      id: 'corridors-points',
+      type: 'circle',
+      source: 'corridors-source',
+      filter: ['==', '$type', 'Point'],
+      layout: { visibility: 'none' },
+      paint: {
+        'circle-radius': 7,
+        'circle-color': '#ec4899',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+        'circle-opacity': 0.9
+      }
+    });
+  }
+
+  // Interactive Clicks:
+  map.on('click', 'municipalities-fill', (e) => {
+    if (e.features && e.features.length > 0) {
+      const p = e.features[0].properties;
+      const html = `
+        <div class="tactical-layer-popup">
+          <div class="layer-popup-badge badge-mun">NORTH MUNICIPALITY · ${p.code || 'NORTH'}</div>
+          <div class="layer-popup-title">${p.name}</div>
+          <div class="layer-popup-meta">Area: <strong>${p.areaKm2} km²</strong> · Population: <strong>~${p.populationEst}</strong></div>
+          <div class="layer-popup-row"><span>HQ:</span> ${p.hq}</div>
+          <div class="layer-popup-row"><span>Police:</span> ${p.policeStation}</div>
+          <div class="layer-popup-row"><span>Access:</span> ${p.primaryAccess}</div>
+          <div class="layer-popup-row"><span>Key Sectors:</span> ${p.keyLocations}</div>
+        </div>
+      `;
+      openMapPopup(e.lngLat, html);
+    }
+  });
+
+  map.on('click', 'corridors-points', (e) => {
+    if (e.features && e.features.length > 0) {
+      const p = e.features[0].properties;
+      const html = `
+        <div class="tactical-layer-popup">
+          <div class="layer-popup-badge badge-corridor">${(p.category || 'POINT').toUpperCase()} · ${p.securityLevel}</div>
+          <div class="layer-popup-title">${p.name}</div>
+          <div class="layer-popup-meta">Status: <strong>${p.status}</strong></div>
+          <div class="layer-popup-desc">${p.description}</div>
+        </div>
+      `;
+      openMapPopup(e.lngLat, html);
+    }
+  });
+
+  // Cursor pointers
+  ['municipalities-fill', 'corridors-points'].forEach(layerId => {
+    map.on('mouseenter', layerId, () => {
+      if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', layerId, () => {
+      if (map.getCanvas()) map.getCanvas().style.cursor = '';
+    });
+  });
+}
+
+function toggleTacticalLayer(layerGroup, isVisible) {
+  if (!state.map) return;
+  const visibility = isVisible ? 'visible' : 'none';
+
+  if (layerGroup === 'abl') {
+    ['abl-glow', 'abl-line'].forEach(layerId => {
+      if (state.map.getLayer(layerId)) {
+        state.map.setLayoutProperty(layerId, 'visibility', visibility);
+      }
+    });
+  } else if (layerGroup === 'municipalities') {
+    ['municipalities-fill', 'municipalities-line'].forEach(layerId => {
+      if (state.map.getLayer(layerId)) {
+        state.map.setLayoutProperty(layerId, 'visibility', visibility);
+      }
+    });
+    renderTacticalMunLabels(isVisible);
+  } else if (layerGroup === 'kfor') {
+    renderTacticalKforBases(isVisible);
+  } else if (layerGroup === 'corridors') {
+    ['corridors-line', 'corridors-points'].forEach(layerId => {
+      if (state.map.getLayer(layerId)) {
+        state.map.setLayoutProperty(layerId, 'visibility', visibility);
+      }
+    });
+  }
+
+  let activeCount = 0;
+  if ($('toggleLayerAbl')?.checked) activeCount++;
+  if ($('toggleLayerMunicipalities')?.checked) activeCount++;
+  if ($('toggleLayerKfor')?.checked) activeCount++;
+  if ($('toggleLayerCorridors')?.checked) activeCount++;
+
+  const badge = $('tacticalLayersActiveBadge');
+  if (badge) {
+    badge.textContent = `${activeCount} Active`;
+    badge.classList.toggle('active', activeCount > 0);
+  }
+}
+
+function toggleTacticalLayersMenu(forceState) {
+  const menu = $('tacticalLayersMenu');
+  if (!menu) return;
+  const isCurrentlyOpen = menu.style.display === 'block';
+  const shouldOpen = typeof forceState === 'boolean' ? forceState : !isCurrentlyOpen;
+  menu.style.display = shouldOpen ? 'block' : 'none';
+  const btn = $('btnTacticalLayersToggle');
+  if (btn) btn.classList.toggle('active', shouldOpen);
 }
 
 function updateMap(data) {
@@ -5817,12 +6144,33 @@ async function calculateRoute() {
     return;
   }
 
-  const rawQueries = [startQuery];
+  const parseDestinations = (str) => {
+    if (!str) return [];
+    const trimmed = str.trim();
+    // 1. If string is a coordinate pair e.g. "42.8945, 20.8672" or "42.8945 20.8672", preserve as single coordinate item
+    if (/^[-+]?\d{1,2}(?:\.\d+)?\s*[, ]\s*[-+]?\d{1,3}(?:\.\d+)?$/.test(trimmed)) {
+      return [trimmed];
+    }
+    // 2. If semicolon is used (e.g. "Prishtinë; Prizren" or "42.89, 20.86; 42.66, 21.15")
+    if (trimmed.includes(';')) {
+      return trimmed.split(';').map(s => s.trim()).filter(Boolean);
+    }
+    // 3. If comma separated, check if it's two numbers (lat, lon)
+    const parts = trimmed.split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
+      return [trimmed];
+    }
+    // 4. Otherwise it's a list of place names like "Prishtinë, Prizren"
+    return parts;
+  };
+
+  const rawQueries = [];
+  parseDestinations(startQuery).forEach(q => rawQueries.push(q));
   viaInputs.forEach(v => {
-    v.split(',').map(s => s.trim()).filter(Boolean).forEach(q => rawQueries.push(q));
+    parseDestinations(v).forEach(q => rawQueries.push(q));
   });
   if (endQuery) {
-    endQuery.split(',').map(s => s.trim()).filter(Boolean).forEach(q => rawQueries.push(q));
+    parseDestinations(endQuery).forEach(q => rawQueries.push(q));
   }
 
   const resolvedPoints = [];
@@ -6120,6 +6468,522 @@ window.BORDER_CROSSING_LOCATIONS = BORDER_CROSSING_LOCATIONS;
 window.getCCTVEmbedUrl = getCCTVEmbedUrl;
 window.clusterGeoItems = clusterGeoItems;
 window.createClusterMarkerElement = createClusterMarkerElement;
+// ─── Staff Warden & Evacuation Security Management ────────────────────────────
+
+function updateStaffLockUI() {
+  const badge = $('staffNavLockBadge');
+  if (badge) {
+    if (state.staffToken) {
+      badge.textContent = '🔓';
+      badge.classList.add('unlocked');
+      badge.title = 'Staff Warden Layer Unlocked';
+    } else {
+      badge.textContent = '🔒';
+      badge.classList.remove('unlocked');
+      badge.title = 'Staff Warden Layer Locked (Click to Authenticate)';
+    }
+  }
+}
+
+function resetStaffInactivityTimer() {
+  if (state.staffInactivityTimer) {
+    clearTimeout(state.staffInactivityTimer);
+  }
+  if (state.staffToken) {
+    state.staffInactivityTimer = setTimeout(() => {
+      console.warn('[Staff Warden] Auto-locking due to 15 minutes of inactivity.');
+      logoutStaff(true);
+    }, 15 * 60 * 1000);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  ['mousemove', 'keydown', 'click', 'touchstart'].forEach(evt => {
+    window.addEventListener(evt, () => {
+      if (state.staffToken) {
+        resetStaffInactivityTimer();
+      }
+    }, { passive: true });
+  });
+}
+
+function openStaffLoginModal() {
+  const modal = $('staffLoginModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    const err = $('staffAuthError');
+    if (err) err.style.display = 'none';
+    const userField = $('staffAuthUser');
+    if (userField) {
+      userField.focus();
+    }
+  }
+}
+
+function closeStaffLoginModal() {
+  const modal = $('staffLoginModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitStaffLogin(e) {
+  if (e) e.preventDefault();
+  const user = $('staffAuthUser')?.value?.trim();
+  const pass = $('staffAuthPass')?.value;
+  const submitBtn = $('btnStaffSubmit');
+  const errEl = $('staffAuthError');
+
+  if (!user || !pass) {
+    if (errEl) {
+      errEl.textContent = 'Username and passphrase are required';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
+
+  try {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verifying...';
+    }
+    if (errEl) errEl.style.display = 'none';
+
+    const res = await fetch('/api/staff/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Authentication failed');
+    }
+
+    state.staffToken = data.token;
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('staff_warden_token', data.token);
+    }
+    updateStaffLockUI();
+    closeStaffLoginModal();
+    resetStaffInactivityTimer();
+
+    // Clear passphrase input for security
+    const passInput = $('staffAuthPass');
+    if (passInput) passInput.value = '';
+
+    // Switch to staffPanel immediately
+    toggleModule('staffPanel');
+    fetchStaffLocations();
+  } catch (err) {
+    if (errEl) {
+      errEl.textContent = err.message || 'Invalid username or passphrase';
+      errEl.style.display = 'block';
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🔓 Authenticate & Decrypt';
+    }
+  }
+}
+
+function logoutStaff(isTimeout = false) {
+  state.staffToken = null;
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.removeItem('staff_warden_token');
+  }
+  if (state.staffInactivityTimer) {
+    clearTimeout(state.staffInactivityTimer);
+    state.staffInactivityTimer = null;
+  }
+  state.staffLocations = [];
+  state.staffFilteredLocations = [];
+
+  // Clear map markers and popup
+  if (moduleLayers.staff) {
+    moduleLayers.staff.clear();
+  }
+  updateStaffLockUI();
+
+  // If staff panel is open, close it
+  if (state.activeModule === 'staffPanel' || state.activeMapModule === 'staff') {
+    closeModulePanel();
+  }
+
+  if (isTimeout) {
+    alert('Staff Warden layer auto-locked due to 15 minutes of inactivity for operational security.');
+  }
+}
+
+async function fetchStaffLocations() {
+  if (!state.staffToken) return;
+  const listEl = $('staffList');
+  if (listEl) {
+    listEl.innerHTML = '<div class="loading-state">Decrypting staff residential roster...</div>';
+  }
+
+  try {
+    const res = await fetch('/api/staff/locations', {
+      headers: {
+        'Authorization': `Bearer ${state.staffToken}`
+      }
+    });
+
+    if (res.status === 401) {
+      logoutStaff();
+      openStaffLoginModal();
+      return;
+    }
+
+    const data = await res.json();
+    state.staffLocations = data.locations || [];
+    const badge = $('staffBadge');
+    if (badge) {
+      badge.textContent = `${state.staffLocations.length} Active`;
+      badge.style.display = 'inline-block';
+    }
+
+    filterStaffList();
+    renderStaffMapMarkers(state.staffLocations);
+  } catch (err) {
+    console.error('[Staff Warden] Fetch error:', err.message);
+    if (listEl) {
+      listEl.innerHTML = `<div class="empty-state">Error loading staff data: ${err.message}</div>`;
+    }
+  }
+}
+
+function filterStaffList() {
+  const query = ($('staffSearchInput')?.value || '').toLowerCase().trim();
+  const zone = $('staffZoneFilter')?.value || 'ALL';
+
+  state.staffFilteredLocations = (state.staffLocations || []).filter(item => {
+    if (zone !== 'ALL' && item.zone !== zone) return false;
+    if (query) {
+      const match = (item.callsign || '').toLowerCase().includes(query) ||
+                    (item.name || '').toLowerCase().includes(query) ||
+                    (item.zone || '').toLowerCase().includes(query) ||
+                    (item.address || '').toLowerCase().includes(query) ||
+                    (item.phone || '').toLowerCase().includes(query);
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  renderStaffList();
+}
+
+function renderStaffList() {
+  const listEl = $('staffList');
+  if (!listEl) return;
+
+  if (state.staffFilteredLocations.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">No personnel or safe havens found matching criteria.</div>';
+    return;
+  }
+
+  listEl.innerHTML = state.staffFilteredLocations.map(staff => {
+    const isSafeHaven = staff.category === 'safe_haven';
+    const prioClass = (staff.evacuationPriority || 'medium').toLowerCase();
+    const prioLabel = staff.evacuationPriority || 'MEDIUM';
+
+    return `
+      <div class="staff-card ${isSafeHaven ? 'staff-card-safehaven' : ''}" id="staffCard-${staff.id}">
+        <div class="staff-card-header">
+          <div class="staff-card-title-wrap">
+            <span class="staff-category-icon">${isSafeHaven ? '🛡️' : '🏠'}</span>
+            <div>
+              <div class="staff-card-callsign">${staff.callsign}</div>
+              <div class="staff-card-name">${staff.name || ''}</div>
+            </div>
+          </div>
+          <div class="staff-card-badges">
+            <span class="staff-prio-badge prio-${prioClass}">${prioLabel}</span>
+            <span class="staff-zone-badge">${staff.zone || 'Kosovo'}</span>
+          </div>
+        </div>
+
+        ${staff.address ? `<div class="staff-card-row"><span class="staff-row-icon">📍</span> <span class="staff-row-text">${staff.address}</span></div>` : ''}
+
+        <div class="staff-card-row staff-contact-row">
+          ${staff.phone ? `<a class="staff-contact-link" href="tel:${staff.phone}"><span class="staff-row-icon">📞</span> ${staff.phone}</a>` : ''}
+          ${staff.phone ? `<a class="staff-contact-link whatsapp" href="https://wa.me/${staff.phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>` : ''}
+        </div>
+
+        ${staff.notes ? `<div class="staff-card-notes"><span class="staff-notes-label">TACTICAL NOTE:</span> ${staff.notes}</div>` : ''}
+
+        <div class="staff-card-actions">
+          <button class="btn-staff-action map-focus" onclick="focusStaffLocation('${staff.id}')" title="Center map on location">
+            📍 Focus Map
+          </button>
+          <button class="btn-staff-action route-btn" onclick="routeToStaff(${staff.lat}, ${staff.lon}, '${(staff.callsign || '').replace(/'/g, "\\'")}')">
+            🛣️ Route Here
+          </button>
+          <button class="btn-staff-action edit-btn" onclick="openAddStaffModal('${staff.id}')" title="Edit entry">
+            ✏️
+          </button>
+          <button class="btn-staff-action delete-btn" onclick="deleteStaffEntry('${staff.id}')" title="Remove entry">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderStaffMapMarkers(data) {
+  if (!state.map) return;
+  clearMarkerList(moduleLayers.staff.markers);
+
+  const locations = Array.isArray(data) ? data : state.staffLocations;
+  if (!locations || locations.length === 0) return;
+
+  locations.forEach(staff => {
+    if (typeof staff.lat !== 'number' || typeof staff.lon !== 'number') return;
+
+    const isSafeHaven = staff.category === 'safe_haven';
+    const prio = (staff.evacuationPriority || 'MEDIUM').toUpperCase();
+
+    const el = document.createElement('div');
+    el.className = `staff-marker-pin ${isSafeHaven ? 'pin-safe-haven' : `pin-prio-${prio.toLowerCase()}`}`;
+    el.innerHTML = `
+      <div class="staff-marker-icon">${isSafeHaven ? '🛡️' : '🏠'}</div>
+      <div class="staff-marker-label">${staff.callsign}</div>
+    `;
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openStaffMapPopup(staff);
+    });
+
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat([staff.lon, staff.lat])
+      .addTo(state.map);
+
+    moduleLayers.staff.markers.push(marker);
+  });
+}
+
+function openStaffMapPopup(staff) {
+  if (!state.map) return;
+  closeMapPopup();
+
+  const isSafeHaven = staff.category === 'safe_haven';
+  const prio = staff.evacuationPriority || 'MEDIUM';
+
+  const popupHtml = `
+    <div class="staff-popup-card">
+      <div class="staff-popup-header">
+        <span class="staff-popup-icon">${isSafeHaven ? '🛡️' : '🏠'}</span>
+        <div>
+          <div class="staff-popup-title">${staff.callsign}</div>
+          <div class="staff-popup-sub">${staff.name || ''}</div>
+        </div>
+      </div>
+      <div class="staff-popup-body">
+        <div class="staff-popup-meta-row">
+          <span class="staff-popup-meta-tag prio-${prio.toLowerCase()}">${prio} PRIORITY</span>
+          <span class="staff-popup-meta-tag zone">${staff.zone || 'Kosovo'}</span>
+        </div>
+        ${staff.address ? `<div class="staff-popup-info"><span class="info-label">Address:</span> ${staff.address}</div>` : ''}
+        ${staff.phone ? `<div class="staff-popup-info"><span class="info-label">Emergency:</span> <a href="tel:${staff.phone}">${staff.phone}</a></div>` : ''}
+        ${staff.notes ? `<div class="staff-popup-notes"><strong>Tactical Notes:</strong> ${staff.notes}</div>` : ''}
+        <div class="staff-popup-actions">
+          <button class="btn-popup-route" onclick="routeToStaff(${staff.lat}, ${staff.lon}, '${(staff.callsign || '').replace(/'/g, "\\'")}')">
+            🛣️ Route to Location
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  state.activeMapPopup = new maplibregl.Popup({
+    closeButton: true,
+    closeOnClick: false,
+    className: 'staff-map-popup',
+    offset: 20
+  })
+    .setLngLat([staff.lon, staff.lat])
+    .setHTML(popupHtml)
+    .addTo(state.map);
+}
+
+function focusStaffLocation(id) {
+  const staff = (state.staffLocations || []).find(s => s.id === id);
+  if (!staff || !state.map) return;
+
+  state.map.flyTo({
+    center: [staff.lon, staff.lat],
+    zoom: 15,
+    essential: true
+  });
+
+  openStaffMapPopup(staff);
+
+  const card = $(`staffCard-${id}`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('card-highlight');
+    setTimeout(() => card.classList.remove('card-highlight'), 2000);
+  }
+}
+
+function routeToStaff(destLat, destLon, destName) {
+  toggleModule('routePanel');
+  const endInput = $('routeEndInput');
+  if (endInput) {
+    const latStr = typeof destLat === 'number' ? destLat.toFixed(4) : destLat;
+    const lonStr = typeof destLon === 'number' ? destLon.toFixed(4) : destLon;
+    endInput.value = `${latStr}, ${lonStr}`;
+  }
+  const startInput = $('routeStartInput');
+  if (startInput) {
+    const destIsNorthBase = Math.abs((Number(destLat) || 0) - 42.8945) < 0.002 && Math.abs((Number(destLon) || 0) - 20.8672) < 0.002;
+    if (!startInput.value || startInput.value === endInput?.value) {
+      startInput.value = destIsNorthBase ? 'Prishtinë' : 'Mitrovicë';
+    }
+  }
+  setTimeout(() => {
+    calculateRoute();
+  }, 150);
+}
+
+function openAddStaffModal(existingId = null) {
+  const modal = $('staffAddModal');
+  if (!modal) return;
+
+  const form = $('staffAddForm');
+  if (form) form.reset();
+
+  const titleEl = $('staffAddModalTitle');
+  const idInput = $('staffEntryId');
+
+  if (existingId) {
+    const item = (state.staffLocations || []).find(l => l.id === existingId);
+    if (item) {
+      if (titleEl) titleEl.textContent = `EDIT LOCATION: ${item.callsign}`;
+      if (idInput) idInput.value = item.id;
+      if ($('staffCallsign')) $('staffCallsign').value = item.callsign || '';
+      if ($('staffName')) $('staffName').value = item.name || '';
+      if ($('staffCategory')) $('staffCategory').value = item.category || 'residence';
+      if ($('staffZone')) $('staffZone').value = item.zone || '';
+      if ($('staffLat')) $('staffLat').value = item.lat || '';
+      if ($('staffLon')) $('staffLon').value = item.lon || '';
+      if ($('staffPhone')) $('staffPhone').value = item.phone || '';
+      if ($('staffPriority')) $('staffPriority').value = item.evacuationPriority || 'HIGH';
+      if ($('staffAddress')) $('staffAddress').value = item.address || '';
+      if ($('staffNotes')) $('staffNotes').value = item.notes || '';
+    }
+  } else {
+    if (titleEl) titleEl.textContent = 'ADD STAFF LOCATION / SAFE HAVEN';
+    if (idInput) idInput.value = '';
+    if (state.map) {
+      const center = state.map.getCenter();
+      if ($('staffLat')) $('staffLat').value = center.lat.toFixed(5);
+      if ($('staffLon')) $('staffLon').value = center.lng.toFixed(5);
+    }
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeAddStaffModal() {
+  const modal = $('staffAddModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitAddStaff(e) {
+  if (e) e.preventDefault();
+  if (!state.staffToken) return;
+
+  const id = $('staffEntryId')?.value;
+  const payload = {
+    callsign: $('staffCallsign')?.value?.trim(),
+    name: $('staffName')?.value?.trim(),
+    category: $('staffCategory')?.value,
+    zone: $('staffZone')?.value?.trim(),
+    lat: parseFloat($('staffLat')?.value),
+    lon: parseFloat($('staffLon')?.value),
+    phone: $('staffPhone')?.value?.trim(),
+    evacuationPriority: $('staffPriority')?.value,
+    address: $('staffAddress')?.value?.trim(),
+    notes: $('staffNotes')?.value?.trim()
+  };
+
+  try {
+    const url = '/api/staff/locations';
+    const method = 'POST';
+    if (id) {
+      payload.id = id;
+    }
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.staffToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to save location');
+    }
+
+    closeAddStaffModal();
+    await fetchStaffLocations();
+  } catch (err) {
+    alert('Error saving staff location: ' + err.message);
+  }
+}
+
+async function deleteStaffEntry(id) {
+  if (!state.staffToken) return;
+  const staff = (state.staffLocations || []).find(s => s.id === id);
+  const name = staff ? staff.callsign : 'this entry';
+  if (!confirm(`Are you sure you want to delete ${name} from the active warden roster?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/staff/locations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${state.staffToken}`
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to delete');
+    }
+
+    await fetchStaffLocations();
+  } catch (err) {
+    alert('Error deleting location: ' + err.message);
+  }
+}
+
+window.openStaffLoginModal = openStaffLoginModal;
+window.closeStaffLoginModal = closeStaffLoginModal;
+window.submitStaffLogin = submitStaffLogin;
+window.logoutStaff = logoutStaff;
+window.fetchStaffLocations = fetchStaffLocations;
+window.filterStaffList = filterStaffList;
+window.renderStaffList = renderStaffList;
+window.renderStaffMapMarkers = renderStaffMapMarkers;
+window.focusStaffLocation = focusStaffLocation;
+window.routeToStaff = routeToStaff;
+window.openAddStaffModal = openAddStaffModal;
+window.closeAddStaffModal = closeAddStaffModal;
+window.submitAddStaff = submitAddStaff;
+window.deleteStaffEntry = deleteStaffEntry;
+
+// Update UI on load
+updateStaffLockUI();
+
+window.toggleTacticalLayer = toggleTacticalLayer;
+window.toggleTacticalLayersMenu = toggleTacticalLayersMenu;
+
 window.calculateRoute = calculateRoute;
 window.clearRoute = clearRoute;
 window.addRouteDestinationInput = addRouteDestinationInput;

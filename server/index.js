@@ -11,6 +11,7 @@ const { fetchWeather } = require('../skills/weather-monitor/skill');
 const { fetchAviation } = require('../skills/aviation-monitor/skill');
 const { fetchTelegram, fetchMediaThumbnail } = require('../skills/telegram-monitor/skill');
 const { fetchBorders } = require('../skills/border-monitor/skill');
+const staffService = require('./staff-service');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -231,6 +232,68 @@ app.get('/api/borders', async (req, res) => {
       error: 'SERVER_ERROR',
       message: err.message || 'Failed to fetch border crossing intelligence.'
     });
+  }
+});
+
+// ── API: Staff Warden & Evacuation (Protected) ─────────────────────────────────
+function requireStaffAuth(req, res, next) {
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : req.headers['x-staff-token'];
+  const session = staffService.verifyToken(token);
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized: Valid staff credentials required' });
+  }
+  req.staffUser = session.user;
+  next();
+}
+
+app.post('/api/staff/login', (req, res) => {
+  const { username, password } = req.body || {};
+  const authResult = staffService.login(username, password);
+  if (!authResult.success) {
+    return res.status(401).json(authResult);
+  }
+  res.json(authResult);
+});
+
+app.post('/api/staff/logout', (req, res) => {
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+app.get('/api/staff/locations', requireStaffAuth, (req, res) => {
+  try {
+    const locations = staffService.getLocations();
+    res.json({ locations, count: locations.length, user: req.staffUser });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/staff/locations', requireStaffAuth, (req, res) => {
+  try {
+    const created = staffService.addLocation(req.body);
+    res.status(201).json({ success: true, location: created });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/staff/import', requireStaffAuth, (req, res) => {
+  try {
+    const locations = staffService.importLocations(req.body.locations);
+    res.json({ success: true, count: locations.length, locations });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/staff/locations/:id', requireStaffAuth, (req, res) => {
+  try {
+    const removed = staffService.deleteLocation(req.params.id);
+    if (!removed) return res.status(404).json({ error: 'Location not found' });
+    res.json({ success: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
