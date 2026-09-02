@@ -792,7 +792,7 @@ function renderNews(news) {
 
   $('newsMeta').textContent = `${totalEvents} Events`;
 
-  filterNewsItems(items, state.newsTab || state.newsFilter || 'operational');
+  filterNewsItems(items, state.newsTab || state.newsFilter || 'all');
 }
 
 /**
@@ -855,38 +855,49 @@ function isOperationalNewsItem(item) {
   return true;
 }
 
-function isNorthKosovoItem(item) {
+const SERBIAN_NEWS_SOURCES = ['kossev', 'radio mitrovica sever', 'radio kim', 'kosova.info'];
+
+function isSerbianNewsItem(item) {
   if (!item) return false;
-  if (item.category === 'north_kosovo') return true;
-  const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
-  return /mitrovicë\s*e\s*veriut|severna\s*mitrovica|leposaviq|leposavić|zveçan|zvečan|zubin\s*potok|jarinj|jaranja|bërnjak|brnjak|banjsk|banjska|gazivod|ujman/i.test(text);
+  if (item.language === 'sr' || item.language === 'serbian') return true;
+  const src = String(item.primarySource || item.source || '').toLowerCase();
+  if (SERBIAN_NEWS_SOURCES.some(s => src.includes(s))) return true;
+  const sources = Array.isArray(item.sources) ? item.sources : [];
+  if (sources.some(s => SERBIAN_NEWS_SOURCES.some(ss => String(s).toLowerCase().includes(ss)))) return true;
+  const text = `${item.title || ''} ${item.description || ''}`;
+  if (/[\u0400-\u04FF]/.test(text)) return true;
+  return false;
+}
+
+function isAlbanianNewsItem(item) {
+  if (!item) return false;
+  if (item.language === 'al' || item.language === 'sq' || item.language === 'albanian') return true;
+  return !isSerbianNewsItem(item);
 }
 
 function filterNewsItems(items, filter) {
-  state.newsTab = filter || state.newsTab || 'operational';
+  state.newsTab = filter || state.newsTab || 'all';
   state.newsFilter = state.newsTab;
   items = items || [];
 
   let filtered = items;
 
-  // 1. Primary Triage Tabs
-  if (state.newsTab === 'operational') {
+  // 1. Language & Operational Tabs
+  if (state.newsTab === 'all') {
+    filtered = items;
+  } else if (state.newsTab === 'serbian') {
+    filtered = items.filter(i => isSerbianNewsItem(i));
+  } else if (state.newsTab === 'albanian') {
+    filtered = items.filter(i => isAlbanianNewsItem(i));
+  } else if (state.newsTab === 'operational') {
     filtered = items.filter(i => isOperationalNewsItem(i));
-  } else if (state.newsTab === 'north_kosovo') {
-    filtered = items.filter(i => isNorthKosovoItem(i));
-  } else if (state.newsTab === 'other') {
-    filtered = items.filter(i => !isOperationalNewsItem(i));
   } else if (state.newsTab === 'critical') {
     filtered = items.filter(i => i.severity === 'critical' || i.intensityScore >= 9);
   } else if (state.newsTab === 'high') {
     filtered = items.filter(i => i.severity === 'high' || (i.intensityScore >= 7 && i.intensityScore <= 8));
   } else if (state.newsTab === 'medium') {
     filtered = items.filter(i => i.severity === 'medium' || (i.intensityScore >= 4 && i.intensityScore <= 6));
-  } else if (state.newsTab === 'commentary') {
-    filtered = items.filter(i => !isOperationalNewsItem(i));
-  } else if (state.newsTab === 'event') {
-    filtered = items.filter(i => isOperationalNewsItem(i));
-  } else if (state.newsTab === 'all') {
+  } else {
     filtered = items;
   }
 
@@ -905,7 +916,8 @@ function filterNewsItems(items, filter) {
   if (!list) return;
 
   if (!sorted.length) {
-    list.innerHTML = `<div class="empty-state">No ${state.newsUrgentOnly ? 'urgent ' : ''}events in ${state.newsTab === 'other' ? 'Other / General' : state.newsTab === 'north_kosovo' ? 'North Kosovo' : 'Operational'} feed</div>`;
+    const tabName = state.newsTab === 'serbian' ? 'Serbian' : state.newsTab === 'albanian' ? 'Albanian' : state.newsTab === 'operational' ? 'Operational' : 'All';
+    list.innerHTML = `<div class="empty-state">No ${state.newsUrgentOnly ? 'urgent ' : ''}events in ${tabName} news feed</div>`;
     return;
   }
 
@@ -6030,6 +6042,8 @@ window.updatePollInterval = updatePollInterval;
 window.filterNews = filterNews;
 window.switchNewsTab = switchNewsTab;
 window.toggleNewsUrgent = toggleNewsUrgent;
+window.isSerbianNewsItem = isSerbianNewsItem;
+window.isAlbanianNewsItem = isAlbanianNewsItem;
 window.closeModulePanel = closeModulePanel;
 window.exportReport = exportReport;
 window.markAllRead = markAllRead;

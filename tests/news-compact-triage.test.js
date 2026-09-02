@@ -10,25 +10,28 @@ console.log('--- Starting News Intelligence Compact Triage Tests ---');
 console.log('Test 1: Verifying index.html streamlined filter elements...');
 const indexHtml = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
 
+assert(indexHtml.includes('id="tabNewsAll"'), 'index.html must contain tabNewsAll');
+assert(indexHtml.includes('id="tabNewsSerbian"'), 'index.html must contain tabNewsSerbian');
+assert(indexHtml.includes('id="tabNewsAlbanian"'), 'index.html must contain tabNewsAlbanian');
 assert(indexHtml.includes('id="tabNewsOperational"'), 'index.html must contain tabNewsOperational');
-assert(indexHtml.includes('id="tabNewsNorth"'), 'index.html must contain tabNewsNorth');
-assert(indexHtml.includes('id="tabNewsOther"'), 'index.html must contain tabNewsOther');
 assert(indexHtml.includes('id="btnNewsUrgentToggle"'), 'index.html must contain btnNewsUrgentToggle');
 assert(indexHtml.includes('id="newsList"'), 'index.html must retain newsList container');
 assert(!indexHtml.includes('onclick="filterNews(\'critical\''), 'index.html must NOT contain obsolete 7-button filter bar');
-console.log('✓ Passed: index.html has clean 3-tab layout and urgent toggle button');
+console.log('✓ Passed: index.html has All, Serbian, Albanian, Operational tabs and urgent toggle button');
 
 // 2. Check public/app.js functions
-console.log('Test 2: Verifying app.js functions & operational filtering...');
+console.log('Test 2: Verifying app.js functions & language/operational filtering...');
 const appJs = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8');
 
 assert(appJs.includes('function isOperationalNewsItem'), 'app.js must define isOperationalNewsItem');
+assert(appJs.includes('function isSerbianNewsItem'), 'app.js must define isSerbianNewsItem');
+assert(appJs.includes('function isAlbanianNewsItem'), 'app.js must define isAlbanianNewsItem');
 assert(appJs.includes('function switchNewsTab'), 'app.js must define switchNewsTab');
 assert(appJs.includes('function toggleNewsUrgent'), 'app.js must define toggleNewsUrgent');
 assert(appJs.includes('news-simple-card'), 'app.js must render news-simple-card');
 assert(appJs.includes('news-badge-sev'), 'app.js must render severity badge');
 assert(appJs.includes('news-badge-cat'), 'app.js must render category badge');
-console.log('✓ Passed: app.js contains clean news card renderer and triage logic');
+console.log('✓ Passed: app.js contains clean news card renderer and language triage logic');
 
 // 3. Check CSS rules in public/style.css
 console.log('Test 3: Verifying public/style.css styling for simplified news cards...');
