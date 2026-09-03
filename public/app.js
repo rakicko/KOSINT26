@@ -630,14 +630,134 @@ function setMapViewMode(mode) {
 
 window.setMapViewMode = setMapViewMode;
 
-document.addEventListener('DOMContentLoaded', () => {
+// ── Global Authentication Gate ───────────────────────────────────────────────
+function showLoginModal() {
+  const modal = $('loginModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function hideLoginModal() {
+  const modal = $('loginModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function updateUserBadgeUI() {
+  const badge = $('userBadge');
+  const roleEl = $('userRoleBadge');
+  const nameEl = $('userName');
+  if (!badge) return;
+
+  if (state.user) {
+    badge.style.display = 'flex';
+    if (roleEl) roleEl.textContent = (state.user.role || 'OPERATOR').toUpperCase();
+    if (nameEl) nameEl.textContent = state.user.username || 'Observer';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function setupAuthEventListeners() {
+  const loginForm = $('loginForm');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userEl = $('loginUsername');
+      const passEl = $('loginPassword');
+      const errEl = $('loginError');
+      const btn = $('loginSubmitBtn');
+
+      if (!userEl || !passEl) return;
+      if (errEl) errEl.style.display = 'none';
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: userEl.value.trim(), password: passEl.value })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          state.user = data.user;
+          state.csrfToken = data.csrfToken;
+          updateUserBadgeUI();
+          hideLoginModal();
+          initAuthenticatedDashboard();
+        } else {
+          if (errEl) {
+            errEl.textContent = data.error || 'Authentication failed';
+            errEl.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        if (errEl) {
+          errEl.textContent = 'Connection error. Please try again.';
+          errEl.style.display = 'block';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+  }
+
+  const logoutBtn = $('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': state.csrfToken || ''
+          }
+        });
+      } catch {}
+      state.user = null;
+      state.csrfToken = null;
+      updateUserBadgeUI();
+      showLoginModal();
+    });
+  }
+}
+
+let dashboardInitialized = false;
+function initAuthenticatedDashboard() {
+  if (dashboardInitialized) {
+    startMonitor();
+    return;
+  }
+  dashboardInitialized = true;
   startClock();
   connectSSE();
   loadAlertHistory();
   initMap();
   startMonitor();
-
   setupCCTVPanelButtons();
+}
+
+async function checkAuthAndInit() {
+  setupAuthEventListeners();
+
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.authenticated && data.user) {
+      state.user = data.user;
+      state.csrfToken = data.csrfToken;
+      updateUserBadgeUI();
+      hideLoginModal();
+      initAuthenticatedDashboard();
+    } else {
+      showLoginModal();
+    }
+  } catch (err) {
+    console.warn('Failed to verify session:', err);
+    showLoginModal();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  checkAuthAndInit();
 });
 
 function setupCCTVPanelButtons() {

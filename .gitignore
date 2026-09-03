@@ -12,3 +12,8 @@ skills/*/.wildfire_cache.json
 skills/*/.telegram_session*
 skills/*/.telegram*.lock
 scratch/
+server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

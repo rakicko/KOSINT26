@@ -79,6 +79,11 @@
   </div>
 
   <div class="header-status">
+    <div class="user-badge" id="userBadge" style="display:none">
+      <span class="user-role-badge" id="userRoleBadge">OPERATOR</span>
+      <span class="user-name" id="userName">Observer</span>
+      <button class="btn-xs btn-logout" id="logoutBtn" title="Sign out of KOSINT">Sign out</button>
+    </div>
     <div id="liveIndicator" class="status-indicator offline">
       <span class="status-dot"></span>
       <span class="status-text">OFFLINE</span>
@@ -792,6 +797,29 @@
         <button type="button" class="btn-cancel" onclick="closeAddStaffModal()">Cancel</button>
         <button type="submit" class="btn-submit">💾 Save Location</button>
       </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Authentication Modal (Global Login Gate) ────────────────────────────── -->
+<div id="loginModal" class="modal-backdrop" style="display:none">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="brand-badge-modal">🛡️ RESTRICTED ACCESS</div>
+      <h2>KOSINT PLATFORM</h2>
+      <p class="modal-subtitle">OSCE Technical & Situational Operations Platform</p>
+    </div>
+    <form id="loginForm" class="modal-form">
+      <div class="form-group">
+        <label for="loginUsername">CALLSIGN / USERNAME</label>
+        <input type="text" id="loginUsername" class="input-field" placeholder="Enter username" autocomplete="username" required />
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">PASSPHRASE</label>
+        <input type="password" id="loginPassword" class="input-field" placeholder="Enter passphrase" autocomplete="current-password" required />
+      </div>
+      <div id="loginError" class="modal-error" style="display:none"></div>
+      <button type="submit" id="loginSubmitBtn" class="btn-primary-modal">AUTHENTICATE & ACCESS</button>
     </form>
   </div>
 </div>
