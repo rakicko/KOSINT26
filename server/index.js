@@ -58,10 +58,18 @@ app.use(helmet({
 }));
 
 // ── Strict Origin & Host Protection (Replacing Insecure Open CORS) ─────────────
+const codespaceOrigin = process.env.CODESPACE_NAME
+  ? `https://${process.env.CODESPACE_NAME}-${PORT}.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN || 'app.github.dev'}`
+  : null;
+
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT},http://127.0.0.1:${PORT}`)
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
+
+if (codespaceOrigin && !allowedOrigins.includes(codespaceOrigin)) {
+  allowedOrigins.push(codespaceOrigin);
+}
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
