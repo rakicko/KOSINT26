@@ -213,4 +213,27 @@ function migrateLegacyJsonDb() {
 
 migrateLegacyJsonDb();
 
+function seedBootstrapAdmin() {
+  try {
+    const defaultUser = process.env.ADMIN_BOOTSTRAP_USER || 'rakicko';
+    const defaultPass = process.env.ADMIN_BOOTSTRAP_PASS || 'Medjurecko1';
+    const existing = db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE').get(defaultUser);
+    if (!existing) {
+      const crypto = require('crypto');
+      const salt = crypto.randomBytes(32).toString('hex');
+      const hash = crypto.scryptSync(defaultPass, salt, 64).toString('hex');
+      const now = new Date().toISOString();
+      const id = `user-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      db.prepare('INSERT INTO users (id, username, password_hash, salt, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(id, defaultUser, hash, salt, 'administrator', now, now);
+      console.log(`[database] Seeded bootstrap administrator: ${defaultUser}`);
+    }
+  } catch (err) {
+    console.warn('[database] Bootstrap admin seeding failed:', err.message);
+  }
+}
+
+seedBootstrapAdmin();
+
 module.exports = db;
+
