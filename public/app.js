@@ -4,7 +4,8 @@ import {
   MUNICIPALITIES_NORTH_GEOJSON,
   MUNICIPALITIES_CENTROIDS_GEOJSON,
   KFOR_BASES_GEOJSON,
-  SENSITIVE_CORRIDORS_GEOJSON
+  SENSITIVE_CORRIDORS_GEOJSON,
+  MINEFIELDS_KOSOVO_GEOJSON
 } from './operational-zones.js';
 
 'use strict';
@@ -3470,7 +3471,8 @@ function toggleModule(panelId) {
     'routePanel': 'route',
     'alertPanel': 'alert',
     'settingsPanel': 'settings',
-    'staffPanel': 'staff'
+    'staffPanel': 'staff',
+    'minePanel': 'mines'
   };
 
   const targetModule = panelToModule[panelId] || null;
@@ -3550,6 +3552,11 @@ function toggleModule(panelId) {
       }
     } else if (targetModule === 'staff') {
       fetchStaffLocations();
+    } else if (targetModule === 'mines') {
+      renderMinefieldsList();
+      toggleTacticalLayer('mines', true);
+      const cb = $('toggleLayerMines');
+      if (cb) cb.checked = true;
     }
   }
 
@@ -4174,10 +4181,59 @@ function initMap() {
   setTimeout(() => { if (state.map) state.map.resize(); }, 200);
 }
 
-// ─── Tactical Operational Zones & Boundaries (ABL, Municipalities, KFOR) ───────
-
+// ─── Tactical Operational Zones & Boundaries (ABL, Municipalities, KFOR, Mines) ──
 let tacticalKforMarkers = [];
 let tacticalMunLabels = [];
+let tacticalMineMarkers = [];
+
+function buildMinefieldPopupHtml(p) {
+  const riskClass = (p.riskLevel || 'medium').toLowerCase();
+  return `
+    <div class="tactical-layer-popup">
+      <div class="layer-popup-badge risk-${riskClass}">⚠️ ${p.status || 'MINE HAZARD'} · ${p.riskLevel || 'HIGH'}</div>
+      <div class="layer-popup-title">💣 ${p.name}</div>
+      <div class="layer-popup-meta">Sector: <strong>${p.sector}</strong> · Municipality: <strong>${p.municipality}</strong></div>
+      <div class="layer-popup-row"><span>Munitions:</span> <strong style="color:#fca5a5;">${p.munitionTypes}</strong></div>
+      <div class="layer-popup-row"><span>Est. Area:</span> ${p.estimatedAreaHa} Ha · <span>Standoff Buffer:</span> <strong style="color:#f87171;">${p.standoffDistanceMeters}m</strong></div>
+      <div class="layer-popup-row"><span>Demining Lead:</span> ${p.deminingAgency}</div>
+      <div class="layer-popup-row"><span>Survey Date:</span> ${p.lastSurveyDate}</div>
+      <div class="layer-popup-desc" style="margin-top:6px;">${p.description}</div>
+      <div class="layer-popup-notes" style="margin-top:6px; color:#fca5a5; font-size:10px;">
+        🚨 <strong>Emergency Contact:</strong> ${p.emergencyContact}
+      </div>
+    </div>
+  `;
+}
+
+function renderTacticalMineMarkers(visible) {
+  tacticalMineMarkers.forEach(m => m.remove());
+  tacticalMineMarkers = [];
+  if (!visible || !state.map) return;
+
+  MINEFIELDS_KOSOVO_GEOJSON.features.forEach(hazard => {
+    const p = hazard.properties;
+    const coords = [p.lon, p.lat];
+
+    const el = document.createElement('div');
+    el.className = 'mine-marker-pin';
+    const shortName = p.name.split('/')[0].trim();
+    el.innerHTML = `
+      <div class="mine-marker-icon-wrap">💣</div>
+      <div class="mine-marker-tag">${shortName}</div>
+    `;
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openMapPopup(coords, buildMinefieldPopupHtml(p));
+    });
+
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat(coords)
+      .addTo(state.map);
+
+    tacticalMineMarkers.push(marker);
+  });
+}
 
 function renderTacticalKforBases(visible) {
   tacticalKforMarkers.forEach(m => m.remove());
@@ -4377,6 +4433,40 @@ function initTacticalLayers(map) {
     });
   }
 
+  // 4. Minefields & Explosive Hazards (CHA / SHA / CBU)
+  if (!map.getSource('minefields-source')) {
+    map.addSource('minefields-source', {
+      type: 'geojson',
+      data: MINEFIELDS_KOSOVO_GEOJSON
+    });
+  }
+  if (!map.getLayer('minefields-fill')) {
+    map.addLayer({
+      id: 'minefields-fill',
+      type: 'fill',
+      source: 'minefields-source',
+      layout: { visibility: 'visible' },
+      paint: {
+        'fill-color': '#dc2626',
+        'fill-opacity': 0.22
+      }
+    });
+  }
+  if (!map.getLayer('minefields-line')) {
+    map.addLayer({
+      id: 'minefields-line',
+      type: 'line',
+      source: 'minefields-source',
+      layout: { visibility: 'visible', 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#ef4444',
+        'line-width': 2.4,
+        'line-dasharray': [3, 2],
+        'line-opacity': 0.95
+      }
+    });
+  }
+
   // Interactive Clicks:
   map.on('click', 'municipalities-fill', (e) => {
     if (e.features && e.features.length > 0) {
@@ -4411,8 +4501,15 @@ function initTacticalLayers(map) {
     }
   });
 
+  map.on('click', 'minefields-fill', (e) => {
+    if (e.features && e.features.length > 0) {
+      const p = e.features[0].properties;
+      openMapPopup(e.lngLat, buildMinefieldPopupHtml(p));
+    }
+  });
+
   // Cursor pointers
-  ['municipalities-fill', 'corridors-points'].forEach(layerId => {
+  ['municipalities-fill', 'corridors-points', 'minefields-fill'].forEach(layerId => {
     map.on('mouseenter', layerId, () => {
       if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer';
     });
@@ -4420,6 +4517,9 @@ function initTacticalLayers(map) {
       if (map.getCanvas()) map.getCanvas().style.cursor = '';
     });
   });
+
+  // Render initial minefield markers
+  renderTacticalMineMarkers(true);
 }
 
 function toggleTacticalLayer(layerGroup, isVisible) {
@@ -4447,6 +4547,13 @@ function toggleTacticalLayer(layerGroup, isVisible) {
         state.map.setLayoutProperty(layerId, 'visibility', visibility);
       }
     });
+  } else if (layerGroup === 'mines') {
+    ['minefields-fill', 'minefields-line'].forEach(layerId => {
+      if (state.map.getLayer(layerId)) {
+        state.map.setLayoutProperty(layerId, 'visibility', visibility);
+      }
+    });
+    renderTacticalMineMarkers(isVisible);
   }
 
   let activeCount = 0;
@@ -4454,6 +4561,7 @@ function toggleTacticalLayer(layerGroup, isVisible) {
   if ($('toggleLayerMunicipalities')?.checked) activeCount++;
   if ($('toggleLayerKfor')?.checked) activeCount++;
   if ($('toggleLayerCorridors')?.checked) activeCount++;
+  if ($('toggleLayerMines')?.checked) activeCount++;
 
   const badge = $('tacticalLayersActiveBadge');
   if (badge) {
@@ -7110,3 +7218,120 @@ window.addRouteDestinationInput = addRouteDestinationInput;
 window.deduplicateNewsItems = deduplicateNewsItems;
 window.resolveLocationCoordinates = resolveLocationCoordinates;
 window.state = state;
+
+// ─── Minefields & Explosive Hazards Controller ────────────────────────────────
+function renderMinefieldsList(categoryFilter = 'ALL', search = '') {
+  const container = $('minefieldsList');
+  if (!container) return;
+
+  const query = (search || '').trim().toLowerCase();
+  const cat = (categoryFilter || 'ALL').toUpperCase();
+
+  const filtered = MINEFIELDS_KOSOVO_GEOJSON.features.filter(feat => {
+    const p = feat.properties;
+    if (cat === 'CHA' && !p.status.includes('CONFIRMED')) return false;
+    if (cat === 'SHA' && !p.status.includes('SUSPECTED')) return false;
+    if (cat === 'CBU' && p.category !== 'cluster_strike' && !p.status.includes('CLUSTER')) return false;
+    if (cat === 'CRITICAL' && p.riskLevel !== 'CRITICAL') return false;
+
+    if (query) {
+      const matchText = `${p.name} ${p.sector} ${p.municipality} ${p.munitionTypes} ${p.description}`.toLowerCase();
+      if (!matchText.includes(query)) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding: 24px 12px; color:#94a3b8; font-size:12px;">
+        No minefields or hazardous areas found matching the filter criteria.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(feat => {
+    const p = feat.properties;
+    const riskClass = (p.riskLevel || 'medium').toLowerCase();
+    return `
+      <div class="mine-card" onclick="focusMinefield('${p.id}')">
+        <div class="mine-card-header">
+          <div class="mine-card-title">💣 ${p.name}</div>
+          <span class="mine-risk-badge risk-${riskClass}">${p.riskLevel || 'HIGH'}</span>
+        </div>
+        <div class="mine-card-sub">📍 ${p.sector} · <strong>${p.municipality}</strong></div>
+        <div class="mine-card-details">
+          <div><span>Status:</span> <strong>${p.status}</strong></div>
+          <div><span>Munitions:</span> <strong style="color:#fca5a5;">${p.munitionTypes}</strong></div>
+          <div><span>Standoff Buffer:</span> <strong style="color:#f87171;">${p.standoffDistanceMeters}m</strong> · <span>Est. Area:</span> ${p.estimatedAreaHa} Ha</div>
+          <div><span>Demining Lead:</span> ${p.deminingAgency}</div>
+        </div>
+        <div class="mine-card-actions">
+          <button class="btn-xs btn-outline" onclick="event.stopPropagation(); focusMinefield('${p.id}')">
+            🎯 Target on Map
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterMinefieldsList() {
+  const cat = $('mineCategoryFilter')?.value || 'ALL';
+  const query = $('mineSearchInput')?.value || '';
+  renderMinefieldsList(cat, query);
+}
+
+function focusMinefield(id) {
+  const feat = MINEFIELDS_KOSOVO_GEOJSON.features.find(f => f.properties.id === id);
+  if (!feat || !state.map) return;
+  const p = feat.properties;
+  const coords = [p.lon, p.lat];
+
+  state.map.flyTo({
+    center: coords,
+    zoom: 12.5,
+    pitch: 35,
+    duration: 1500
+  });
+
+  setTimeout(() => {
+    openMapPopup(coords, buildMinefieldPopupHtml(p));
+  }, 1600);
+}
+
+async function checkMineProximityCurrentMap() {
+  if (!state.map) return;
+  const center = state.map.getCenter();
+  const statusBox = $('mineProximityStatusBox');
+  const textEl = $('mineProximityText');
+  if (!statusBox || !textEl) return;
+
+  textEl.textContent = 'Calculating standoff distance to known hazards...';
+  statusBox.className = 'proximity-status-box';
+
+  try {
+    const res = await fetch(`/api/minefields/proximity?lat=${center.lat}&lon=${center.lng}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const nearest = data.nearestHazard;
+
+    if (data.dangerStatus === 'CRITICAL_DANGER_INSIDE_STANDOFF') {
+      statusBox.className = 'proximity-status-box critical';
+      textEl.innerHTML = `<strong>CRITICAL HAZARD:</strong> Inside ${nearest.standoffDistanceMeters}m perimeter of <strong>${nearest.name}</strong>!`;
+    } else if (data.dangerStatus === 'WARNING_PROXIMATE_HAZARD') {
+      statusBox.className = 'proximity-status-box warning';
+      textEl.innerHTML = `<strong>WARNING:</strong> Active hazard within <strong>${nearest.distanceKm} km</strong> (${nearest.name}). Keep to verified asphalt routes.`;
+    } else {
+      statusBox.className = 'proximity-status-box';
+      textEl.innerHTML = `<strong>Safe Distance:</strong> Nearest hazard is <strong>${nearest.distanceKm} km</strong> away (${nearest.name}).`;
+    }
+  } catch (err) {
+    textEl.textContent = 'Could not verify proximity. Please ensure server connection is active.';
+  }
+}
+
+window.renderMinefieldsList = renderMinefieldsList;
+window.filterMinefieldsList = filterMinefieldsList;
+window.focusMinefield = focusMinefield;
+window.checkMineProximityCurrentMap = checkMineProximityCurrentMap;

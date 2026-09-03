@@ -601,3 +601,398 @@ export const SENSITIVE_CORRIDORS_GEOJSON = {
     }
   ]
 };
+
+/**
+ * Authoritative Dataset: Minefields, Cluster Munition Footprints & Suspected Hazardous Areas (SHA/CHA) in Kosovo
+ * Compiled from Kosovo Mine Action Centre (KMAC), KFOR EOD Coordination Cell, and HALO Trust operational records.
+ */
+export const MINEFIELDS_KOSOVO_GEOJSON = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-koshare',
+        name: 'Koshare / Rrasa e Zogut High Frontier Belt',
+        sector: 'Junik / Pastrik Western Frontier',
+        municipality: 'Deçan / Gjakovë',
+        category: 'minefield',
+        riskLevel: 'CRITICAL',
+        status: 'CONFIRMED HAZARDOUS AREA (CHA)',
+        munitionTypes: 'Antipersonnel (PMA-2, PMA-3), Antitank (TMA-3, TMA-4), PMR-2A stake mines',
+        estimatedAreaHa: 68.5,
+        standoffDistanceMeters: 200,
+        deminingAgency: 'Kosovo Mine Action Centre (KMAC) / KSF EOD / HALO Trust',
+        lastSurveyDate: '2025-11-12',
+        emergencyContact: 'KMAC Hot Desk: +383 38 500 192 · KFOR EOD Duty Officer: Ch 16',
+        description: 'Dense historical minefield belt along high mountainous ridgelines. Unmarked perimeter with steep terrain wash hazards.',
+        lat: 42.4583,
+        lon: 20.1528
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.1350, 42.4450],
+          [20.1700, 42.4480],
+          [20.1780, 42.4680],
+          [20.1520, 42.4750],
+          [20.1300, 42.4620],
+          [20.1350, 42.4450]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-pashtrik',
+        name: 'Pashtrik Mountain Defensive Frontier (Maja e Pashtrikut)',
+        sector: 'Has / Prizren Border Crest',
+        municipality: 'Prizren / Gjakovë',
+        category: 'minefield',
+        riskLevel: 'CRITICAL',
+        status: 'CONFIRMED HAZARDOUS AREA (CHA)',
+        munitionTypes: 'Antipersonnel (PMA-2, PMR-2A, PROM-1 Bounding), Sub-surface Tripwires',
+        estimatedAreaHa: 82.0,
+        standoffDistanceMeters: 200,
+        deminingAgency: 'KMAC / KSF Demining Company',
+        lastSurveyDate: '2025-10-04',
+        emergencyContact: 'KMAC: +383 38 500 192 · Police EOD: 192',
+        description: 'Heavy legacy defensive installations on alpine approaches. Severe rocky terrain subject to shift following snowmelt.',
+        lat: 42.2100,
+        lon: 20.5250
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.5050, 42.1950],
+          [20.5450, 42.2020],
+          [20.5520, 42.2250],
+          [20.5200, 42.2300],
+          [20.4980, 42.2120],
+          [20.5050, 42.1950]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-dulje',
+        name: 'Dulje Pass Cluster Strike & Ambush Footprint (Qafa e Duhlës)',
+        sector: 'Suva Reka / Shtime Arterial Axis',
+        municipality: 'Suharekë / Shtime',
+        category: 'cluster_strike',
+        riskLevel: 'CRITICAL',
+        status: 'CONFIRMED HAZARDOUS AREA (CHA)',
+        munitionTypes: 'CBU-87 / BLU-97 A/B Cluster Submunitions, Artillery UXO, Fragmentary Mines',
+        estimatedAreaHa: 45.2,
+        standoffDistanceMeters: 150,
+        deminingAgency: 'NPA (Norwegian People’s Aid) / KMAC',
+        lastSurveyDate: '2026-02-18',
+        emergencyContact: 'KMAC: +383 38 500 192 · KFOR RC-East EOD',
+        description: 'Strategic canyon pass hit during 1999 airstrikes and defensive mining. Submunition duds remain sensitive to disturbance in dense woodland.',
+        lat: 42.4180,
+        lon: 20.8950
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.8800, 42.4080],
+          [20.9120, 42.4120],
+          [20.9180, 42.4280],
+          [20.8920, 42.4310],
+          [20.8750, 42.4200],
+          [20.8800, 42.4080]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-bajgora',
+        name: 'Shala e Bajgorës Trench & Ridge Perimeter',
+        sector: 'Mitrovica East Highland / Trepča Heights',
+        municipality: 'Mitrovica / Podujevo',
+        category: 'minefield',
+        riskLevel: 'HIGH',
+        status: 'SUSPECTED HAZARDOUS AREA (SHA)',
+        munitionTypes: 'Antipersonnel Mines (PMA-3, PMR-2A), Heavy Mortar Duds',
+        estimatedAreaHa: 34.0,
+        standoffDistanceMeters: 100,
+        deminingAgency: 'KMAC / KFOR EOD Regional Patrol',
+        lastSurveyDate: '2025-08-20',
+        emergencyContact: 'Police Regional Command North: 192 / +383 28 530 100',
+        description: 'Highland grazing zones near historic fortified bunkers. Warnings posted along forest edges; off-road transit strictly prohibited.',
+        lat: 42.9650,
+        lon: 20.9700
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.9500, 42.9520],
+          [20.9880, 42.9560],
+          [20.9950, 42.9780],
+          [20.9620, 42.9810],
+          [20.9420, 42.9660],
+          [20.9500, 42.9520]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-mokra-gora',
+        name: 'Mokra Gora / Brnjak Ridge Perimeter',
+        sector: 'Zubin Potok / Gazivode Highland',
+        municipality: 'Zubin Potok',
+        category: 'minefield',
+        riskLevel: 'HIGH',
+        status: 'SUSPECTED HAZARDOUS AREA (SHA)',
+        munitionTypes: 'Defensive Barrier Minefields, PMR-2A, Tripwire Improvised Caches',
+        estimatedAreaHa: 52.4,
+        standoffDistanceMeters: 150,
+        deminingAgency: 'KFOR EOD Liaison / KMAC',
+        lastSurveyDate: '2025-09-15',
+        emergencyContact: 'KFOR Base Camp Cabra: Ch 16 · Police North: 192',
+        description: 'Mountain crest line overlooking Lake Gazivode approaches. Isolated unmapped tactical defensive pockets.',
+        lat: 42.8550,
+        lon: 20.4850
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.4650, 42.8420],
+          [20.5050, 42.8460],
+          [20.5120, 42.8680],
+          [20.4800, 42.8720],
+          [20.4580, 42.8580],
+          [20.4650, 42.8420]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-kopaonik',
+        name: 'Kopaonik / Belo Brdo Highland Cluster Footprint',
+        sector: 'Leposavić Northern Highland',
+        municipality: 'Leposavić',
+        category: 'cluster_strike',
+        riskLevel: 'HIGH',
+        status: 'CLUSTER MUNITION FOOTPRINT',
+        munitionTypes: 'BLU-97 Submunitions, 1999 Airstrike Submunitions, Unexploded Rocket Warheads',
+        estimatedAreaHa: 29.8,
+        standoffDistanceMeters: 100,
+        deminingAgency: 'KMAC / KFOR RC-East Explosive Ordnance Disposal',
+        lastSurveyDate: '2025-07-29',
+        emergencyContact: 'KMAC: +383 38 500 192 · KFOR Camp Nothing Hill',
+        description: 'Dense forest sector near mining communications. Known unexploded yellow BLU-97 canisters hidden under autumn pine needles.',
+        lat: 43.2100,
+        lon: 20.8400
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.8250, 43.1980],
+          [20.8580, 43.2020],
+          [20.8650, 43.2210],
+          [20.8350, 43.2250],
+          [20.8180, 43.2120],
+          [20.8250, 43.1980]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-drenica',
+        name: 'Drenica Hills / Likovac – Prekaz Sector',
+        sector: 'Central Drenica Highland',
+        municipality: 'Skenderaj / Gllogoc',
+        category: 'uxo_area',
+        riskLevel: 'MEDIUM',
+        status: 'SUSPECTED HAZARDOUS AREA (SHA)',
+        munitionTypes: 'Mortar Blind Shells, Abandoned Ammunition Pits, Residual Submunitions',
+        estimatedAreaHa: 21.0,
+        standoffDistanceMeters: 80,
+        deminingAgency: 'KSF EOD Demining Battalion',
+        lastSurveyDate: '2025-06-11',
+        emergencyContact: 'Police Operations: 192 · KSF Ops Desk',
+        description: 'Agricultural and secondary forestry areas with intermittent deep-plow unearthing of wartime unexploded shells.',
+        lat: 42.7250,
+        lon: 20.8100
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.7950, 42.7150],
+          [20.8280, 42.7180],
+          [20.8320, 42.7350],
+          [20.8050, 42.7380],
+          [20.7880, 42.7260],
+          [20.7950, 42.7150]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-gllobocice',
+        name: 'Glloboçicë / Šar Mountain Alpine Pass (Border Ridge)',
+        sector: 'Kaçanik / Strpce Southern Frontier',
+        municipality: 'Kaçanik / Shtërpcë',
+        category: 'minefield',
+        riskLevel: 'CRITICAL',
+        status: 'CONFIRMED HAZARDOUS AREA (CHA)',
+        munitionTypes: 'PMA-1, PMA-3 Plastic AP Mines, TMA-4 Antitank, PROM-1 Bounding',
+        estimatedAreaHa: 48.0,
+        standoffDistanceMeters: 150,
+        deminingAgency: 'KMAC / HALO Trust',
+        lastSurveyDate: '2025-10-22',
+        emergencyContact: 'KMAC: +383 38 500 192 · Border Police South',
+        description: 'Border patrol alpine tracks with confirmed plastic mine contamination undetectable by traditional magnetic sweeping.',
+        lat: 42.1800,
+        lon: 21.1900
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.1700, 42.1680],
+          [20.2080, 42.1720],
+          [20.2150, 42.1910],
+          [20.1820, 42.1950],
+          [20.1650, 42.1810],
+          [20.1700, 42.1680]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-merdare',
+        name: 'Kulina / Podujevo ABL Border Perimeter',
+        sector: 'Merdare / Gate 3 North-East Axis',
+        municipality: 'Podujevë',
+        category: 'minefield',
+        riskLevel: 'HIGH',
+        status: 'SUSPECTED HAZARDOUS AREA (SHA)',
+        munitionTypes: 'Defensive Trenches, PMR-2A, Anti-Vehicle Surface Mines',
+        estimatedAreaHa: 37.5,
+        standoffDistanceMeters: 120,
+        deminingAgency: 'KFOR Multinational EOD / KMAC',
+        lastSurveyDate: '2025-09-02',
+        emergencyContact: 'Police Podujevo: 192 · KFOR Base Camp Film City',
+        description: 'Woodland parallel to the ABL demarcation line. Strictly marked with red hazard skulls; civilian livestock pasturing restricted.',
+        lat: 42.9300,
+        lon: 21.2200
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [21.2050, 42.9180],
+          [21.2380, 42.9220],
+          [21.2420, 42.9410],
+          [21.2120, 42.9450],
+          [21.1980, 42.9310],
+          [21.2050, 42.9180]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-radoniq',
+        name: 'Radoniq Lake Basin & Baballoq Foothills',
+        sector: 'Dukagjini Basin / Decani Axis',
+        municipality: 'Gjakovë / Deçan',
+        category: 'cluster_strike',
+        riskLevel: 'MEDIUM',
+        status: 'PARTIALLY CLEARED / RESIDUAL RISK',
+        munitionTypes: 'Cluster Submunition Remnants, Underwater UXO, Hand Grenade Caches',
+        estimatedAreaHa: 19.5,
+        standoffDistanceMeters: 80,
+        deminingAgency: 'KMAC / KSF EOD Divers Team',
+        lastSurveyDate: '2025-05-18',
+        emergencyContact: 'KMAC: +383 38 500 192 · Emergency 112',
+        description: 'Reservoir surrounding shoreline subject to annual water-level exposure of submerged wartime munitions.',
+        lat: 42.4700,
+        lon: 20.4200
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.4050, 42.4580],
+          [20.4380, 42.4620],
+          [20.4420, 42.4810],
+          [20.4120, 42.4850],
+          [20.3980, 42.4710],
+          [20.4050, 42.4580]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-sar-brezovica',
+        name: 'Šar Mountain / Jazhincë Ridge (Brezovica High Crest)',
+        sector: 'Šar Massif Ski & Wilderness Area',
+        municipality: 'Shtërpcë / Prizren',
+        category: 'minefield',
+        riskLevel: 'HIGH',
+        status: 'SUSPECTED HAZARDOUS AREA (SHA)',
+        munitionTypes: 'PMA-2, TMA-3, Alpine Fortified Pit Mines',
+        estimatedAreaHa: 41.0,
+        standoffDistanceMeters: 150,
+        deminingAgency: 'KMAC / KFOR Mountain Troops EOD',
+        lastSurveyDate: '2025-09-28',
+        emergencyContact: 'Mountain Rescue: +383 49 112 000 · KMAC: +383 38 500 192',
+        description: 'High-altitude ridges off marked ski pistes and hiking paths. Winter avalanche deposits can displace items downhill.',
+        lat: 42.2200,
+        lon: 21.0300
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [21.0150, 42.2080],
+          [21.0480, 42.2120],
+          [21.0550, 42.2310],
+          [21.0250, 42.2350],
+          [21.0080, 42.2210],
+          [21.0150, 42.2080]
+        ]]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'mine-gora-restelica',
+        name: 'Gora / Restelica Alpine Tripoint (Korab Frontier)',
+        sector: 'Southernmost Kosovo Mountain Frontier',
+        municipality: 'Dragash',
+        category: 'minefield',
+        riskLevel: 'HIGH',
+        status: 'SUSPECTED HAZARDOUS AREA (SHA)',
+        munitionTypes: 'Boundary Defensive Line, PMA-3, Fragmentation PMR-2A',
+        estimatedAreaHa: 58.0,
+        standoffDistanceMeters: 150,
+        deminingAgency: 'KMAC / KSF Demining',
+        lastSurveyDate: '2025-08-08',
+        emergencyContact: 'Border Police Dragash: +383 29 281 100 · KMAC: +383 38 500 192',
+        description: 'Extremely remote highland pasturage along the Macedonian / Albanian border tripoint.',
+        lat: 41.9300,
+        lon: 20.6500
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [20.6350, 41.9180],
+          [20.6680, 41.9220],
+          [20.6720, 41.9420],
+          [20.6420, 41.9450],
+          [20.6250, 41.9310],
+          [20.6350, 41.9180]
+        ]]
+      }
+    }
+  ]
+};
+

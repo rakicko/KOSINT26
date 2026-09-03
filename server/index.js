@@ -12,6 +12,7 @@ const { fetchAviation } = require('../skills/aviation-monitor/skill');
 const { fetchTelegram, fetchMediaThumbnail } = require('../skills/telegram-monitor/skill');
 const { fetchBorders } = require('../skills/border-monitor/skill');
 const staffService = require('./staff-service');
+const mineService = require('./mine-service');
 const auth = require('./auth');
 const rateLimit = require('express-rate-limit');
 
@@ -367,6 +368,31 @@ app.get('/api/borders', auth.requireAuth, async (req, res) => {
       error: 'SERVER_ERROR',
       message: err.message || 'Failed to fetch border crossing intelligence.'
     });
+  }
+});
+
+// ── API: Kosovo Minefields & UXO Hazards ──────────────────────────────────────
+app.get('/api/minefields', auth.requireAuth, (req, res) => {
+  try {
+    const data = mineService.getMinefieldsData();
+    res.json(data);
+  } catch (err) {
+    console.error('[server] minefields fetch error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/minefields/proximity', auth.requireAuth, (req, res) => {
+  try {
+    const { lat, lon } = req.query;
+    const result = mineService.calculateProximity(lat, lon);
+    if (result.error) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err) {
+    console.error('[server] minefields proximity error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

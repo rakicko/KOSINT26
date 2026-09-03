@@ -157,6 +157,11 @@
         <span class="nav-rail-tooltip">CCTV Surveillance</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
+      <button class="nav-rail-btn" data-panel="minePanel" onclick="toggleModule('minePanel')" aria-label="Minefields & UXO Hazards">
+        <span class="nav-rail-icon">💣</span>
+        <span class="nav-rail-tooltip">Minefields & UXO Hazards</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
       <button class="nav-rail-btn" data-panel="staffPanel" id="btnStaffWarden" onclick="toggleModule('staffPanel')" aria-label="Staff Warden & Evacuation">
         <span class="nav-rail-icon">🛡️</span>
         <span class="nav-rail-lock-badge" id="staffNavLockBadge">🔒</span>
@@ -231,6 +236,14 @@
                 <div class="layer-toggle-info">
                   <span class="layer-toggle-name">Mostovi na Ibru & Zaštićene zone (SPZ)</span>
                   <span class="layer-toggle-sub">Ibar transition bridges, SPZ Banjska, M-22 corridor</span>
+                </div>
+              </label>
+              <label class="layer-toggle-item">
+                <input type="checkbox" id="toggleLayerMines" checked onchange="toggleTacticalLayer('mines', this.checked)">
+                <span class="layer-toggle-indicator indicator-mines"></span>
+                <div class="layer-toggle-info">
+                  <span class="layer-toggle-name">Minska Polja & Kasetna Municija (CHA/SHA)</span>
+                  <span class="layer-toggle-sub">Hazard perimeters, cluster footprints & EOD buffers</span>
                 </div>
               </label>
             </div>
@@ -619,6 +632,88 @@
                 </div>
               </div>
               <div class="staff-list" id="staffList"></div>
+            </div>
+
+            <!-- ── Minefields & UXO Hazards Panel ───────────────────────────── -->
+            <div class="panel overlay-panel" id="minePanel" data-panel-title="Minefields & UXO Hazards" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">💣</span>
+                  <span>Minefields & UXO</span>
+                  <span class="panel-badge badge-critical" id="mineHazardBadge">12 SITES</span>
+                </div>
+                <div class="panel-meta">KMAC / KFOR EOD OPERATIONAL TELEMETRY</div>
+              </div>
+
+              <!-- Quick Hazard Stats Grid -->
+              <div class="mine-stats-grid">
+                <div class="mine-stat-card">
+                  <div class="mine-stat-val text-red" id="mineStatCha">6</div>
+                  <div class="mine-stat-lbl">Confirmed (CHA)</div>
+                </div>
+                <div class="mine-stat-card">
+                  <div class="mine-stat-val text-amber" id="mineStatSha">4</div>
+                  <div class="mine-stat-lbl">Suspected (SHA)</div>
+                </div>
+                <div class="mine-stat-card">
+                  <div class="mine-stat-val text-cyan" id="mineStatCbu">2</div>
+                  <div class="mine-stat-lbl">Cluster (CBU)</div>
+                </div>
+                <div class="mine-stat-card">
+                  <div class="mine-stat-val text-purple" id="mineStatArea">537 Ha</div>
+                  <div class="mine-stat-lbl">Est. Contaminated</div>
+                </div>
+              </div>
+
+              <!-- Emergency EOD Hotline Banner -->
+              <div class="mine-hotline-banner">
+                <div class="hotline-title">🚨 EMERGENCY EOD / UXO REPORTING</div>
+                <div class="hotline-grid">
+                  <div class="hotline-item">
+                    <span class="hotline-name">Kosovo Police EOD:</span>
+                    <a href="tel:192" class="hotline-val">📞 192</a>
+                  </div>
+                  <div class="hotline-item">
+                    <span class="hotline-name">KMAC Operations Desk:</span>
+                    <a href="tel:+38338500192" class="hotline-val">📞 +383 38 500 192</a>
+                  </div>
+                  <div class="hotline-item">
+                    <span class="hotline-name">KFOR EOD Cell:</span>
+                    <span class="hotline-val">📻 VHF Ch 16 / Ops</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Proximity & Standoff Safety Checker -->
+              <div class="mine-proximity-widget">
+                <div class="widget-header-row">
+                  <span class="widget-heading">🎯 STANDOFF PROXIMITY CHECKER</span>
+                  <button class="btn-xs btn-outline" onclick="checkMineProximityCurrentMap()">📍 Use Map Center</button>
+                </div>
+                <div class="proximity-status-box" id="mineProximityStatusBox">
+                  <span class="proximity-indicator-dot"></span>
+                  <span id="mineProximityText">Click "Use Map Center" or select a hazard below to verify standoff safety.</span>
+                </div>
+              </div>
+
+              <!-- Filters and Search Bar -->
+              <div class="mine-controls-bar">
+                <div class="mine-search-wrap">
+                  <input type="text" class="input-field mine-search-input" id="mineSearchInput" placeholder="Search sector, municipality, munitions..." oninput="filterMinefieldsList()">
+                </div>
+                <div class="mine-filter-row">
+                  <select class="input-field select-field mine-select" id="mineCategoryFilter" onchange="filterMinefieldsList()">
+                    <option value="ALL">All Categories</option>
+                    <option value="CHA">Confirmed Hazardous (CHA)</option>
+                    <option value="SHA">Suspected Hazardous (SHA)</option>
+                    <option value="CBU">Cluster Munitions (CBU)</option>
+                    <option value="CRITICAL">Critical Risk Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Hazardous Areas List -->
+              <div class="mine-list" id="minefieldsList"></div>
             </div>
           </div>
         </div>

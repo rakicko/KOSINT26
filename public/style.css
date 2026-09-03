@@ -6710,4 +6710,313 @@ body {
   box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
 }
 
+/* ── Minefields & Explosive Hazards Subsystem ─────────────────────────────── */
+.indicator-mines {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.mine-marker-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+  transition: transform 0.18s ease;
+  z-index: 10;
+}
+
+.mine-marker-pin:hover {
+  transform: scale(1.15);
+  z-index: 20;
+}
+
+.mine-marker-icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(185, 28, 28, 0.9);
+  border: 1.5px solid #f87171;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.65), 0 2px 8px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.mine-marker-tag {
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  margin-top: 3px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.mine-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mine-stat-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 6px;
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.mine-stat-val {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.mine-stat-lbl {
+  font-size: 9px;
+  color: #94a3b8;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+}
+
+.text-red { color: #f87171; }
+.text-amber { color: #fbbf24; }
+.text-cyan { color: #38bdf8; }
+.text-purple { color: #c084fc; }
+
+.mine-hotline-banner {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.hotline-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: #f87171;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+
+.hotline-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hotline-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.hotline-name {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.hotline-val {
+  color: #fca5a5;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.hotline-val:hover {
+  text-decoration: underline;
+}
+
+.mine-proximity-widget {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.widget-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.widget-heading {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: 0.8px;
+}
+
+.proximity-status-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(2, 6, 23, 0.6);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #e2e8f0;
+}
+
+.proximity-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #38bdf8;
+  flex-shrink: 0;
+}
+
+.proximity-status-box.critical .proximity-indicator-dot {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulse 1s infinite;
+}
+
+.proximity-status-box.warning .proximity-indicator-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+}
+
+.mine-controls-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mine-search-wrap .mine-search-input {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 7px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  color: #f8fafc;
+}
+
+.mine-select {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 6px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  color: #f8fafc;
+}
+
+.mine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.mine-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-left: 3px solid #ef4444;
+  border-radius: 6px;
+  padding: 10px 12px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.mine-card:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(239, 68, 68, 0.4);
+  border-left-color: #f87171;
+  transform: translateX(2px);
+}
+
+.mine-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.mine-card-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: #f8fafc;
+  line-height: 1.3;
+}
+
+.mine-risk-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.risk-critical {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.risk-high {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.risk-medium {
+  background: rgba(56, 189, 248, 0.2);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.mine-card-sub {
+  font-size: 10.5px;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.mine-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10.5px;
+  color: #cbd5e1;
+  margin-bottom: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  padding-top: 6px;
+}
+
+.mine-card-details span {
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.mine-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+
 
