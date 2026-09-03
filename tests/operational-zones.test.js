@@ -67,9 +67,9 @@ async function runOperationalZonesTest() {
   const indexHtml = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   assert.ok(indexHtml.includes('id="tacticalLayersWidget"'), 'index.html must have tacticalLayersWidget');
   assert.ok(indexHtml.includes('id="btnTacticalLayersToggle"'), 'index.html must have btnTacticalLayersToggle');
-  assert.ok(indexHtml.includes('id="tacticalLayersMenu"'), 'index.html must have tacticalLayersMenu');
-  assert.ok(indexHtml.includes('id="toggleLayerAbl"'), 'index.html must have toggleLayerAbl');
-  assert.ok(indexHtml.includes('id="toggleLayerMunicipalities"'), 'index.html must have toggleLayerMunicipalities');
+  assert.ok(indexHtml.includes('id="toggleLayerMines"'), 'index.html must have toggleLayerMines');
+  assert.ok(indexHtml.includes('id="toggleLayerSeismic"'), 'index.html must have toggleLayerSeismic');
+  assert.ok(indexHtml.includes('id="toggleLayerRadiation"'), 'index.html must have toggleLayerRadiation');
   assert.ok(indexHtml.includes('id="toggleLayerKfor"'), 'index.html must have toggleLayerKfor');
   assert.ok(indexHtml.includes('id="toggleLayerCorridors"'), 'index.html must have toggleLayerCorridors');
   console.log('✓ Passed: All tactical layer toggle controls present in index.html.\n');

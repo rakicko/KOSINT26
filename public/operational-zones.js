@@ -473,11 +473,11 @@ export const SENSITIVE_CORRIDORS_GEOJSON = {
       type: 'Feature',
       properties: {
         id: 'bridge-main-ibar',
-        name: 'Glavni most na reci Ibar (Main Ibar Bridge)',
+        name: 'Main Ibar Bridge (Glavni Most / Ura e Ibrit)',
         category: 'bridge',
-        status: 'KFOR / Carabinieri Fixed Post · Closed for Vehicles',
+        status: 'KFOR / Carabinieri Fixed Static Post · Closed to Vehicular Traffic',
         securityLevel: 'HIGH SENSITIVITY',
-        description: 'Ključna tačka razdvajanja Severne i Južne Mitrovice. 24/7 fiksni nadzor karabinjera.',
+        description: 'Primary demarcation crossing between North and South Mitrovica across the Ibar River. 24/7 static guard and monitoring by Italian Carabinieri MSU.',
         lat: 42.8912,
         lon: 20.8665
       },
@@ -490,11 +490,11 @@ export const SENSITIVE_CORRIDORS_GEOJSON = {
       type: 'Feature',
       properties: {
         id: 'bridge-bosnjacka',
-        name: 'Pešački / Tranzitni most - Bošnjačka Mahala',
+        name: 'Bošnjačka Mahala Transit Bridge (Pedestrian / Light Vehicle)',
         category: 'bridge',
         status: 'Open for Pedestrians & Light Traffic',
         securityLevel: 'ELEVATED MONITORING',
-        description: 'Glavni mešoviti tranzitni pravac između istočnih delova Mitrovice.',
+        description: 'Mixed eastern transit crossing connecting North Mitrovica (Bošnjačka Mahala) with South Mitrovica.',
         lat: 42.8926,
         lon: 20.8732
       },
@@ -506,12 +506,29 @@ export const SENSITIVE_CORRIDORS_GEOJSON = {
     {
       type: 'Feature',
       properties: {
-        id: 'crossing-suvi-do',
-        name: 'Prelaz Suvi Do / Kroi i Vitakut',
-        category: 'corridor',
-        status: 'Open Transit',
+        id: 'bridge-railway',
+        name: 'Mitrovica North Railway Bridge (Ibar Rail Spur)',
+        category: 'bridge',
+        status: 'Single-Track Industrial / Rail Crossing',
         securityLevel: 'MEDIUM',
-        description: 'Zapadni prilazni koridor reci Ibar.',
+        description: 'Northern railway bridge spanning the Ibar river upstream near the industrial perimeter.',
+        lat: 42.8940,
+        lon: 20.8580
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.8580, 42.8940]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'crossing-suvi-do',
+        name: 'Suvi Do / Kroi i Vitakut Transition Crossing',
+        category: 'corridor',
+        status: 'Open Transit Approach',
+        securityLevel: 'MEDIUM',
+        description: 'Western transit approach corridor connecting South Mitrovica with Suvi Do and the northern bypass.',
         lat: 42.8915,
         lon: 20.8490
       },
@@ -520,16 +537,67 @@ export const SENSITIVE_CORRIDORS_GEOJSON = {
         coordinates: [20.8490, 42.8915]
       }
     },
-    // Special Protective Zones (SPZ)
+    // Special Protective Zones (SPZ) under Law No. 03/L-047
+    {
+      type: 'Feature',
+      properties: {
+        id: 'spz-decani',
+        name: 'Special Protective Zone: Visoki Dečani Monastery',
+        category: 'spz',
+        status: 'UNESCO World Heritage · 24/7 KFOR Static Perimeter Guard',
+        securityLevel: 'MAXIMUM SECURITY',
+        description: '14th-century Serbian Orthodox monastery under 24/7 direct static security protection by KFOR (Italian RC-West contingent). Legally protected SPZ perimeter.',
+        lat: 42.5497,
+        lon: 20.2661
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.2661, 42.5497]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'spz-patriarchate-pec',
+        name: 'Special Protective Zone: Patriarchate of Peć (Pećka Patrijaršija)',
+        category: 'spz',
+        status: 'UNESCO World Heritage · Protected Heritage Complex',
+        securityLevel: 'HIGH SENSITIVITY',
+        description: 'Medieval monastic complex at the mouth of Rugova Canyon. Historic seat of Serbian Orthodox Patriarchs. Guarded by Kosovo Police Special Protective Unit (SPU).',
+        lat: 42.6611,
+        lon: 20.2644
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.2644, 42.6611]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'spz-gracanica',
+        name: 'Special Protective Zone: Gračanica Monastery',
+        category: 'spz',
+        status: 'UNESCO World Heritage · Protected Heritage Area',
+        securityLevel: 'HIGH SENSITIVITY',
+        description: '14th-century monastery founded by King Stefan Milutin in Gračanica enclave. Key religious and cultural site in central Kosovo.',
+        lat: 42.5986,
+        lon: 21.1931
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [21.1931, 42.5986]
+      }
+    },
     {
       type: 'Feature',
       properties: {
         id: 'spz-banjska',
-        name: 'Specijalna Zaštitna Zona: Manastir Banjska',
+        name: 'Special Protective Zone: Banjska Monastery',
         category: 'spz',
-        status: 'Protected Heritage Area',
+        status: 'Protected Heritage Area · Northern Sector',
         securityLevel: 'HIGH SENSITIVITY',
-        description: 'Srednjovekovni manastir Banjska (14. vek) sa zaštićenim bezbednosnim perimetrom u opštini Zvečan.',
+        description: '14th-century fortified monastery in Zvečan municipality with an established statutory security perimeter.',
         lat: 42.9720,
         lon: 20.7830
       },
@@ -542,11 +610,11 @@ export const SENSITIVE_CORRIDORS_GEOJSON = {
       type: 'Feature',
       properties: {
         id: 'spz-sokolica',
-        name: 'Specijalna Zaštitna Zona: Manastir Sokolica',
+        name: 'Special Protective Zone: Sokolica Monastery',
         category: 'spz',
-        status: 'Protected Heritage Area',
-        securityLevel: 'MEDIUM',
-        description: 'Manastir Sokolica na padinama brda Sokolica, opština Zvečan.',
+        status: 'Protected Heritage Area · Zvečan Ridge',
+        securityLevel: 'MEDIUM SENSITIVITY',
+        description: 'Medieval monastery on the forested slopes of Sokolica hill overlooking the Ibar valley, Zvečan municipality.',
         lat: 42.9230,
         lon: 20.8710
       },
@@ -555,48 +623,380 @@ export const SENSITIVE_CORRIDORS_GEOJSON = {
         coordinates: [20.8710, 42.9230]
       }
     },
-    // Primary Security Patrol Corridors
     {
       type: 'Feature',
       properties: {
-        id: 'corridor-m22',
-        name: 'Magistralni Koridor M-22.3 (Mitrovica – Zvečan – Leposavić – Jarinje)',
-        category: 'patrol_route',
-        status: 'Primary Arterial Supply Route',
-        securityLevel: 'STRATEGIC TRANSIT CORRIDOR',
-        description: 'Glavna drumska komunikacija koja povezuje Severnu Mitrovicu sa administrativnim prelazom Jarinje.'
+        id: 'spz-devic',
+        name: 'Special Protective Zone: Devič Monastery',
+        category: 'spz',
+        status: 'Protected Heritage Area · Drenica Forest Sector',
+        securityLevel: 'HIGH SENSITIVITY',
+        description: '15th-century monastery located in dense Drenica woodland (Skenderaj municipality). Guarded by Kosovo Police Special Protective Unit.',
+        lat: 42.7167,
+        lon: 20.7917
       },
       geometry: {
-        type: 'LineString',
-        coordinates: [
-          [20.8672, 42.8945], // Severna Mitrovica
-          [20.8400, 42.9050], // Zvečan
-          [20.8100, 43.0100], // Slatina / Sočanica
-          [20.8033, 43.1025], // Leposavić
-          [20.7500, 43.1600], // Lešak
-          [20.6975, 43.2181]  // Jarinje
-        ]
+        type: 'Point',
+        coordinates: [20.7917, 42.7167]
       }
     },
     {
       type: 'Feature',
       properties: {
-        id: 'corridor-m2',
-        name: 'Magistralni Koridor M-2 (Mitrovica – Zubin Potok – Gazivode – Brnjak)',
-        category: 'patrol_route',
-        status: 'Primary Arterial Supply Route',
-        securityLevel: 'STRATEGIC TRANSIT CORRIDOR',
-        description: 'Glavna drumska komunikacija duž jezera Gazivode prema administrativnom prelazu Brnjak.'
+        id: 'spz-our-lady-ljevis',
+        name: 'Special Protective Zone: Our Lady of Ljeviš (Bogorodica Ljeviška)',
+        category: 'spz',
+        status: 'UNESCO World Heritage · Historic Center Prizren',
+        securityLevel: 'HIGH SENSITIVITY',
+        description: '14th-century cathedral church in urban Prizren. UNESCO World Heritage Site with designated statutory protective zone.',
+        lat: 42.2119,
+        lon: 20.7425
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.7425, 42.2119]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'spz-holy-archangels',
+        name: 'Special Protective Zone: Holy Archangels Monastery (Sveti Arhangeli)',
+        category: 'spz',
+        status: 'Protected Heritage Area · Prizren Bistrica Canyon',
+        securityLevel: 'ELEVATED MONITORING',
+        description: '14th-century monastic foundation of Emperor Stefan Dušan situated in the Prizren Bistrica canyon.',
+        lat: 42.1931,
+        lon: 20.7639
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.7639, 42.1931]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'spz-gazimestan',
+        name: 'Special Protective Zone: Gazimestan Memorial Monument',
+        category: 'spz',
+        status: 'Historic Memorial SPZ · Static Police Post',
+        securityLevel: 'ELEVATED MONITORING',
+        description: 'Memorial commemorative monument and tower north of Prishtinë (Obiliq). Guarded by Kosovo Police SPU.',
+        lat: 42.6908,
+        lon: 21.1242
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [21.1242, 42.6908]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'spz-draganac',
+        name: 'Special Protective Zone: Draganac Monastery',
+        category: 'spz',
+        status: 'Protected Heritage Area · Eastern Kosovo',
+        securityLevel: 'MEDIUM SENSITIVITY',
+        description: 'Active 14th-century monastery in Novo Brdo municipality serving the eastern Kosovo enclaves.',
+        lat: 42.5414,
+        lon: 21.4683
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [21.4683, 42.5414]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'spz-duboki-potok',
+        name: 'Special Protective Zone: Duboki Potok Monastery',
+        category: 'spz',
+        status: 'Protected Heritage Area · Ibarski Kolašin',
+        securityLevel: 'MEDIUM SENSITIVITY',
+        description: '14th-century monastery situated in northern Ibarski Kolašin (Zubin Potok municipality).',
+        lat: 42.9239,
+        lon: 20.6789
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.6789, 42.9239]
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'spz-zociste',
+        name: 'Special Protective Zone: Zočište Monastery (Sveti Vrači)',
+        category: 'spz',
+        status: 'Protected Heritage Area · Rahovec Sector',
+        securityLevel: 'ELEVATED MONITORING',
+        description: 'Medieval monastery dedicated to Saints Cosmas and Damian, situated in Zočište near Rahovec.',
+        lat: 42.3831,
+        lon: 20.7103
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.7103, 42.3831]
+      }
+    }
+  ]
+};
+
+/**
+ * Authoritative Dataset: KFOR Main Supply Routes (MSR) & Strategic Patrol Corridors
+ * Official NATO / KFOR theater callsigns and designated logistical arteries.
+ */
+export const KFOR_MSR_ROUTES_GEOJSON = {
+  type: 'FeatureCollection',
+  features: [
+    // 1. MSR BULL
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-bull',
+        callsign: 'MSR BULL',
+        name: 'MSR BULL (Mitrovica – Zvečan – Leposavić – Jarinje Gate 1)',
+        civilianRoute: 'Magistralni put M-22.3',
+        sector: 'RC-East / Northern Sector (Mitrovica North)',
+        command: 'KFOR Regional Command East (RC-East)',
+        status: 'Strategic Primary Supply Route · High Freedom of Movement Patrol Priority',
+        securityLevel: 'MAXIMUM TACTICAL PRIORITY',
+        color: '#38bdf8',
+        lengthApproxKm: 56,
+        description: 'Primary northern tactical artery along the Ibar valley connecting Mitrovica through Leposavić to ABL Gate 1 (Jarinje). Monitored 24/7 by KFOR kinetic and ISR aerial patrols.'
       },
       geometry: {
         type: 'LineString',
         coordinates: [
-          [20.8672, 42.8945], // Severna Mitrovica
-          [20.7800, 42.8950],
-          [20.6900, 42.9130], // Zubin Potok
-          [20.6178, 42.9619], // Gazivode
-          [20.5519, 42.9753]  // Brnjak
+          [20.8672, 42.8945], // Mitrovica
+          [20.8520, 42.9050], // Zvečan
+          [20.8350, 42.9450], // Rudar
+          [20.8200, 42.9850], // Banjska Junction
+          [20.8100, 43.0250], // Sočanica
+          [20.8033, 43.1025], // Leposavić
+          [20.7800, 43.1350], // Dren
+          [20.7450, 43.1650], // Lešak
+          [20.7200, 43.1900], // Krn
+          [20.6975, 43.2181]  // Jarinje (Gate 1)
         ]
+      }
+    },
+    // 2. ROUTE FOX
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-fox',
+        callsign: 'ROUTE FOX',
+        name: 'ROUTE FOX (Mitrovica – Zubin Potok – Gazivode – Brnjak Gate 31)',
+        civilianRoute: 'Magistralni put M-2',
+        sector: 'Northwest Operational Sector (Ibarski Kolašin)',
+        command: 'KFOR Regional Command East / Kinetic Patrols',
+        status: 'Critical Dam & ABL Access Corridor · Static Checkpoints',
+        securityLevel: 'HIGH MOBILITY PATROL ROUTE',
+        color: '#60a5fa',
+        lengthApproxKm: 42,
+        description: 'Northwestern tactical supply route running alongside Lake Gazivode towards ABL Gate 31 (Brnjak) and the critical Gazivode hydroelectric dam complex.'
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [20.8672, 42.8945], // Mitrovica
+          [20.8150, 42.8900], // Zupče
+          [20.7600, 42.9020], // Ugljare
+          [20.6900, 42.9130], // Zubin Potok
+          [20.6550, 42.9400], // Velji Breg
+          [20.6178, 42.9619], // Gazivode Dam
+          [20.5850, 42.9700], // Lake Gazivode north shore
+          [20.5519, 42.9753]  // Brnjak (Gate 31)
+        ]
+      }
+    },
+    // 3. MSR HAWK
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-hawk',
+        callsign: 'MSR HAWK',
+        name: 'MSR HAWK (Hani i Elezit / Blace – Kaçanik – Ferizaj – Prishtinë)',
+        civilianRoute: 'Corridor M-2 / R6 Motorway',
+        sector: 'RC-East Southern Logistics Corridor',
+        command: 'KFOR JLSG / RC-East Logistics Support',
+        status: 'Primary International Heavy Logistics Artery · Project Hawk Bridges',
+        securityLevel: 'STRATEGIC SUPPLY ARTERY',
+        color: '#0284c7',
+        lengthApproxKm: 78,
+        description: 'Southern international lifeline connecting North Macedonia (Skopje corridor) via the Kaçanik Gorge to Prishtina and Camp Bondsteel. Subject of historical KFOR bridge modernization (Project Hawk).'
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [21.2960, 42.1470], // Hani i Elezit / SMKD Border
+          [21.2590, 42.2280], // Kaçanik Gorge
+          [21.2150, 42.3150], // Ferizaj / Camp Bondsteel access
+          [21.1900, 42.4200], // Bablak
+          [21.1650, 42.5200], // Lipjan junction
+          [21.1550, 42.5950], // Çagllavicë
+          [21.1600, 42.6450]  // Prishtinë HQ
+        ]
+      }
+    },
+    // 4. MSR DOG
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-dog',
+        callsign: 'MSR DOG',
+        name: 'MSR DOG (Prishtinë – Komoran – Klinë – Pejë)',
+        civilianRoute: 'Magistralni put M-9',
+        sector: 'East-West Transversal Corridor (RC-East to RC-West)',
+        command: 'KFOR RC-West / Multinational Task Force',
+        status: 'Strategic Transversal Axis · Inter-Regional Quick Reaction Link',
+        securityLevel: 'STRATEGIC TRANSIT AXIS',
+        color: '#06b6d4',
+        lengthApproxKm: 85,
+        description: 'Central east-west arterial transit axis connecting KFOR Film City Headquarters with Western Regional Command (Camp Villaggio Italia, Peja) and the Rugova mountain approach.'
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [21.1600, 42.6450], // Prishtinë
+          [21.0900, 42.6250], // Fushë Kosovë
+          [21.0100, 42.5950], // Slatina Airport junction
+          [20.9100, 42.5750], // Komoran
+          [20.8000, 42.5650], // Kijevë pass
+          [20.7100, 42.5850], // Dollc
+          [20.5800, 42.6200], // Klinë
+          [20.4400, 42.6450], // Zahaq
+          [20.2880, 42.6600]  // Pejë (Camp Villaggio Italia)
+        ]
+      }
+    },
+    // 5. MSR LION
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-lion',
+        callsign: 'MSR LION',
+        name: 'MSR LION (Prishtinë – Gračanica – Gjilan – Camp Bondsteel)',
+        civilianRoute: 'Magistralni put M-25.2 / M-25',
+        sector: 'RC-East Central & Eastern Staging Sector',
+        command: 'KFOR RC-East / Task Force Medical & Aviation',
+        status: 'Operational Staging Route · Direct Bondsteel Logistics Axis',
+        securityLevel: 'HIGH MOBILITY LOGISTICS CORRIDOR',
+        color: '#38bdf8',
+        lengthApproxKm: 58,
+        description: 'Eastern arterial corridor facilitating rapid military mobility, medevac transit, and convoys between Prishtina, eastern enclaves, and Camp Bondsteel.'
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [21.1600, 42.6450], // Prishtinë
+          [21.1930, 42.5980], // Gračanica
+          [21.2500, 42.5400], // Kishnicë
+          [21.3200, 42.4900], // Livoç
+          [21.4680, 42.4630], // Gjilan
+          [21.3500, 42.3900], // Camp Bondsteel Gate
+          [21.2500, 42.3667]  // Camp Bondsteel Center
+        ]
+      }
+    },
+    // Route Waypoints (Shield Badges on Map)
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-bull-waypoint',
+        routeId: 'msr-bull',
+        callsign: 'MSR BULL',
+        name: 'MSR BULL (Mitrovica – Zvečan – Leposavić – Jarinje Gate 1)',
+        civilianRoute: 'Magistralni put M-22.3',
+        sector: 'RC-East / Northern Sector (Mitrovica North)',
+        command: 'KFOR Regional Command East (RC-East)',
+        status: 'Strategic Primary Supply Route',
+        securityLevel: 'MAXIMUM TACTICAL PRIORITY',
+        description: 'Primary northern tactical artery along the Ibar valley connecting Mitrovica with ABL Gate 1 (Jarinje).'
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.8033, 43.1025] // Leposavić
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-fox-waypoint',
+        routeId: 'msr-fox',
+        callsign: 'ROUTE FOX',
+        name: 'ROUTE FOX (Mitrovica – Zubin Potok – Gazivode – Brnjak Gate 31)',
+        civilianRoute: 'Magistralni put M-2',
+        sector: 'Northwest Operational Sector',
+        command: 'KFOR Regional Command East',
+        status: 'Critical Dam & ABL Access Corridor',
+        securityLevel: 'HIGH MOBILITY PATROL ROUTE',
+        description: 'Northwestern tactical supply route running alongside Lake Gazivode towards ABL Gate 31 (Brnjak).'
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.6900, 42.9130] // Zubin Potok
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-hawk-waypoint',
+        routeId: 'msr-hawk',
+        callsign: 'MSR HAWK',
+        name: 'MSR HAWK (Hani i Elezit / Blace – Kaçanik – Ferizaj – Prishtinë)',
+        civilianRoute: 'Corridor M-2 / R6 Motorway',
+        sector: 'RC-East Southern Logistics Corridor',
+        command: 'KFOR JLSG',
+        status: 'Primary International Heavy Logistics Artery',
+        securityLevel: 'STRATEGIC SUPPLY ARTERY',
+        description: 'Southern international lifeline connecting North Macedonia via the Kaçanik Gorge to Prishtina and Camp Bondsteel.'
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [21.2450, 42.2450] // Kaçanik Gorge
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-dog-waypoint',
+        routeId: 'msr-dog',
+        callsign: 'MSR DOG',
+        name: 'MSR DOG (Prishtinë – Komoran – Klinë – Pejë)',
+        civilianRoute: 'Magistralni put M-9',
+        sector: 'East-West Transversal Corridor',
+        command: 'KFOR RC-West',
+        status: 'Strategic Transversal Axis',
+        securityLevel: 'STRATEGIC TRANSIT AXIS',
+        description: 'Central east-west arterial transit axis connecting KFOR HQ with Western Regional Command (Peja).'
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [20.7100, 42.5850] // Klinë / Kijevë
+      }
+    },
+    {
+      type: 'Feature',
+      properties: {
+        id: 'msr-lion-waypoint',
+        routeId: 'msr-lion',
+        callsign: 'MSR LION',
+        name: 'MSR LION (Prishtinë – Gračanica – Gjilan – Camp Bondsteel)',
+        civilianRoute: 'Magistralni put M-25.2 / M-25',
+        sector: 'RC-East Central & Eastern Staging Sector',
+        command: 'KFOR RC-East',
+        status: 'Operational Staging Route',
+        securityLevel: 'HIGH MOBILITY LOGISTICS CORRIDOR',
+        description: 'Eastern arterial corridor connecting Prishtina, eastern enclaves, and Camp Bondsteel.'
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [21.3600, 42.4300] // Gjilan / Bondsteel axis
       }
     }
   ]

@@ -46,6 +46,130 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+const BALKAN_PLACES = [
+  // Kosovo Municipalities & Regions
+  { name: 'Prishtina', country: 'Kosovo', lat: 42.6629, lon: 21.1655 },
+  { name: 'Prizren', country: 'Kosovo', lat: 42.2139, lon: 20.7397 },
+  { name: 'Peja', country: 'Kosovo', lat: 42.6592, lon: 20.2887 },
+  { name: 'Mitrovica', country: 'Kosovo', lat: 42.8914, lon: 20.8660 },
+  { name: 'Gjakova', country: 'Kosovo', lat: 42.3803, lon: 20.4308 },
+  { name: 'Gjilan', country: 'Kosovo', lat: 42.4635, lon: 21.4694 },
+  { name: 'Ferizaj', country: 'Kosovo', lat: 42.3706, lon: 21.1557 },
+  { name: 'Podujeva', country: 'Kosovo', lat: 42.9108, lon: 21.1925 },
+  { name: 'Skenderaj / Drenica', country: 'Kosovo', lat: 42.7481, lon: 20.7892 },
+  { name: 'Zubin Potok / Gazivode', country: 'Kosovo', lat: 42.9144, lon: 20.6897 },
+  { name: 'Leposaviq', country: 'Kosovo', lat: 43.1039, lon: 20.8031 },
+  { name: 'Zvečan', country: 'Kosovo', lat: 42.9069, lon: 20.8403 },
+  { name: 'Deçan', country: 'Kosovo', lat: 42.5406, lon: 20.2878 },
+  { name: 'Rahovec', country: 'Kosovo', lat: 42.3994, lon: 20.6547 },
+  { name: 'Suhareka', country: 'Kosovo', lat: 42.3586, lon: 20.8250 },
+  { name: 'Klina', country: 'Kosovo', lat: 42.6217, lon: 20.5778 },
+  { name: 'Istog', country: 'Kosovo', lat: 42.7808, lon: 20.4875 },
+  { name: 'Malisheva', country: 'Kosovo', lat: 42.4828, lon: 20.7458 },
+  { name: 'Viti', country: 'Kosovo', lat: 42.3214, lon: 21.3583 },
+  { name: 'Dragash / Šar', country: 'Kosovo', lat: 42.0622, lon: 20.6533 },
+  { name: 'Kaçanik', country: 'Kosovo', lat: 42.2319, lon: 21.2592 },
+
+  // Albania
+  { name: 'Burrel / Mat District', country: 'Albania', lat: 41.6103, lon: 20.0108 },
+  { name: 'Klos / Bulqizë', country: 'Albania', lat: 41.5067, lon: 20.0867 },
+  { name: 'Tirana', country: 'Albania', lat: 41.3275, lon: 19.8187 },
+  { name: 'Durrës', country: 'Albania', lat: 41.3246, lon: 19.4565 },
+  { name: 'Shkodra', country: 'Albania', lat: 42.0683, lon: 19.5126 },
+  { name: 'Lezha / Shengjin', country: 'Albania', lat: 41.7836, lon: 19.6436 },
+  { name: 'Kukës', country: 'Albania', lat: 42.0769, lon: 20.4219 },
+  { name: 'Peshkopi / Dibër', country: 'Albania', lat: 41.6850, lon: 20.4289 },
+  { name: 'Vlora', country: 'Albania', lat: 40.4661, lon: 19.4914 },
+  { name: 'Fier', country: 'Albania', lat: 40.7239, lon: 19.5561 },
+  { name: 'Berat', country: 'Albania', lat: 40.7058, lon: 19.9522 },
+  { name: 'Korça', country: 'Albania', lat: 40.6186, lon: 20.7808 },
+  { name: 'Pogradec', country: 'Albania', lat: 40.9025, lon: 20.6550 },
+  { name: 'Gjirokastër', country: 'Albania', lat: 40.0758, lon: 20.1389 },
+  { name: 'Saranda', country: 'Albania', lat: 39.8756, lon: 20.0053 },
+  { name: 'Bajram Curri / Tropojë', country: 'Albania', lat: 42.3578, lon: 20.0764 },
+  { name: 'Pukë', country: 'Albania', lat: 42.0444, lon: 19.8997 },
+  { name: 'Rrëshen / Mirditë', country: 'Albania', lat: 41.7675, lon: 19.8756 },
+
+  // Serbia
+  { name: 'Negotin / Bor Area', country: 'Serbia', lat: 44.2264, lon: 22.5311 },
+  { name: 'Kladovo / Danube Gorge', country: 'Serbia', lat: 44.6114, lon: 22.6108 },
+  { name: 'Bor', country: 'Serbia', lat: 44.0749, lon: 22.0959 },
+  { name: 'Majdanpek', country: 'Serbia', lat: 44.4278, lon: 21.9444 },
+  { name: 'Zaječar', country: 'Serbia', lat: 43.9036, lon: 22.2742 },
+  { name: 'Niš', country: 'Serbia', lat: 43.3209, lon: 21.8958 },
+  { name: 'Vranje', country: 'Serbia', lat: 42.5514, lon: 21.9003 },
+  { name: 'Leskovac', country: 'Serbia', lat: 42.9981, lon: 21.9461 },
+  { name: 'Novi Pazar / Sandžak', country: 'Serbia', lat: 43.1367, lon: 20.5122 },
+  { name: 'Raška', country: 'Serbia', lat: 43.2875, lon: 20.6150 },
+  { name: 'Kuršumlija', country: 'Serbia', lat: 43.1417, lon: 21.2722 },
+  { name: 'Prokuplje', country: 'Serbia', lat: 43.2342, lon: 21.5878 },
+  { name: 'Kraljevo', country: 'Serbia', lat: 43.7258, lon: 20.6894 },
+  { name: 'Kruševac', country: 'Serbia', lat: 43.5800, lon: 21.3339 },
+  { name: 'Pirot', country: 'Serbia', lat: 43.1531, lon: 22.5861 },
+  { name: 'Belgrade', country: 'Serbia', lat: 44.7866, lon: 20.4489 },
+
+  // North Macedonia
+  { name: 'Skopje', country: 'North Macedonia', lat: 41.9981, lon: 21.4254 },
+  { name: 'Tetovo', country: 'North Macedonia', lat: 42.0106, lon: 20.9714 },
+  { name: 'Gostivar', country: 'North Macedonia', lat: 41.7961, lon: 20.9083 },
+  { name: 'Kumanovo', country: 'North Macedonia', lat: 42.1322, lon: 21.7144 },
+  { name: 'Bitola', country: 'North Macedonia', lat: 41.0319, lon: 21.3347 },
+  { name: 'Ohrid', country: 'North Macedonia', lat: 41.1172, lon: 20.8019 },
+  { name: 'Prilep', country: 'North Macedonia', lat: 41.3464, lon: 21.5542 },
+  { name: 'Veles', country: 'North Macedonia', lat: 41.7164, lon: 21.7753 },
+  { name: 'Strumica', country: 'North Macedonia', lat: 41.4378, lon: 22.6433 },
+  { name: 'Štip', country: 'North Macedonia', lat: 41.7458, lon: 22.1958 },
+
+  // Montenegro
+  { name: 'Podgorica', country: 'Montenegro', lat: 42.4304, lon: 19.2594 },
+  { name: 'Nikšić', country: 'Montenegro', lat: 42.7731, lon: 18.9445 },
+  { name: 'Pljevlja', country: 'Montenegro', lat: 43.3569, lon: 19.3583 },
+  { name: 'Bijelo Polje', country: 'Montenegro', lat: 43.0383, lon: 19.7475 },
+  { name: 'Berane', country: 'Montenegro', lat: 42.8425, lon: 19.8733 },
+  { name: 'Rožaje', country: 'Montenegro', lat: 42.8394, lon: 20.1667 },
+  { name: 'Bar', country: 'Montenegro', lat: 42.0931, lon: 19.1003 },
+  { name: 'Budva', country: 'Montenegro', lat: 42.2911, lon: 18.8403 },
+  { name: 'Ulcinj', country: 'Montenegro', lat: 41.9311, lon: 19.2144 },
+
+  // Greece & Bulgaria
+  { name: 'Ioannina', country: 'Greece', lat: 39.6650, lon: 20.8537 },
+  { name: 'Kastoria', country: 'Greece', lat: 40.5217, lon: 21.2633 },
+  { name: 'Florina', country: 'Greece', lat: 40.7817, lon: 21.4094 },
+  { name: 'Kyustendil', country: 'Bulgaria', lat: 42.2839, lon: 22.6914 },
+  { name: 'Blagoevgrad', country: 'Bulgaria', lat: 42.0208, lon: 23.0944 }
+];
+
+function resolveWildfireLocation(lat, lon) {
+  if (typeof lat !== 'number' || typeof lon !== 'number') {
+    return { place: 'Balkan Region', country: 'Regional' };
+  }
+
+  // Precise boundary check for Kosovo (41.85 to 43.28 N, 20.01 to 21.78 E)
+  const inKosovo = (lat >= 41.85 && lat <= 43.28 && lon >= 20.01 && lon <= 21.78);
+
+  let nearest = null;
+  let minDist = Infinity;
+
+  for (const p of BALKAN_PLACES) {
+    if (inKosovo && p.country !== 'Kosovo') continue;
+    const d = haversine(lat, lon, p.lat, p.lon);
+    if (d < minDist) {
+      minDist = d;
+      nearest = p;
+    }
+  }
+
+  if (!nearest) {
+    nearest = BALKAN_PLACES[0];
+  }
+
+  return {
+    place: nearest.name,
+    country: nearest.country,
+    distanceKm: Math.round(minDist)
+  };
+}
+
 /**
  * Parse raw CSV lines from NASA FIRMS Area API
  */
@@ -103,11 +227,15 @@ function parseCsvFires(csvText, sourceName) {
     const acq_date = dateIdx !== -1 ? cols[dateIdx] : new Date().toISOString().split('T')[0];
     const acq_time = timeIdx !== -1 ? cols[timeIdx] : '0000';
     const daynight = daynightIdx !== -1 ? cols[daynightIdx] : 'D';
+    const loc = resolveWildfireLocation(lat, lon);
 
     detections.push({
       id: `firms-${acq_date}-${acq_time}-${lat.toFixed(4)}-${lon.toFixed(4)}`,
       lat,
       lon,
+      place: loc.place,
+      country: loc.country,
+      locationLabel: `${loc.place}, ${loc.country}`,
       brightness: isNaN(brightness) ? 0 : brightness,
       frp: isNaN(frp) ? 0 : frp,
       confidence: numericConf,
@@ -252,11 +380,15 @@ async function fetchFromEONET({ period }) {
 
       const sourceObj = ev.sources?.[0] || {};
       const sourceUrl = sourceObj.url || ev.link || 'https://eonet.gsfc.nasa.gov/';
+      const loc = resolveWildfireLocation(ptLat, ptLon);
 
       detections.push({
         id: `eonet-${ev.id}-${ptLat.toFixed(4)}-${ptLon.toFixed(4)}`,
         lat: ptLat,
         lon: ptLon,
+        place: loc.place,
+        country: loc.country,
+        locationLabel: `${loc.place}, ${loc.country}`,
         brightness: brightEst,
         frp: frpEst,
         confidence: conf,
@@ -290,11 +422,12 @@ async function fetchFromEONET({ period }) {
  * 4. Fallback: UNAVAILABLE
  */
 async function fetchWildfire({ period = '24h', lat, lon, forceRefresh = false, debug = false } = {}) {
-  // Check fresh in-memory cache
-  const isFreshCache = !forceRefresh && wildfireCache[period] && (Date.now() - (lastFetchTimes[period] || 0) < WILDFIRE_CACHE_TTL_MS);
+  const cachedObj = wildfireCache[period];
+  const cachedTime = lastFetchTimes[period] || (cachedObj?.fetchedAt ? new Date(cachedObj.fetchedAt).getTime() : 0);
+  const isFreshCache = !forceRefresh && cachedObj && (Date.now() - cachedTime < WILDFIRE_CACHE_TTL_MS);
   if (isFreshCache) {
-    const cached = wildfireCache[period];
-    const ageSec = Math.round((Date.now() - (lastFetchTimes[period] || 0)) / 1000);
+    const cached = cachedObj;
+    const ageSec = Math.round((Date.now() - cachedTime) / 1000);
     const cacheSource = (cached.provider === 'nasa_firms' || cached.source?.includes('FIRMS')) ? 'firms' : ((cached.provider === 'nasa_eonet' || cached.source?.includes('EONET')) ? 'eonet' : 'cache');
     console.log(`[wildfire-monitor] Cache HIT period=${period} source=${cacheSource} age=${ageSec}s`);
 
@@ -512,7 +645,9 @@ module.exports = {
   fetchWildfire,
   fetchFromFIRMS,
   fetchFromEONET,
-  parseCsvFires
+  parseCsvFires,
+  resolveWildfireLocation,
+  BALKAN_PLACES
 };
 
 if (require.main === module) {

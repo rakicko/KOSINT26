@@ -2,7 +2,8 @@ import * as maplibregl from './vendor/maplibre-gl.mjs';
 import {
   KFOR_BASES_GEOJSON,
   SENSITIVE_CORRIDORS_GEOJSON,
-  MINEFIELDS_KOSOVO_GEOJSON
+  MINEFIELDS_KOSOVO_GEOJSON,
+  KFOR_MSR_ROUTES_GEOJSON
 } from './operational-zones.js';
 
 'use strict';
@@ -531,10 +532,10 @@ const moduleLayers = {
   mines: {
     markers: [],
     render: () => {
-      toggleMinefieldsLayer(true);
+      if (typeof toggleMinefieldsLayer === 'function') toggleMinefieldsLayer(true);
     },
     clear: () => {
-      toggleMinefieldsLayer(false);
+      if (typeof toggleMinefieldsLayer === 'function') toggleMinefieldsLayer(false);
     }
   }
 };
@@ -542,6 +543,9 @@ const moduleLayers = {
 function clearAllModuleLayers() {
   closeMapPopup();
   Object.keys(moduleLayers).forEach(mod => {
+    // Preserve persistent tactical layers (earthquake, radiation, mines, weather, aqi, msr)
+    if (['earthquake', 'radiation', 'mines', 'weather', 'aqi', 'msr'].includes(mod)) return;
+    if (mod === 'border' && $('toggleLayerBorder')?.checked) return;
     try {
       moduleLayers[mod].clear();
     } catch (e) {
@@ -1971,8 +1975,13 @@ function renderRadiationMarkers(radData) {
 }
 
 function renderRadiationMapMarkers(radData) {
-  if (!state.map || state.activeMapModule !== 'radiation') return;
+  if (!state.map) return;
+  const isEnabled = $('toggleLayerRadiation') ? $('toggleLayerRadiation').checked : true;
   clearMarkerList(moduleLayers.radiation.markers);
+  if (!isEnabled) {
+    updateMapBadgeAndMeta();
+    return;
+  }
 
   const data = radData || state.data?.radiation;
   if (!data || data.error || !Array.isArray(data.neighbors)) {
@@ -2180,8 +2189,13 @@ function debugSeismicMarkers() {
 }
 
 function renderEarthquakeMapMarkers(eqData) {
-  if (!state.map || state.activeMapModule !== 'earthquake') return;
+  if (!state.map) return;
+  const isEnabled = $('toggleLayerSeismic') ? $('toggleLayerSeismic').checked : true;
   clearMarkerList(moduleLayers.earthquake.markers);
+  if (!isEnabled) {
+    updateMapBadgeAndMeta();
+    return;
+  }
 
   const data = eqData || state.data?.earthquakes;
   if (!data || data.error || !Array.isArray(data.earthquakes)) {
@@ -2780,7 +2794,8 @@ function createWeatherMarkerElement(city, weatherData = null, isActive = false) 
 }
 
 function renderWeatherMapMarkers(initialWeatherData = null) {
-  if (!state.map || state.activeMapModule !== 'weather') return;
+  const showLayer = $('toggleLayerWeather') ? $('toggleLayerWeather').checked : false;
+  if (!state.map || !showLayer) return;
   clearMarkerList(moduleLayers.weather.markers);
 
   if (!state.weatherCache) state.weatherCache = {};
@@ -2817,7 +2832,8 @@ function renderWeatherMapMarkers(initialWeatherData = null) {
 }
 
 function renderAqiMapMarkers(aqiData) {
-  if (!state.map || state.activeMapModule !== 'aqi') return;
+  const showLayer = $('toggleLayerAqi') ? $('toggleLayerAqi').checked : true;
+  if (!state.map || !showLayer) return;
   clearMarkerList(moduleLayers.aqi.markers);
 
   const data = aqiData || state.data?.aqi;
@@ -2887,31 +2903,20 @@ function renderWildfire(wildfireData) {
     return;
   }
 
-  if (wildfireData.status === 'NOT_CONFIGURED' || wildfireData.error === 'FIRMS_KEY_MISSING') {
+  if (wildfireData.status === 'UNAVAILABLE' || wildfireData.error) {
     list.innerHTML = `
       <div class="empty-state wildfire-empty-state">
-        <div class="wildfire-state-icon">📡</div>
-        <div class="wildfire-state-title">FIRMS NOT CONFIGURED</div>
-        <div class="wildfire-state-desc">NASA FIRMS API key is missing. Set <code>FIRMS_MAP_KEY</code> in server environment (.env) to enable live satellite thermal detections.</div>
+        <div class="wildfire-state-icon">⚠️</div>
+        <div class="wildfire-state-title">SERVICE TEMPORARILY UNAVAILABLE</div>
+        <div class="wildfire-state-desc">${escHtml(wildfireData?.error || 'NASA FIRMS and EONET services could not be reached.')}</div>
       </div>`;
-    if (meta) meta.textContent = 'NASA FIRMS · Not Configured';
+    if (meta) meta.textContent = 'NASA FIRMS / EONET · UNAVAILABLE';
     if (badge) badge.style.display = 'none';
     return;
   }
 
-  if (wildfireData.status === 'UNAVAILABLE' || (wildfireData.error && wildfireData.status !== 'NO_ACTIVE_FIRES')) {
-    list.innerHTML = `
-      <div class="error-state wildfire-error-state">
-        <div class="wildfire-state-title">NO LIVE FIRE DATA</div>
-        <div class="wildfire-state-desc">${escHtml(wildfireData.message || wildfireData.error || 'NASA satellite fire services are currently unavailable.')}</div>
-      </div>`;
-    if (meta) meta.textContent = `${(wildfireData.source || 'NASA SATELLITES').toUpperCase()} · UNAVAILABLE`;
-    if (badge) badge.style.display = 'none';
-    return;
-  }
-
-  const detections = (wildfireData.detections || []).filter(d =>
-    typeof d.lat === 'number' && typeof d.lon === 'number' && !d.isDemo
+  const detections = Array.isArray(wildfireData.detections) ? wildfireData.detections : (
+    Array.isArray(wildfireData.events) ? wildfireData.events : []
   );
 
   const sourceName = (wildfireData.source || 'NASA Satellite Network').toUpperCase();
@@ -2936,22 +2941,32 @@ function renderWildfire(wildfireData) {
     badge.textContent = wildfireData.isCached ? `${detections.length} ACTIVE (CACHED)` : `${detections.length} ACTIVE`;
   }
 
-  list.innerHTML = detections.map(d => {
-    const conf = d.confidence || 0;
-    const confClass = conf >= 80 ? 'high' : conf >= 50 ? 'medium' : 'low';
-    const sat = d.satellite || 'NASA Satellite';
-    const time = d.acq_time ? formatHour(d.acq_time) : '';
-    const date = d.acq_date ? formatDate(d.acq_date) : '';
-    const bright = typeof d.brightness === 'number' && d.brightness > 0 ? `${d.brightness.toFixed(1)} K` : 'N/A';
-    const frp = typeof d.frp === 'number' && d.frp > 0 ? `${d.frp.toFixed(1)} MW` : 'N/A';
-    const distText = d.distanceKm ? ` · ${d.distanceKm} km away` : '';
+    const maxDisplay = 60;
+    const displayItems = detections.slice(0, maxDisplay);
 
-    return `<div class="wildfire-item severity-${confClass}">
+    list.innerHTML = displayItems.map(d => {
+      const conf = d.confidence || 0;
+      const confClass = conf >= 80 ? 'high' : conf >= 50 ? 'medium' : 'low';
+      const sat = d.satellite || 'NASA Satellite';
+      const time = d.acq_time ? formatHour(d.acq_time) : '';
+      const date = d.acq_date ? formatDate(d.acq_date) : '';
+      const bright = typeof d.brightness === 'number' && d.brightness > 0 ? `${d.brightness.toFixed(1)} K` : 'N/A';
+      const frp = typeof d.frp === 'number' && d.frp > 0 ? `${d.frp.toFixed(1)} MW` : 'N/A';
+      const distText = d.distanceKm ? ` · ${d.distanceKm} km away` : '';
+      const place = d.place || (typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(d.lat, d.lon).place : 'Balkan Area');
+      const country = d.country || (typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(d.lat, d.lon).country : 'Regional');
+
+      return `<div class="wildfire-item severity-${confClass}">
       <div class="wildfire-header">
         <span class="wildfire-confidence">${conf}% Conf${distText}</span>
         <span class="wildfire-sat">${escHtml(sat)}</span>
       </div>
       ${d.title ? `<div class="wildfire-event-title" style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">🔥 ${escHtml(d.title)}</div>` : ''}
+      <div class="wildfire-location-row">
+        <span>📍</span>
+        <strong class="wildfire-place-name">${escHtml(place)}</strong>
+        <span class="wildfire-country-badge">${escHtml(country)}</span>
+      </div>
       <div class="wildfire-coords">
         <span class="wildfire-lat">Lat: ${d.lat.toFixed(4)}</span>
         <span class="wildfire-lon">Lon: ${d.lon.toFixed(4)}</span>
@@ -2962,7 +2977,14 @@ function renderWildfire(wildfireData) {
         <span class="wildfire-frp">FRP: ${frp}</span>
       </div>
     </div>`;
-  }).join('');
+    }).join('');
+
+    if (detections.length > maxDisplay) {
+      list.innerHTML += `
+      <div class="wildfire-pagination-note" style="text-align:center; padding:10px 12px; font-size:11px; color:var(--text-secondary); background:rgba(15,23,42,0.5); border-radius:8px; margin-top:8px; border:1px solid rgba(56,189,248,0.15);">
+        Showing <strong>${maxDisplay}</strong> most critical detections · All <strong>${detections.length}</strong> plotted on live map
+      </div>`;
+    }
 }
 
 function formatDate(dateStr) {
@@ -2976,13 +2998,22 @@ function filterWildfire(period, btn) {
   if (btn) btn.classList.add('active');
   state.wildfireFilter = period;
   if (state.activeMapModule === 'wildfire') {
-    window.updateWildfireLayer(period);
+    window.updateWildfireLayer(period, true);
   }
 }
 
-window.updateWildfireLayer = async function (period = '24h') {
+window.updateWildfireLayer = async function (period = '24h', force = false) {
   if (!state.mapInitialized) return;
   const requestModule = 'wildfire';
+
+  // Fast-path: render immediately from in-memory cache if available and not forced
+  if (!force && state.data?.wildfire && state.data.wildfire.period === period && Array.isArray(state.data.wildfire.detections)) {
+    renderWildfire(state.data.wildfire);
+    if (state.activeMapModule === requestModule) {
+      renderWildfireMapLayer(state.data.wildfire);
+    }
+    return;
+  }
 
   try {
     const response = await fetch(`/api/wildfire?period=${period}`);
@@ -2990,22 +3021,23 @@ window.updateWildfireLayer = async function (period = '24h') {
     const data = await response.json();
 
     if (state.data) state.data.wildfire = data;
-    renderWildfire(data);
 
-    // Async guard check: only render wildfire layer if wildfire is STILL active!
-    if (state.activeMapModule === requestModule) {
+    // Strict guard: only update UI if Wildfire module is still the active view!
+    if (state.activeMapModule === requestModule || state.activeModule === 'wildfirePanel') {
+      renderWildfire(data);
       renderWildfireMapLayer(data);
     }
   } catch (err) {
     console.error('Wildfire update error:', err);
-    renderWildfire({ status: 'UNAVAILABLE', error: err.message });
-    if (state.activeMapModule === requestModule) {
+    if (state.activeMapModule === requestModule || state.activeModule === 'wildfirePanel') {
+      renderWildfire({ status: 'UNAVAILABLE', error: err.message });
       clearWildfireMapLayer();
     }
   }
 };
 
 function clearWildfireMapLayer() {
+  clearMarkerList(moduleLayers.wildfire.markers);
   if (!state.map) return;
   if (state.map.getSource('wildfire-source')) {
     state.map.getSource('wildfire-source').setData({ type: 'FeatureCollection', features: [] });
@@ -3013,6 +3045,44 @@ function clearWildfireMapLayer() {
   if (state.map.getLayer('wildfire-layer')) {
     state.map.setLayoutProperty('wildfire-layer', 'visibility', 'none');
   }
+}
+
+function openWildfirePopup(d) {
+  if (!state.map || !d) return;
+  const lat = Number(d.lat);
+  const lon = Number(d.lon);
+  if (isNaN(lat) || isNaN(lon)) return;
+
+  const loc = typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(lat, lon) : { place: 'Balkan Area', country: 'Regional' };
+  const place = d.place || loc.place;
+  const country = d.country || loc.country;
+  const frpVal = (Number(d.frp) || 0).toFixed(1);
+  const brightVal = (Number(d.brightness) || 0).toFixed(1);
+  const confVal = d.confidence || 'HIGH';
+
+  const popupHtml = buildMapPopupHtml({
+    icon: '🔥',
+    title: `Wildfire · ${place}`,
+    subtitle: `Location: ${place}, ${country}`,
+    source: 'NASA FIRMS / EONET',
+    badge: { text: `${confVal}% CONF`, color: '#f87171' },
+    primary: {
+      val: `${frpVal} MW`,
+      sub: 'Fire Radiative Power (FRP)',
+      secondary: `Brightness: ${brightVal} K`
+    },
+    stats: [
+      { label: 'Place', val: place },
+      { label: 'Country', val: country },
+      { label: 'Satellite', val: d.satellite || 'NASA VIIRS' },
+      { label: 'Confidence', val: `${confVal}%` },
+      { label: 'Acq. Date', val: d.acq_date || 'Live' },
+      { label: 'Acq. Time', val: d.acq_time ? formatHour(d.acq_time) : 'UTC' }
+    ],
+    footer: `LOCATION: ${place.toUpperCase()}, ${country.toUpperCase()} · ${lat.toFixed(4)}, ${lon.toFixed(4)} · NASA FIRMS`
+  });
+
+  openMapPopup([lon, lat], popupHtml);
 }
 
 function renderWildfireMapLayer(wildfireData) {
@@ -3032,25 +3102,84 @@ function renderWildfireMapLayer(wildfireData) {
     typeof d.lat === 'number' && typeof d.lon === 'number' && !d.isDemo
   );
 
-  const features = validDetections.map(d => ({
-    type: 'Feature',
-    geometry: {
-      type: 'Point',
-      coordinates: [d.lon, d.lat]
-    },
-    properties: {
-      id: d.id,
-      lat: d.lat,
-      lon: d.lon,
-      confidence: d.confidence,
-      brightness: d.brightness,
-      frp: d.frp,
-      satellite: d.satellite,
-      acq_date: d.acq_date,
-      acq_time: d.acq_time,
-      _module: 'wildfire'
-    }
-  }));
+  clearMarkerList(moduleLayers.wildfire.markers);
+
+  // Create clickable interactive DOM HTML markers with pulsing tactical flame
+  validDetections.forEach((d, idx) => {
+    const lat = Number(d.lat);
+    const lon = Number(d.lon);
+    if (isNaN(lat) || isNaN(lon)) return;
+
+    const loc = typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(lat, lon) : { place: 'Balkan Area', country: 'Regional' };
+    const place = d.place || loc.place;
+    const country = d.country || loc.country;
+    const frp = Number(d.frp) || 0;
+
+    const el = document.createElement('div');
+    el.className = 'wildfire-custom-marker';
+    el.setAttribute('data-fire-id', d.id || `fire-${idx}`);
+    el.setAttribute('title', `🔥 Wildfire: ${place}, ${country} (${frp.toFixed(1)} MW)`);
+    el.style.cssText = 'width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; z-index: 10;';
+
+    el.innerHTML = `
+      <div class="wildfire-marker-pin" style="width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle, #ffedd5 0%, #ff4500 55%, #b91c1c 100%); border: 2px solid #ffffff; box-shadow: 0 0 10px rgba(255, 69, 0, 0.9), 0 0 18px rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center; font-size: 11px; user-select: none; transition: transform 0.15s ease, box-shadow 0.15s ease;">
+        🔥
+      </div>
+    `;
+
+    el.addEventListener('mouseenter', () => {
+      const pin = el.querySelector('.wildfire-marker-pin');
+      if (pin) {
+        pin.style.transform = 'scale(1.3)';
+        pin.style.boxShadow = '0 0 16px rgba(255, 69, 0, 1), 0 0 25px rgba(239, 68, 68, 0.8)';
+      }
+    });
+    el.addEventListener('mouseleave', () => {
+      const pin = el.querySelector('.wildfire-marker-pin');
+      if (pin) {
+        pin.style.transform = 'scale(1)';
+        pin.style.boxShadow = '0 0 10px rgba(255, 69, 0, 0.9), 0 0 18px rgba(239, 68, 68, 0.5)';
+      }
+    });
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openWildfirePopup(d);
+    });
+
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([lon, lat])
+      .addTo(state.map);
+
+    marker._module = 'wildfire';
+    moduleLayers.wildfire.markers.push(marker);
+  });
+
+  const features = validDetections.map(d => {
+    const place = d.place || (typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(d.lat, d.lon).place : 'Balkan Area');
+    const country = d.country || (typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(d.lat, d.lon).country : 'Regional');
+    return {
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: [d.lon, d.lat]
+      },
+      properties: {
+        id: d.id,
+        lat: d.lat,
+        lon: d.lon,
+        place,
+        country,
+        confidence: d.confidence,
+        brightness: d.brightness,
+        frp: d.frp,
+        satellite: d.satellite,
+        acq_date: d.acq_date,
+        acq_time: d.acq_time,
+        _module: 'wildfire'
+      }
+    };
+  });
 
   if (state.map.getSource('wildfire-source')) {
     state.map.getSource('wildfire-source').setData({
@@ -3398,36 +3527,33 @@ function ensureMapVisible() {
     }
   }
 
-  if (!state.mapInitialized) initMap();
-  else if (state.data) updateMap(state.data);
+  if (!state.mapInitialized) {
+    initMap();
+  }
 
   if (state.map) {
-    setTimeout(() => state.map.resize(), 200);
+    setTimeout(() => state.map.resize(), 100);
   }
 }
 
 function toggleModule(panelId) {
   const overlay = $('moduleOverlay');
 
-  // Weather is purely map-based: toggle weather markers on map without overlay panel
+  // Weather & AQI are now persistent tactical layers on the map: focus map and ensure layer is active
   if (panelId === 'weatherPanel') {
-    if (state.activeMapModule === 'weather') {
-      closeModulePanel();
-      return;
-    }
     ensureMapVisible();
-    if (overlay) {
-      overlay.querySelectorAll('.overlay-panel').forEach(p => { p.style.display = 'none'; });
-      overlay.classList.remove('active');
-      overlay.setAttribute('aria-hidden', 'true');
+    if ($('toggleLayerWeather') && !$('toggleLayerWeather').checked) {
+      $('toggleLayerWeather').checked = true;
+      toggleTacticalLayer('weather', true);
     }
-    const cctvPanel = $('cctvIntelligencePanel');
-    if (cctvPanel) {
-      cctvPanel.style.display = 'none';
-      closeCCTVViewer();
+    return;
+  }
+  if (panelId === 'aqiPanel') {
+    ensureMapVisible();
+    if ($('toggleLayerAqi') && !$('toggleLayerAqi').checked) {
+      $('toggleLayerAqi').checked = true;
+      toggleTacticalLayer('aqi', true);
     }
-    document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === 'weatherPanel'));
-    setActiveMapModule('weather', state.data);
     return;
   }
 
@@ -3536,8 +3662,10 @@ function toggleModule(panelId) {
     // Atomic module switch
     setActiveMapModule(targetModule, state.data);
 
-    // Async triggers with targetModule guard
-    if (targetModule === 'wildfire') {
+    // Triggers with targetModule guard
+    if (targetModule === 'news') {
+      if (state.data?.news) renderNews(state.data.news);
+    } else if (targetModule === 'wildfire') {
       window.updateWildfireLayer(state.wildfireFilter);
     } else if (targetModule === 'aviation') {
       if (!state.data?.aviation) {
@@ -4058,10 +4186,13 @@ function initMap() {
     state.map.on('click', 'wildfire-layer', (e) => {
       if (e.features && e.features.length > 0) {
         const props = e.features[0].properties;
+        const loc = resolveWildfireLocation(Number(props.lat), Number(props.lon));
+        const place = props.place || loc.place;
+        const country = props.country || loc.country;
         const popupHtml = buildMapPopupHtml({
           icon: '🔥',
-          title: 'Wildfire Detection',
-          subtitle: 'Thermal Anomaly Detection',
+          title: `Wildfire · ${place}`,
+          subtitle: `Location: ${place}, ${country}`,
           source: 'NASA FIRMS / EONET',
           badge: { text: `${props.confidence || 'HIGH'}% CONF`, color: '#f87171' },
           primary: {
@@ -4070,12 +4201,14 @@ function initMap() {
             secondary: `Brightness: ${(Number(props.brightness) || 0).toFixed(1)} K`
           },
           stats: [
+            { label: 'Place', val: place },
+            { label: 'Country', val: country },
             { label: 'Satellite', val: props.satellite || 'NASA VIIRS' },
             { label: 'Confidence', val: `${props.confidence || '?'}%` },
             { label: 'Acq. Date', val: props.acq_date || 'Live' },
             { label: 'Acq. Time', val: props.acq_time ? formatHour(props.acq_time) : 'UTC' }
           ],
-          footer: `COORDINATES: ${Number(props.lat)?.toFixed(4)}, ${Number(props.lon)?.toFixed(4)} · NASA FIRMS`
+          footer: `LOCATION: ${place.toUpperCase()}, ${country.toUpperCase()} · ${Number(props.lat)?.toFixed(4)}, ${Number(props.lon)?.toFixed(4)} · NASA FIRMS`
         });
         openMapPopup(e.lngLat, popupHtml);
       }
@@ -4195,21 +4328,66 @@ function initMap() {
 // ─── Tactical Operational Zones (KFOR Sectors, Strategic Corridors, Mines) ───
 let tacticalKforMarkers = [];
 let tacticalMineMarkers = [];
+let tacticalMsrMarkers = [];
 
 function buildMinefieldPopupHtml(p) {
   const riskClass = (p.riskLevel || 'medium').toLowerCase();
+  const riskColor = riskClass === 'critical' ? '#ef4444' : (riskClass === 'high' ? '#fb923c' : '#fbbf24');
+  const badgeText = `${p.status || 'SUSPECTED HAZARDOUS AREA (SHA)'} · ${p.riskLevel || 'MEDIUM'}`;
+
   return `
-    <div class="tactical-layer-popup">
-      <div class="layer-popup-badge risk-${riskClass}">⚠️ ${p.status || 'MINE HAZARD'} · ${p.riskLevel || 'HIGH'}</div>
-      <div class="layer-popup-title">💣 ${p.name}</div>
-      <div class="layer-popup-meta">Sector: <strong>${p.sector}</strong> · Municipality: <strong>${p.municipality}</strong></div>
-      <div class="layer-popup-row"><span>Munitions:</span> <strong style="color:#fca5a5;">${p.munitionTypes}</strong></div>
-      <div class="layer-popup-row"><span>Est. Area:</span> ${p.estimatedAreaHa} Ha · <span>Standoff Buffer:</span> <strong style="color:#f87171;">${p.standoffDistanceMeters}m</strong></div>
-      <div class="layer-popup-row"><span>Demining Lead:</span> ${p.deminingAgency}</div>
-      <div class="layer-popup-row"><span>Survey Date:</span> ${p.lastSurveyDate}</div>
-      <div class="layer-popup-desc" style="margin-top:6px;">${p.description}</div>
-      <div class="layer-popup-notes" style="margin-top:6px; color:#fca5a5; font-size:10px;">
-        🚨 <strong>Emergency Contact:</strong> ${p.emergencyContact}
+    <div class="map-popup map-popup-container mine-hazard-popup">
+      <div class="map-popup-header" style="display:flex; flex-direction:column; gap:5px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.1);">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+          <span class="map-popup-badge" style="background:${riskColor}22; color:${riskColor}; border:1px solid ${riskColor}55; padding:3px 8px; font-size:10px; font-weight:800; border-radius:4px; font-family:var(--font-mono); letter-spacing:0.5px;">
+            ⚠️ ${escHtml(badgeText.toUpperCase())}
+          </span>
+        </div>
+        <div class="map-popup-title" style="width:100%; display:flex; align-items:center; gap:8px; margin-top:2px;">
+          <span class="map-popup-icon" style="font-size:16px; line-height:1; flex-shrink:0;">💣</span>
+          <span class="map-popup-title-text" style="font-size:13.5px; font-weight:700; color:#ffffff; line-height:1.35; word-break:normal; overflow-wrap:break-word;">
+            ${escHtml(p.name)}
+          </span>
+        </div>
+        <div class="map-popup-header-sub" style="display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:11px; color:#94a3b8; margin-top:2px;">
+          <span class="map-popup-subtitle" style="color:#94a3b8;">Sector: <strong style="color:#e2e8f0;">${escHtml(p.sector)}</strong> · Municipality: <strong style="color:#e2e8f0;">${escHtml(p.municipality)}</strong></span>
+          <span class="map-popup-source" style="color:#64748b; font-size:10px;">via ${escHtml(p.deminingAgency || 'KSF EOD')}</span>
+        </div>
+      </div>
+      <div class="map-popup-body" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+        <div class="map-popup-primary" style="display:flex; align-items:baseline; justify-content:space-between; gap:10px; background:rgba(15,23,42,0.6); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+          <div>
+            <span class="map-popup-primary-val" style="font-family:var(--font-mono); font-size:18px; font-weight:800; color:#38bdf8;">${escHtml(String(p.estimatedAreaHa))} Ha</span>
+            <span class="map-popup-primary-sub" style="font-size:10.5px; color:#94a3b8; margin-left:6px;">Estimated Contaminated Area</span>
+          </div>
+          <div style="font-size:11px; color:#94a3b8; font-family:var(--font-mono);">
+            Standoff: <strong style="color:#f87171;">${escHtml(String(p.standoffDistanceMeters))}m</strong>
+          </div>
+        </div>
+        ${p.description ? `<div class="map-popup-desc-text" style="font-size:11.5px; line-height:1.45; color:#cbd5e1; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:4px;">${escHtml(p.description)}</div>` : ''}
+        <div class="map-popup-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+          <div class="map-popup-stat" style="background:rgba(15,23,42,0.6); padding:6px 8px; border-radius:5px; border:1px solid rgba(255,255,255,0.06);">
+            <span class="map-popup-stat-label" style="display:block; font-size:9.5px; font-weight:700; color:#64748b; font-family:var(--font-mono); text-transform:uppercase;">Munitions</span>
+            <span class="map-popup-stat-val" style="display:block; color:#fca5a5; font-size:11px; font-weight:600; line-height:1.35; margin-top:2px;">${escHtml(p.munitionTypes)}</span>
+          </div>
+          <div class="map-popup-stat" style="background:rgba(15,23,42,0.6); padding:6px 8px; border-radius:5px; border:1px solid rgba(255,255,255,0.06);">
+            <span class="map-popup-stat-label" style="display:block; font-size:9.5px; font-weight:700; color:#64748b; font-family:var(--font-mono); text-transform:uppercase;">Standoff Buffer</span>
+            <span class="map-popup-stat-val" style="display:block; color:#f87171; font-size:13px; font-weight:700; font-family:var(--font-mono); margin-top:2px;">${escHtml(String(p.standoffDistanceMeters))}m</span>
+          </div>
+          <div class="map-popup-stat" style="background:rgba(15,23,42,0.6); padding:6px 8px; border-radius:5px; border:1px solid rgba(255,255,255,0.06);">
+            <span class="map-popup-stat-label" style="display:block; font-size:9.5px; font-weight:700; color:#64748b; font-family:var(--font-mono); text-transform:uppercase;">Demining Lead</span>
+            <span class="map-popup-stat-val" style="display:block; color:#e2e8f0; font-size:11px; line-height:1.3; margin-top:2px;">${escHtml(p.deminingAgency)}</span>
+          </div>
+          <div class="map-popup-stat" style="background:rgba(15,23,42,0.6); padding:6px 8px; border-radius:5px; border:1px solid rgba(255,255,255,0.06);">
+            <span class="map-popup-stat-label" style="display:block; font-size:9.5px; font-weight:700; color:#64748b; font-family:var(--font-mono); text-transform:uppercase;">Survey Date</span>
+            <span class="map-popup-stat-val" style="display:block; color:#94a3b8; font-size:11px; font-family:var(--font-mono); margin-top:2px;">${escHtml(p.lastSurveyDate)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="map-popup-footer" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); border-radius:4px; padding:6px 8px; margin-top:8px;">
+        <span style="color:#fca5a5; font-size:11px; font-weight:600;">
+          🚨 Emergency Contact: ${escHtml(p.emergencyContact || 'Police Operations: 192 · KSF Ops Desk')}
+        </span>
       </div>
     </div>
   `;
@@ -4226,10 +4404,10 @@ function renderTacticalMineMarkers(visible) {
 
     const el = document.createElement('div');
     el.className = 'mine-marker-pin';
-    const shortName = p.name.split('/')[0].trim();
+    el.title = `${p.name} (${p.status || 'Hazardous Area'})`;
+    el.setAttribute('aria-label', p.name);
     el.innerHTML = `
-      <div class="mine-marker-icon-wrap">💣</div>
-      <div class="mine-marker-tag">${shortName}</div>
+      <div class="mine-marker-icon-wrap"></div>
     `;
 
     el.addEventListener('click', (e) => {
@@ -4256,10 +4434,36 @@ function renderTacticalKforBases(visible) {
 
     const el = document.createElement('div');
     el.className = 'kfor-marker-pin';
-    const shortName = p.name.replace('Camp ', '');
+    el.title = `${p.name} · ${p.typeLabel}`;
+    el.setAttribute('aria-label', p.name);
     el.innerHTML = `
-      <div class="kfor-marker-shield">🛡️</div>
-      <div class="kfor-marker-tag">${shortName}</div>
+      <svg viewBox="0 0 28 32" width="24" height="28" class="kfor-crest-svg" style="display:block; overflow:visible;">
+        <defs>
+          <linearGradient id="kforBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1e3a8a" />
+            <stop offset="50%" stop-color="#1d4ed8" />
+            <stop offset="100%" stop-color="#0f172a" />
+          </linearGradient>
+          <filter id="kforDropGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000" flood-opacity="0.85"/>
+          </filter>
+        </defs>
+        <!-- Tactical Military Shield -->
+        <path d="M14 2 L25 5.5 C25 18 19 25.5 14 30 C9 25.5 3 18 3 5.5 Z" fill="url(#kforBlueGrad)" stroke="#60a5fa" stroke-width="1.6" filter="url(#kforDropGlow)" />
+        <!-- Inner Gold Rim -->
+        <path d="M14 4 L23 7 C23 17 18 23.5 14 27.5 C10 23.5 5 17 5 7 Z" fill="none" stroke="#f59e0b" stroke-width="0.7" opacity="0.85" />
+        <!-- "KFOR" Header Banner Text -->
+        <text x="14" y="9.2" font-size="4.2" font-weight="900" font-family="'Inter', sans-serif" fill="#ffffff" text-anchor="middle" letter-spacing="0.6">KFOR</text>
+        <!-- NATO Compass Star -->
+        <polygon points="14,11 15.2,16 14,21 12.8,16" fill="#ffffff" />
+        <polygon points="9,16 14,14.8 19,16 14,17.2" fill="#ffffff" />
+        <polygon points="14,11 15.2,16 14,16" fill="#93c5fd" />
+        <polygon points="14,21 12.8,16 14,16" fill="#93c5fd" />
+        <polygon points="19,16 14,17.2 14,16" fill="#93c5fd" />
+        <polygon points="9,16 14,14.8 14,16" fill="#93c5fd" />
+        <!-- Center circle -->
+        <circle cx="14" cy="16" r="1.6" fill="#f59e0b" />
+      </svg>
     `;
 
     el.addEventListener('click', (e) => {
@@ -4279,12 +4483,55 @@ function renderTacticalKforBases(visible) {
       openMapPopup(coords, html);
     });
 
-    const marker = new maplibregl.Marker({ element: el })
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
       .setLngLat(coords)
       .addTo(state.map);
 
     tacticalKforMarkers.push(marker);
   });
+}
+
+function renderTacticalMsrMarkers(visible) {
+  tacticalMsrMarkers.forEach(m => m.remove());
+  tacticalMsrMarkers = [];
+  if (!visible || !state.map) return;
+
+  KFOR_MSR_ROUTES_GEOJSON.features.filter(f => f.geometry.type === 'Point').forEach(feat => {
+    const p = feat.properties;
+    const coords = feat.geometry.coordinates;
+
+    const el = document.createElement('div');
+    el.className = 'msr-badge-marker';
+    el.title = `${p.callsign} · ${p.civilianRoute}`;
+    el.setAttribute('aria-label', p.callsign);
+    el.innerHTML = `<span>${p.callsign}</span>`;
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openMapPopup(coords, buildMsrPopupHtml(p));
+    });
+
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat(coords)
+      .addTo(state.map);
+
+    tacticalMsrMarkers.push(marker);
+  });
+}
+
+function buildMsrPopupHtml(p) {
+  return `
+    <div class="tactical-layer-popup">
+      <div class="layer-popup-badge badge-msr">KFOR MAIN SUPPLY ROUTE · ${p.callsign || 'MSR'}</div>
+      <div class="layer-popup-title">${p.name || p.callsign}</div>
+      <div class="layer-popup-meta">Civilian Designation: <strong>${p.civilianRoute || 'Arterial Highway'}</strong></div>
+      <div class="layer-popup-row"><span>Operational Sector:</span> <strong>${p.sector || 'Regional Command'}</strong></div>
+      <div class="layer-popup-row"><span>Command:</span> ${p.command || 'KFOR Headquarters'}</div>
+      <div class="layer-popup-row"><span>Status:</span> ${p.status || 'Active Patrol Route'}</div>
+      <div class="layer-popup-row"><span>Security Priority:</span> <strong>${p.securityLevel || 'STRATEGIC'}</strong></div>
+      <div class="layer-popup-notes"><strong>Tactical Telemetry:</strong> ${p.description || ''}</div>
+    </div>
+  `;
 }
 
 function initTacticalLayers(map) {
@@ -4297,20 +4544,8 @@ function initTacticalLayers(map) {
       data: SENSITIVE_CORRIDORS_GEOJSON
     });
   }
-  if (!map.getLayer('corridors-line')) {
-    map.addLayer({
-      id: 'corridors-line',
-      type: 'line',
-      source: 'corridors-source',
-      filter: ['==', '$type', 'LineString'],
-      layout: { visibility: 'none' },
-      paint: {
-        'line-color': '#ec4899',
-        'line-width': 3.5,
-        'line-dasharray': [2, 2],
-        'line-opacity': 0.9
-      }
-    });
+  if (map.getLayer('corridors-line')) {
+    map.removeLayer('corridors-line');
   }
   if (!map.getLayer('corridors-points')) {
     map.addLayer({
@@ -4324,7 +4559,7 @@ function initTacticalLayers(map) {
         'circle-color': '#ec4899',
         'circle-stroke-width': 2,
         'circle-stroke-color': '#ffffff',
-        'circle-opacity': 0.9
+        'circle-opacity': 0.95
       }
     });
   }
@@ -4363,13 +4598,51 @@ function initTacticalLayers(map) {
     });
   }
 
-  // Interactive Clicks:
+  // 3. KFOR Main Supply Routes (MSR)
+  if (!map.getSource('msr-source')) {
+    map.addSource('msr-source', {
+      type: 'geojson',
+      data: KFOR_MSR_ROUTES_GEOJSON
+    });
+  }
+  if (!map.getLayer('msr-casing')) {
+    map.addLayer({
+      id: 'msr-casing',
+      type: 'line',
+      source: 'msr-source',
+      filter: ['==', '$type', 'LineString'],
+      layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#03213a',
+        'line-width': 6,
+        'line-opacity': 0.85
+      }
+    });
+  }
+  if (!map.getLayer('msr-line')) {
+    map.addLayer({
+      id: 'msr-line',
+      type: 'line',
+      source: 'msr-source',
+      filter: ['==', '$type', 'LineString'],
+      layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#38bdf8',
+        'line-width': 3.2,
+        'line-opacity': 0.95
+      }
+    });
+  }
+
   map.on('click', 'corridors-points', (e) => {
     if (e.features && e.features.length > 0) {
       const p = e.features[0].properties;
+      const categoryLabel = p.category === 'spz'
+        ? 'SPECIAL PROTECTIVE ZONE (SPZ)'
+        : (p.category === 'bridge' ? 'IBAR TRANSIT BRIDGE' : (p.category || 'TACTICAL POINT').toUpperCase());
       const html = `
         <div class="tactical-layer-popup">
-          <div class="layer-popup-badge badge-corridor">${(p.category || 'POINT').toUpperCase()} · ${p.securityLevel}</div>
+          <div class="layer-popup-badge badge-corridor">${categoryLabel} · ${p.securityLevel || 'PROTECTED'}</div>
           <div class="layer-popup-title">${p.name}</div>
           <div class="layer-popup-meta">Status: <strong>${p.status}</strong></div>
           <div class="layer-popup-desc">${p.description}</div>
@@ -4386,8 +4659,15 @@ function initTacticalLayers(map) {
     }
   });
 
+  map.on('click', 'msr-line', (e) => {
+    if (e.features && e.features.length > 0) {
+      const p = e.features[0].properties;
+      openMapPopup(e.lngLat, buildMsrPopupHtml(p));
+    }
+  });
+
   // Cursor pointers
-  ['corridors-points', 'minefields-fill'].forEach(layerId => {
+  ['corridors-points', 'minefields-fill', 'msr-line'].forEach(layerId => {
     map.on('mouseenter', layerId, () => {
       if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer';
     });
@@ -4395,25 +4675,104 @@ function initTacticalLayers(map) {
       if (map.getCanvas()) map.getCanvas().style.cursor = '';
     });
   });
+
+  syncTacticalLayersOnMap();
+}
+
+function syncTacticalLayersOnMap() {
+  if (!state.map) return;
+  const showMines = $('toggleLayerMines') ? $('toggleLayerMines').checked : false;
+  const showKfor = $('toggleLayerKfor') ? $('toggleLayerKfor').checked : false;
+  const showCorridors = $('toggleLayerCorridors') ? $('toggleLayerCorridors').checked : false;
+  const showBorder = $('toggleLayerBorder') ? $('toggleLayerBorder').checked : false;
+  const showMsr = $('toggleLayerMsr') ? $('toggleLayerMsr').checked : false;
+  const showSeismic = $('toggleLayerSeismic') ? $('toggleLayerSeismic').checked : false;
+  const showRadiation = $('toggleLayerRadiation') ? $('toggleLayerRadiation').checked : false;
+  const showWeather = $('toggleLayerWeather') ? $('toggleLayerWeather').checked : false;
+  const showAqi = $('toggleLayerAqi') ? $('toggleLayerAqi').checked : false;
+
+  if (showMines) toggleMinefieldsLayer(true);
+  if (showKfor) renderTacticalKforBases(true);
+  if (showCorridors && state.map.getLayer('corridors-points')) state.map.setLayoutProperty('corridors-points', 'visibility', 'visible');
+  if (showBorder) toggleBorderTacticalLayer(true);
+  if (showMsr) renderTacticalMsrMarkers(true);
+  if (showSeismic && state.data?.earthquakes) renderEarthquakeMapMarkers(state.data.earthquakes);
+  if (showRadiation && state.data?.radiation) renderRadiationMapMarkers(state.data.radiation);
+  if (showWeather && state.data?.weather) renderWeatherMapMarkers(state.data.weather);
+  if (showAqi && state.data?.aqi) renderAqiMapMarkers(state.data.aqi);
+
+  let activeCount = 0;
+  if ($('toggleLayerMines')?.checked) activeCount++;
+  if ($('toggleLayerKfor')?.checked) activeCount++;
+  if ($('toggleLayerCorridors')?.checked) activeCount++;
+  if ($('toggleLayerBorder')?.checked) activeCount++;
+  if ($('toggleLayerMsr')?.checked) activeCount++;
+  if ($('toggleLayerSeismic')?.checked) activeCount++;
+  if ($('toggleLayerRadiation')?.checked) activeCount++;
+  if ($('toggleLayerWeather')?.checked) activeCount++;
+  if ($('toggleLayerAqi')?.checked) activeCount++;
+
+  const badge = $('tacticalLayersActiveBadge');
+  if (badge) {
+    badge.textContent = `${activeCount} Active`;
+    badge.classList.toggle('active', activeCount > 0);
+  }
 }
 
 function toggleTacticalLayer(layerGroup, isVisible) {
   if (!state.map) return;
   const visibility = isVisible ? 'visible' : 'none';
 
-  if (layerGroup === 'kfor') {
-    renderTacticalKforBases(isVisible);
-  } else if (layerGroup === 'corridors') {
-    ['corridors-line', 'corridors-points'].forEach(layerId => {
+  if (layerGroup === 'abl') {
+    ['abl-contour', 'abl-casing', 'abl-glow'].forEach(layerId => {
       if (state.map.getLayer(layerId)) {
         state.map.setLayoutProperty(layerId, 'visibility', visibility);
       }
     });
+  } else if (layerGroup === 'municipalities') {
+    ['mun-polygons-fill', 'mun-polygons-line'].forEach(layerId => {
+      if (state.map.getLayer(layerId)) {
+        state.map.setLayoutProperty(layerId, 'visibility', visibility);
+      }
+    });
+    renderTacticalMunLabels(isVisible);
+  } else if (layerGroup === 'kfor') {
+    renderTacticalKforBases(isVisible);
+  } else if (layerGroup === 'corridors') {
+    if (state.map.getLayer('corridors-points')) {
+      state.map.setLayoutProperty('corridors-points', 'visibility', visibility);
+    }
+  } else if (layerGroup === 'msr') {
+    ['msr-casing', 'msr-line'].forEach(layerId => {
+      if (state.map.getLayer(layerId)) {
+        state.map.setLayoutProperty(layerId, 'visibility', visibility);
+      }
+    });
+    renderTacticalMsrMarkers(isVisible);
+  } else if (layerGroup === 'mines') {
+    toggleMinefieldsLayer(isVisible);
+  } else if (layerGroup === 'border') {
+    toggleBorderTacticalLayer(isVisible);
+  } else if (layerGroup === 'seismic') {
+    toggleSeismicTacticalLayer(isVisible);
+  } else if (layerGroup === 'radiation') {
+    toggleRadiationTacticalLayer(isVisible);
+  } else if (layerGroup === 'weather') {
+    toggleWeatherTacticalLayer(isVisible);
+  } else if (layerGroup === 'aqi') {
+    toggleAqiTacticalLayer(isVisible);
   }
 
   let activeCount = 0;
+  if ($('toggleLayerMines')?.checked) activeCount++;
   if ($('toggleLayerKfor')?.checked) activeCount++;
   if ($('toggleLayerCorridors')?.checked) activeCount++;
+  if ($('toggleLayerBorder')?.checked) activeCount++;
+  if ($('toggleLayerMsr')?.checked) activeCount++;
+  if ($('toggleLayerSeismic')?.checked) activeCount++;
+  if ($('toggleLayerRadiation')?.checked) activeCount++;
+  if ($('toggleLayerWeather')?.checked) activeCount++;
+  if ($('toggleLayerAqi')?.checked) activeCount++;
 
   const badge = $('tacticalLayersActiveBadge');
   if (badge) {
@@ -4431,6 +4790,58 @@ function toggleMinefieldsLayer(visible) {
     }
   });
   renderTacticalMineMarkers(visible);
+}
+
+function toggleBorderTacticalLayer(visible) {
+  if (!state.map) return;
+  if (visible) {
+    renderBorderMapMarkers(state.borderData);
+  } else {
+    if (state.activeMapModule !== 'border') {
+      clearMarkerList(moduleLayers.border.markers);
+      closeBorderPopup();
+    }
+  }
+}
+
+function toggleSeismicTacticalLayer(visible) {
+  if (!state.map) return;
+  if (visible) {
+    renderEarthquakeMapMarkers(state.data?.earthquakes);
+  } else {
+    clearMarkerList(moduleLayers.earthquake.markers);
+  }
+}
+
+function toggleRadiationTacticalLayer(visible) {
+  if (!state.map) return;
+  if (visible) {
+    renderRadiationMapMarkers(state.data?.radiation);
+  } else {
+    clearMarkerList(moduleLayers.radiation.markers);
+  }
+}
+
+function toggleWeatherTacticalLayer(visible) {
+  if (!state.map) return;
+  if (visible) {
+    renderWeatherMapMarkers(state.data?.weather);
+  } else {
+    clearMarkerList(moduleLayers.weather.markers);
+    if (state.weatherPopup) {
+      try { state.weatherPopup.remove(); } catch (_) {}
+      state.weatherPopup = null;
+    }
+  }
+}
+
+function toggleAqiTacticalLayer(visible) {
+  if (!state.map) return;
+  if (visible) {
+    renderAqiMapMarkers(state.data?.aqi);
+  } else {
+    clearMarkerList(moduleLayers.aqi.markers);
+  }
 }
 
 function toggleTacticalLayersMenu(forceState) {
@@ -4455,11 +4866,11 @@ function updateMap(data) {
   const centerPoint = [coords.lon, coords.lat];
 
   const shouldShowKosovoView = state.currentLocation.toLowerCase().includes('kosovo') || (data.location && data.location.toLowerCase().includes('kosovo'));
+  const currentPitch = state.mapMode === '3d' ? 50 : 0;
   if (shouldShowKosovoView) {
-    state.map.fitBounds(DEFAULT_KOSOVO_BOUNDS, { padding: 60, duration: 800 });
-    state.map.setPitch(35);
+    state.map.fitBounds(DEFAULT_KOSOVO_BOUNDS, { padding: 60, duration: 800, pitch: currentPitch });
   } else {
-    state.map.easeTo({ center: centerPoint, zoom: 11, pitch: 35, duration: 800 });
+    state.map.easeTo({ center: centerPoint, zoom: 11, pitch: currentPitch, duration: 800 });
   }
 
   // Only render layer for the currently active map module
@@ -4468,14 +4879,10 @@ function updateMap(data) {
   } else {
     clearAllModuleLayers();
   }
+  syncTacticalLayersOnMap();
 
-  if (state.mapMode === '3d') {
-    state.map.setPitch(50);
-    state.map.setBearing(0);
-  } else if (state.mapMode === '2d') {
-    state.map.setPitch(0);
-    state.map.setBearing(0);
-  }
+  state.map.setPitch(currentPitch);
+  state.map.setBearing(0);
 
   setTimeout(() => { if (state.map) state.map.resize(); }, 100);
 }
@@ -4968,37 +5375,7 @@ function buildAlerts(statusData = state.data, borderData = state.borderData, tel
     });
   }
 
-  // 7. WILDFIRE (only on real satellite detections)
-  const wildfire = statusData?.wildfire;
-  if (wildfire?.detections && Array.isArray(wildfire.detections) && wildfire.status === 'LIVE_DATA') {
-    wildfire.detections.forEach(d => {
-      const conf = typeof d.confidence === 'number' ? d.confidence : 50;
-      const dist = typeof d.distanceKm === 'number' ? d.distanceKm : 999;
-      if (conf >= ALERT_THRESHOLDS.wildfire.minConfidence) {
-        let severity = 'MEDIUM';
-        if (dist <= ALERT_THRESHOLDS.wildfire.criticalDistKm) severity = 'CRITICAL';
-        else if (dist <= ALERT_THRESHOLDS.wildfire.highDistKm) severity = 'HIGH';
-
-        const distText = dist < 999 ? `${dist} km from Kosovo` : 'Balkan region';
-        alerts.push({
-          id: genFrontendAlertId('wildfire', d.id || `${d.lat}_${d.lon}`),
-          module: 'wildfire',
-          panelId: 'wildfirePanel',
-          type: 'WILDFIRE_DETECTION',
-          severity,
-          title: dist <= ALERT_THRESHOLDS.wildfire.criticalDistKm ? `Proximate Wildfire (${distText})` : `Wildfire Detected (${distText})`,
-          message: `${d.title || 'Thermal anomaly'} · Sat: ${d.satellite || 'VIIRS/MODIS'} · ${conf}% Conf`,
-          timestamp: d.acq_date ? `${d.acq_date}T${(d.acq_time || '1200').padStart(4, '0').slice(0, 2)}:${(d.acq_time || '1200').padStart(4, '0').slice(2, 4)}:00Z` : now,
-          source: wildfire.source || 'NASA Satellites',
-          sourceUrl: d.sourceUrl || wildfire.sourceUrl || '#',
-          location: d.title || `Lat: ${d.lat.toFixed(2)}, Lon: ${d.lon.toFixed(2)}`,
-          coordinates: { lat: d.lat, lon: d.lon },
-          value: conf,
-          isCached: Boolean(wildfire.isCached || d.isCached)
-        });
-      }
-    });
-  }
+  // 7. WILDFIRE EXCLUDED FROM LIVE ALERTS PER OPERATIONAL REQUIREMENT
 
   // 8. BORDER CROSSINGS
   const borders = borderData || statusData?.borders;
@@ -5139,13 +5516,15 @@ function renderLiveAlertTicker(alerts = []) {
   const track = $('liveAlertTickerTrack');
   if (!track) return;
 
-  if (!alerts || alerts.length === 0) {
+  const validAlerts = (alerts || []).filter(a => a.module !== 'wildfire' && a.category !== 'wildfire');
+
+  if (!validAlerts || validAlerts.length === 0) {
     track.innerHTML = '<span class="ticker-item-placeholder">ALL SYSTEMS NORMAL · KOSINT REAL-TIME INTELLIGENCE ACTIVE</span>';
     track.style.animation = 'none';
     return;
   }
 
-  const itemsHtml = alerts.map(a => {
+  const itemsHtml = validAlerts.map(a => {
     const sev = (a.severity || 'INFO').toUpperCase();
     const sevClass = sev.toLowerCase();
     const mod = (a.module || a.category || 'SYSTEM').toUpperCase();
@@ -5164,16 +5543,24 @@ function renderLiveAlertTicker(alerts = []) {
 
   track.innerHTML = itemsHtml + itemsHtml;
   track.style.animation = 'tickerMove 160s linear infinite';
+  track.onmouseenter = () => { track.style.animationPlayState = 'paused'; };
+  track.onmouseleave = () => { track.style.animationPlayState = 'running'; };
+  const bar = $('liveAlertTickerBar');
+  if (bar) {
+    bar.onmouseenter = () => { track.style.animationPlayState = 'paused'; };
+    bar.onmouseleave = () => { track.style.animationPlayState = 'running'; };
+  }
 }
 
 function renderAlertLog(alerts = []) {
-  renderLiveAlertTicker(alerts);
+  const cleanAlerts = (alerts || []).filter(a => a.module !== 'wildfire' && a.category !== 'wildfire');
+  renderLiveAlertTicker(cleanAlerts);
 
   const log = $('alertLog');
   const badge = $('unreadBadge');
   if (!log) return;
 
-  const unreadCount = alerts.filter(a => !a.read).length;
+  const unreadCount = cleanAlerts.filter(a => !a.read).length;
   if (badge) {
     if (unreadCount > 0) {
       badge.textContent = unreadCount;
@@ -5183,12 +5570,12 @@ function renderAlertLog(alerts = []) {
     }
   }
 
-  if (!alerts || alerts.length === 0) {
+  if (!cleanAlerts || cleanAlerts.length === 0) {
     log.innerHTML = '<div class="empty-state">No active alerts · All systems normal</div>';
     return;
   }
 
-  log.innerHTML = alerts.map(a => {
+  log.innerHTML = cleanAlerts.map(a => {
     const sev = (a.severity || 'INFO').toUpperCase();
     const sevClass = sev.toLowerCase();
     const isUnread = !a.read;
@@ -5965,7 +6352,8 @@ function selectBorderCrossing(crossingId) {
 }
 
 function renderBorderMapMarkers(borderData) {
-  if (!state.map || state.activeMapModule !== 'border') return;
+  const isTacticalActive = (typeof $ === 'function' && $('toggleLayerBorder')) ? $('toggleLayerBorder').checked : false;
+  if (!state.map || (state.activeMapModule !== 'border' && !isTacticalActive)) return;
   clearMarkerList(moduleLayers.border.markers);
 
   const data = borderData || state.borderData;
@@ -6165,7 +6553,14 @@ const KOSOVO_LOCATIONS_GEOCODE = {
   'kulle': { name: 'Kullë / Kula (Border)', lat: 42.7830, lon: 20.3080 },
   'kula': { name: 'Kullë / Kula (Border)', lat: 42.7830, lon: 20.3080 },
   'morinë': { name: 'Morinë (Border)', lat: 42.3550, lon: 20.4050 },
-  'morine': { name: 'Morinë (Border)', lat: 42.3550, lon: 20.4050 }
+  'morine': { name: 'Morinë (Border)', lat: 42.3550, lon: 20.4050 },
+
+  // Operational Hubs & Safe Havens
+  'regional centre mitrovica': { name: 'Regional Centre Mitrovica', lat: 42.890128, lon: 20.876167 },
+  'regional center mitrovica': { name: 'Regional Centre Mitrovica', lat: 42.890128, lon: 20.876167 },
+  'rc mitrovica': { name: 'Regional Centre Mitrovica', lat: 42.890128, lon: 20.876167 },
+  'safe haven north': { name: 'Safe Haven North', lat: 42.898893, lon: 20.862213 },
+  'safe haven - north': { name: 'Safe Haven North', lat: 42.898893, lon: 20.862213 }
 };
 
 function resolveLocationCoordinates(query) {
@@ -6177,6 +6572,12 @@ function resolveLocationCoordinates(query) {
     const lat = parseFloat(coordsMatch[1]);
     const lon = parseFloat(coordsMatch[2]);
     if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+      if (Math.abs(lat - 42.890128) < 0.0005 && Math.abs(lon - 20.876167) < 0.0005) {
+        return { name: 'Regional Centre Mitrovica', lat: 42.890128, lon: 20.876167 };
+      }
+      if (Math.abs(lat - 42.898893) < 0.0005 && Math.abs(lon - 20.862213) < 0.0005) {
+        return { name: 'Safe Haven North', lat: 42.898893, lon: 20.862213 };
+      }
       return { name: `${lat.toFixed(4)}, ${lon.toFixed(4)}`, lat, lon };
     }
   }
@@ -6734,7 +7135,6 @@ async function fetchStaffLocations() {
     }
 
     filterStaffList();
-    renderStaffMapMarkers(state.staffLocations);
   } catch (err) {
     console.error('[Staff Warden] Fetch error:', err.message);
     if (listEl) {
@@ -6743,15 +7143,61 @@ async function fetchStaffLocations() {
   }
 }
 
+function getNationalityFlag(nat) {
+  if (!nat) return '';
+  const map = {
+    'Greece': '🇬🇷 Greece',
+    'Albania': '🇦🇱 Albania',
+    'Czech Republic': '🇨🇿 Czech Republic',
+    'France': '🇫🇷 France',
+    'USA': '🇺🇸 USA',
+    'Montenegro': '🇲🇪 Montenegro',
+    'Kosovo (National Staff)': '🇽🇰 National Staff',
+    'National Staff': '🇽🇰 National Staff',
+    'Kosovo': '🇽🇰 National Staff',
+    'Kosovo S': '🇽🇰 National Staff',
+    'International Mission': '🌐 International Mission'
+  };
+  return map[nat] || nat;
+}
+
+function getRoleBadge(role) {
+  if (!role) return '';
+  const r = role.toLowerCase();
+  if (r.includes('deputy')) {
+    return `<span class="staff-role-badge role-deputy" style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(56,189,248,0.18); color:#38bdf8; border:1px solid rgba(56,189,248,0.4);">DEPUTY WARDEN</span>`;
+  }
+  if (r.includes('warden')) {
+    return `<span class="staff-role-badge role-warden" style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(234,179,8,0.18); color:#fbbf24; border:1px solid rgba(234,179,8,0.4);">WARDEN</span>`;
+  }
+  if (r.includes('assembly') || r.includes('safe_haven') || r.includes('point') || r.includes('centre') || r.includes('center')) {
+    return `<span class="staff-role-badge role-haven" style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(16,185,129,0.18); color:#10b981; border:1px solid rgba(16,185,129,0.4);">ASSEMBLY POINT</span>`;
+  }
+  return `<span class="staff-role-badge role-member" style="font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; background:rgba(148,163,184,0.15); color:#94a3b8; border:1px solid rgba(148,163,184,0.3);">MISSION MEMBER</span>`;
+}
+
 function filterStaffList() {
   const query = ($('staffSearchInput')?.value || '').toLowerCase().trim();
   const zone = $('staffZoneFilter')?.value || 'ALL';
+  const showIntl = $('staffFilterInternational') ? $('staffFilterInternational').checked : true;
+  const showNatl = $('staffFilterNational') ? $('staffFilterNational').checked : true;
+  const showHaven = $('staffFilterSafeHaven') ? $('staffFilterSafeHaven').checked : true;
 
   state.staffFilteredLocations = (state.staffLocations || []).filter(item => {
+    const isSafeHaven = item.category === 'safe_haven';
+    const isNational = item.staffType === 'national' || (item.nationality && item.nationality.toLowerCase().includes('kosovo'));
+    const isInternational = !isSafeHaven && !isNational;
+
+    if (isSafeHaven && !showHaven) return false;
+    if (isInternational && !showIntl) return false;
+    if (isNational && !showNatl) return false;
+
     if (zone !== 'ALL' && item.zone !== zone) return false;
     if (query) {
       const match = (item.callsign || '').toLowerCase().includes(query) ||
                     (item.name || '').toLowerCase().includes(query) ||
+                    (item.role || '').toLowerCase().includes(query) ||
+                    (item.nationality || '').toLowerCase().includes(query) ||
                     (item.zone || '').toLowerCase().includes(query) ||
                     (item.address || '').toLowerCase().includes(query) ||
                     (item.phone || '').toLowerCase().includes(query);
@@ -6760,7 +7206,20 @@ function filterStaffList() {
     return true;
   });
 
+  const totalSouls = (state.staffFilteredLocations || [])
+    .filter(l => l.category !== 'safe_haven')
+    .reduce((sum, item) => sum + (item.totalSouls || 1), 0);
+  const staffCount = (state.staffFilteredLocations || [])
+    .filter(l => l.category !== 'safe_haven').length;
+  const metaEl = $('staffMeta');
+  if (metaEl) {
+    metaEl.textContent = `WARD No. 10 · RC MITROVICA · ${staffCount} PERSONNEL · ${totalSouls} SOULS`;
+  }
+
   renderStaffList();
+  if (typeof renderStaffMapMarkers === 'function') {
+    renderStaffMapMarkers(state.staffFilteredLocations);
+  }
 }
 
 function renderStaffList() {
@@ -6776,37 +7235,75 @@ function renderStaffList() {
     const isSafeHaven = staff.category === 'safe_haven';
     const prioClass = (staff.evacuationPriority || 'medium').toLowerCase();
     const prioLabel = staff.evacuationPriority || 'MEDIUM';
+    const radioCh = staff.radioChannel ? `<span class="staff-radio-tag" style="font-size:10px; font-weight:700; color:var(--cyan); background:rgba(56,189,248,0.12); padding:2px 6px; border-radius:4px; border:1px solid rgba(56,189,248,0.25);">📻 ${escHtml(staff.radioChannel)}</span>` : '';
+    const natBadge = staff.nationality ? `<span class="staff-nat-tag" style="font-size:11px; color:#cbd5e1; background:rgba(255,255,255,0.06); padding:2px 7px; border-radius:4px;">${getNationalityFlag(staff.nationality)}</span>` : '';
+    const roleBadge = getRoleBadge(staff.role);
+    // OPSEC requirement: Remove (1 Souls) / (X Souls) and leave only Dependants
+    const dependantsText = staff.dependants && staff.dependants !== 'None' && staff.dependants !== 'Safe Haven'
+      ? `<div class="staff-card-row staff-dependants-row" style="font-size:11.5px; color:#fbbf24; background:rgba(234,179,8,0.08); padding:5px 8px; border-radius:5px; margin:5px 0; border:1px solid rgba(234,179,8,0.22);">
+          <span class="staff-row-icon">👨‍👩‍👧</span> <strong>Dependants:</strong> ${escHtml(staff.dependants)}
+        </div>`
+      : '';
+    const gridRefRow = staff.gridRef
+      ? `<div class="staff-card-row staff-grid-row" style="font-size:11px; color:#38bdf8; font-family:var(--font-mono); margin:3px 0;">
+          <span class="staff-row-icon">🌐</span> <strong>GR:</strong> ${escHtml(staff.gridRef)}
+        </div>`
+      : '';
+    // OPSEC requirement: Hide user email addresses to preserve identity; display only for facility safe havens
+    const emailLink = (isSafeHaven && staff.email)
+      ? `<a class="staff-contact-link email" href="mailto:${staff.email}" style="color:#38bdf8;"><span class="staff-row-icon">✉️</span> ${escHtml(staff.email)}</a>`
+      : '';
+    const secondaryPhoneLink = staff.secondaryPhone
+      ? `<a class="staff-contact-link" href="tel:${staff.secondaryPhone}"><span class="staff-row-icon">📞</span> ${escHtml(staff.secondaryPhone)}</a>`
+      : '';
+
+    // OPSEC requirement: Only Safe Havens display facility name; mission members identify strictly by Call Sign
+    const nameLine = isSafeHaven
+      ? `<div class="staff-card-name" style="font-size:13px; font-weight:700; color:var(--text-primary); margin-top:2px;">${escHtml(staff.name || '')}</div>`
+      : '';
 
     return `
       <div class="staff-card ${isSafeHaven ? 'staff-card-safehaven' : ''}" id="staffCard-${staff.id}">
         <div class="staff-card-header">
           <div class="staff-card-title-wrap">
-            <span class="staff-category-icon">${isSafeHaven ? '🛡️' : '🏠'}</span>
+            <span class="staff-category-icon">${isSafeHaven ? '🛡️' : (staff.role === 'Warden' ? '⭐' : (staff.role === 'Deputy Warden' ? '🎖️' : '🏠'))}</span>
             <div>
-              <div class="staff-card-callsign">${staff.callsign}</div>
-              <div class="staff-card-name">${staff.name || ''}</div>
+              <div class="staff-card-callsign" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span>${escHtml(staff.callsign)}</span>
+                ${radioCh}
+                ${roleBadge}
+              </div>
+              ${nameLine}
             </div>
           </div>
           <div class="staff-card-badges">
             <span class="staff-prio-badge prio-${prioClass}">${prioLabel}</span>
-            <span class="staff-zone-badge">${staff.zone || 'Kosovo'}</span>
+            <span class="staff-zone-badge">${escHtml(staff.zone || 'Kosovo')}</span>
           </div>
         </div>
 
-        ${staff.address ? `<div class="staff-card-row"><span class="staff-row-icon">📍</span> <span class="staff-row-text">${staff.address}</span></div>` : ''}
-
-        <div class="staff-card-row staff-contact-row">
-          ${staff.phone ? `<a class="staff-contact-link" href="tel:${staff.phone}"><span class="staff-row-icon">📞</span> ${staff.phone}</a>` : ''}
-          ${staff.phone ? `<a class="staff-contact-link whatsapp" href="https://wa.me/${staff.phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>` : ''}
+        <div style="display:flex; align-items:center; gap:6px; margin:5px 0;">
+          ${natBadge}
         </div>
 
-        ${staff.notes ? `<div class="staff-card-notes"><span class="staff-notes-label">TACTICAL NOTE:</span> ${staff.notes}</div>` : ''}
+        ${staff.address ? `<div class="staff-card-row"><span class="staff-row-icon">📍</span> <span class="staff-row-text">${escHtml(staff.address)}</span></div>` : ''}
+        ${gridRefRow}
+        ${dependantsText}
+
+        <div class="staff-card-row staff-contact-row" style="flex-wrap:wrap; gap:6px; margin-top:6px;">
+          ${staff.phone ? `<a class="staff-contact-link" href="tel:${staff.phone}"><span class="staff-row-icon">📞</span> ${escHtml(staff.phone)}</a>` : ''}
+          ${secondaryPhoneLink}
+          ${staff.phone ? `<a class="staff-contact-link whatsapp" href="https://wa.me/${staff.phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>` : ''}
+          ${emailLink}
+        </div>
+
+        ${staff.notes ? `<div class="staff-card-notes"><span class="staff-notes-label">TACTICAL NOTE:</span> ${escHtml(staff.notes)}</div>` : ''}
 
         <div class="staff-card-actions">
           <button class="btn-staff-action map-focus" onclick="focusStaffLocation('${staff.id}')" title="Center map on location">
             📍 Focus Map
           </button>
-          <button class="btn-staff-action route-btn" onclick="routeToStaff(${staff.lat}, ${staff.lon}, '${(staff.callsign || '').replace(/'/g, "\\'")}')">
+          <button class="btn-staff-action route-btn" onclick="routeToStaff(${staff.lat}, ${staff.lon}, '${(staff.callsign || '').replace(/'/g, "\\'")}', '${(staff.zone || '').replace(/'/g, "\\'")}')">
             🛣️ Route Here
           </button>
           <button class="btn-staff-action edit-btn" onclick="openAddStaffModal('${staff.id}')" title="Edit entry">
@@ -6837,8 +7334,8 @@ function renderStaffMapMarkers(data) {
     const el = document.createElement('div');
     el.className = `staff-marker-pin ${isSafeHaven ? 'pin-safe-haven' : `pin-prio-${prio.toLowerCase()}`}`;
     el.innerHTML = `
-      <div class="staff-marker-icon">${isSafeHaven ? '🛡️' : '🏠'}</div>
-      <div class="staff-marker-label">${staff.callsign}</div>
+      <div class="staff-marker-icon">${isSafeHaven ? '🛡️' : (staff.role === 'Warden' ? '⭐' : (staff.role === 'Deputy Warden' ? '🎖️' : '🏠'))}</div>
+      <div class="staff-marker-label">${escHtml(staff.callsign)}</div>
     `;
 
     el.addEventListener('click', (e) => {
@@ -6860,26 +7357,37 @@ function openStaffMapPopup(staff) {
 
   const isSafeHaven = staff.category === 'safe_haven';
   const prio = staff.evacuationPriority || 'MEDIUM';
+  const roleBadge = staff.role ? `<span style="font-size:10px; font-weight:700; color:var(--cyan); background:rgba(56,189,248,0.15); padding:2px 6px; border-radius:4px;">${escHtml(staff.role.toUpperCase())}</span>` : '';
+  const radioBadge = staff.radioChannel ? `<span style="font-size:10px; font-weight:700; color:#fbbf24; background:rgba(234,179,8,0.15); padding:2px 6px; border-radius:4px;">📻 ${escHtml(staff.radioChannel)}</span>` : '';
+  const natBadge = staff.nationality ? getNationalityFlag(staff.nationality) : '';
 
   const popupHtml = `
     <div class="staff-popup-card">
       <div class="staff-popup-header">
-        <span class="staff-popup-icon">${isSafeHaven ? '🛡️' : '🏠'}</span>
+        <span class="staff-popup-icon">${isSafeHaven ? '🛡️' : (staff.role === 'Warden' ? '⭐' : (staff.role === 'Deputy Warden' ? '🎖️' : '🏠'))}</span>
         <div>
-          <div class="staff-popup-title">${staff.callsign}</div>
-          <div class="staff-popup-sub">${staff.name || ''}</div>
+          <div class="staff-popup-title" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <span>${escHtml(staff.callsign)}</span>
+            ${radioBadge}
+            ${roleBadge}
+          </div>
+          ${isSafeHaven && staff.name ? `<div class="staff-popup-sub" style="font-weight:700; color:var(--text-primary); margin-top:2px;">${escHtml(staff.name)} ${natBadge ? `· ${natBadge}` : ''}</div>` : (natBadge ? `<div class="staff-popup-sub" style="margin-top:2px;">${natBadge}</div>` : '')}
         </div>
       </div>
       <div class="staff-popup-body">
         <div class="staff-popup-meta-row">
           <span class="staff-popup-meta-tag prio-${prio.toLowerCase()}">${prio} PRIORITY</span>
-          <span class="staff-popup-meta-tag zone">${staff.zone || 'Kosovo'}</span>
+          <span class="staff-popup-meta-tag zone">${escHtml(staff.zone || 'Kosovo')}</span>
         </div>
-        ${staff.address ? `<div class="staff-popup-info"><span class="info-label">Address:</span> ${staff.address}</div>` : ''}
-        ${staff.phone ? `<div class="staff-popup-info"><span class="info-label">Emergency:</span> <a href="tel:${staff.phone}">${staff.phone}</a></div>` : ''}
-        ${staff.notes ? `<div class="staff-popup-notes"><strong>Tactical Notes:</strong> ${staff.notes}</div>` : ''}
+        ${staff.dependants && staff.dependants !== 'None' && staff.dependants !== 'Safe Haven' ? `<div class="staff-popup-info" style="color:#fbbf24;"><span class="info-label">Dependants:</span> ${escHtml(staff.dependants)}</div>` : ''}
+        ${staff.address ? `<div class="staff-popup-info"><span class="info-label">Address:</span> ${escHtml(staff.address)}</div>` : ''}
+        ${staff.gridRef ? `<div class="staff-popup-info" style="font-family:var(--font-mono); color:#38bdf8;"><span class="info-label">GR:</span> ${escHtml(staff.gridRef)}</div>` : ''}
+        ${staff.phone ? `<div class="staff-popup-info"><span class="info-label">Emergency:</span> <a href="tel:${staff.phone}">${escHtml(staff.phone)}</a></div>` : ''}
+        ${staff.secondaryPhone ? `<div class="staff-popup-info"><span class="info-label">Secondary:</span> <a href="tel:${staff.secondaryPhone}">${escHtml(staff.secondaryPhone)}</a></div>` : ''}
+        ${isSafeHaven && staff.email ? `<div class="staff-popup-info"><span class="info-label">Email:</span> <a href="mailto:${staff.email}">${escHtml(staff.email)}</a></div>` : ''}
+        ${staff.notes ? `<div class="staff-popup-notes"><strong>Tactical Notes:</strong> ${escHtml(staff.notes)}</div>` : ''}
         <div class="staff-popup-actions">
-          <button class="btn-popup-route" onclick="routeToStaff(${staff.lat}, ${staff.lon}, '${(staff.callsign || '').replace(/'/g, "\\'")}')">
+          <button class="btn-popup-route" onclick="routeToStaff(${staff.lat}, ${staff.lon}, '${(staff.callsign || '').replace(/'/g, "\\'")}', '${(staff.zone || '').replace(/'/g, "\\'")}')">
             🛣️ Route to Location
           </button>
         </div>
@@ -6918,19 +7426,45 @@ function focusStaffLocation(id) {
   }
 }
 
-function routeToStaff(destLat, destLon, destName) {
+function routeToStaff(destLat, destLon, destName, destZone = '') {
   toggleModule('routePanel');
   const endInput = $('routeEndInput');
   if (endInput) {
-    const latStr = typeof destLat === 'number' ? destLat.toFixed(4) : destLat;
-    const lonStr = typeof destLon === 'number' ? destLon.toFixed(4) : destLon;
+    const latStr = typeof destLat === 'number' ? destLat.toFixed(6) : destLat;
+    const lonStr = typeof destLon === 'number' ? destLon.toFixed(6) : destLon;
     endInput.value = `${latStr}, ${lonStr}`;
   }
   const startInput = $('routeStartInput');
   if (startInput) {
-    const destIsNorthBase = Math.abs((Number(destLat) || 0) - 42.8945) < 0.002 && Math.abs((Number(destLon) || 0) - 20.8672) < 0.002;
-    if (!startInput.value || startInput.value === endInput?.value) {
-      startInput.value = destIsNorthBase ? 'Prishtinë' : 'Mitrovicë';
+    const dLat = Number(destLat) || 0;
+    const dLon = Number(destLon) || 0;
+    const zoneStr = String(destZone || '').toLowerCase();
+
+    // Specific user requirement:
+    // Mitrovica North Safe Haven grid: 42.89889288749447, 20.86221307613816
+    // Regional Centre Mitrovica: 42.890127875103566, 20.876166511526243
+    const NORTH_GRID = '42.898893, 20.862213';
+    const SOUTH_LABEL = 'Regional Centre Mitrovica';
+    const SOUTH_GRID = '42.890128, 20.876167';
+
+    const isNorth = zoneStr.includes('north') || (dLat >= 42.892 && !zoneStr.includes('prishtin'));
+    const isSouth = zoneStr.includes('south') || (dLat < 42.892 && !zoneStr.includes('prishtin'));
+
+    // Check if destination is Safe Haven North itself
+    const isDestNorthSafeHaven = Math.abs(dLat - 42.898893) < 0.001 && Math.abs(dLon - 20.862213) < 0.001;
+    // Check if destination is Regional Centre Mitrovica itself
+    const isDestSouthGrid = Math.abs(dLat - 42.890128) < 0.001 && Math.abs(dLon - 20.876167) < 0.001;
+
+    if (isDestNorthSafeHaven) {
+      startInput.value = SOUTH_LABEL;
+    } else if (isDestSouthGrid) {
+      startInput.value = NORTH_GRID;
+    } else if (isNorth) {
+      startInput.value = NORTH_GRID;
+    } else if (isSouth) {
+      startInput.value = SOUTH_LABEL;
+    } else {
+      startInput.value = NORTH_GRID;
     }
   }
   setTimeout(() => {
@@ -6955,11 +7489,17 @@ function openAddStaffModal(existingId = null) {
       if (idInput) idInput.value = item.id;
       if ($('staffCallsign')) $('staffCallsign').value = item.callsign || '';
       if ($('staffName')) $('staffName').value = item.name || '';
+      if ($('staffRole')) $('staffRole').value = item.role || '';
+      if ($('staffNationality')) $('staffNationality').value = item.nationality || '';
+      if ($('staffRadioChannel')) $('staffRadioChannel').value = item.radioChannel || '';
       if ($('staffCategory')) $('staffCategory').value = item.category || 'residence';
       if ($('staffZone')) $('staffZone').value = item.zone || '';
       if ($('staffLat')) $('staffLat').value = item.lat || '';
       if ($('staffLon')) $('staffLon').value = item.lon || '';
+      if ($('staffGridRef')) $('staffGridRef').value = item.gridRef || '';
       if ($('staffPhone')) $('staffPhone').value = item.phone || '';
+      if ($('staffEmail')) $('staffEmail').value = item.email || '';
+      if ($('staffDependants')) $('staffDependants').value = item.dependants || '';
       if ($('staffPriority')) $('staffPriority').value = item.evacuationPriority || 'HIGH';
       if ($('staffAddress')) $('staffAddress').value = item.address || '';
       if ($('staffNotes')) $('staffNotes').value = item.notes || '';
@@ -6967,6 +7507,8 @@ function openAddStaffModal(existingId = null) {
   } else {
     if (titleEl) titleEl.textContent = 'ADD STAFF LOCATION / SAFE HAVEN';
     if (idInput) idInput.value = '';
+    if ($('staffRadioChannel')) $('staffRadioChannel').value = 'CH-04';
+    if ($('staffRole')) $('staffRole').value = 'Mission Member';
     if (state.map) {
       const center = state.map.getCenter();
       if ($('staffLat')) $('staffLat').value = center.lat.toFixed(5);
@@ -6990,11 +7532,17 @@ async function submitAddStaff(e) {
   const payload = {
     callsign: $('staffCallsign')?.value?.trim(),
     name: $('staffName')?.value?.trim(),
+    role: $('staffRole')?.value?.trim() || 'Mission Member',
+    nationality: $('staffNationality')?.value?.trim() || 'International',
+    radioChannel: $('staffRadioChannel')?.value?.trim() || 'CH-04',
     category: $('staffCategory')?.value,
     zone: $('staffZone')?.value?.trim(),
     lat: parseFloat($('staffLat')?.value),
     lon: parseFloat($('staffLon')?.value),
+    gridRef: $('staffGridRef')?.value?.trim() || '',
     phone: $('staffPhone')?.value?.trim(),
+    email: $('staffEmail')?.value?.trim() || '',
+    dependants: $('staffDependants')?.value?.trim() || 'None',
     evacuationPriority: $('staffPriority')?.value,
     address: $('staffAddress')?.value?.trim(),
     notes: $('staffNotes')?.value?.trim()

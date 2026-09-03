@@ -16,20 +16,17 @@ assert.strictEqual(indexHtml.includes('class="osiris-nav-rail"'), true, 'Must ha
 assert.strictEqual(indexHtml.includes('id="moduleNavRail"'), true, 'Must have #moduleNavRail ID');
 console.log('✓ Passed: .osiris-nav-rail is present');
 
-// 2. Check all 13 module buttons and tooltips
-console.log('Test 2: Verifying all 13 module icon buttons and tooltips...');
+// 2. Check active OSIRIS navigation rail modules and tooltips
+console.log('Test 2: Verifying OSIRIS module icon buttons and tooltips...');
 const expectedPanels = [
   { panel: 'newsPanel', label: 'News Intelligence' },
-  { panel: 'weatherPanel', label: 'Weather Monitor' },
   { panel: 'trafficPanel', label: 'Traffic Intelligence' },
-  { panel: 'radiationPanel', label: 'Radiation Monitor' },
-  { panel: 'aqiPanel', label: 'Air Quality Index' },
-  { panel: 'earthquakePanel', label: 'Seismic Activity' },
   { panel: 'wildfirePanel', label: 'Wildfire Detection' },
   { panel: 'aviationPanel', label: 'Aviation Intelligence' },
+  { panel: 'routePanel', label: 'Route Intelligence' },
   { panel: 'telegramPanel', label: 'Telegram Public Feed' },
-  { panel: 'borderPanel', label: 'Border Crossing Monitor' },
   { panel: 'cctvIntelligencePanel', label: 'CCTV Surveillance' },
+  { panel: 'staffPanel', label: 'Staff Warden & Evacuation' },
   { panel: 'alertPanel', label: 'Alert Log' },
   { panel: 'settingsPanel', label: 'System Settings' }
 ];
@@ -38,14 +35,25 @@ expectedPanels.forEach(({ panel, label }) => {
   assert.strictEqual(indexHtml.includes(`data-panel="${panel}"`), true, `Missing button for ${panel}`);
   assert.strictEqual(indexHtml.includes(`class="nav-rail-tooltip">${label}</span>`), true, `Missing tooltip for ${label}`);
 });
-console.log('✓ Passed: All 13 module icon buttons & tooltips are configured');
+console.log('✓ Passed: All OSIRIS module icon buttons & tooltips are configured');
+
+// 2b. Check Tactical Map Layers (Minefields, Seismic, Radiation, Weather, AQI, Border)
+console.log('Test 2b: Verifying persistent Tactical Map Layers...');
+assert.strictEqual(indexHtml.includes('id="toggleLayerMines"'), true, 'Must have #toggleLayerMines');
+assert.strictEqual(indexHtml.includes('id="toggleLayerBorder"'), true, 'Must have #toggleLayerBorder');
+assert.strictEqual(indexHtml.includes('data-panel="borderPanel"'), false, 'borderPanel button must be removed from main menu nav-rail');
+assert.strictEqual(indexHtml.includes('id="toggleLayerSeismic"'), true, 'Must have #toggleLayerSeismic');
+assert.strictEqual(indexHtml.includes('id="toggleLayerRadiation"'), true, 'Must have #toggleLayerRadiation');
+assert.strictEqual(indexHtml.includes('id="toggleLayerWeather"'), true, 'Must have #toggleLayerWeather');
+assert.strictEqual(indexHtml.includes('id="toggleLayerAqi"'), true, 'Must have #toggleLayerAqi');
+console.log('✓ Passed: Tactical Map Layers for Mines, Border, Seismic, Radiation, Weather, and AQI are configured');
 
 // 3. Check that all target panel containers exist in the DOM
-console.log('Test 3: Verifying all target panel elements exist in index.html...');
+console.log('Test 3: Verifying target panel elements exist in index.html...');
 expectedPanels.forEach(({ panel }) => {
   assert.strictEqual(indexHtml.includes(`id="${panel}"`), true, `Missing panel DOM container #${panel}`);
 });
-console.log('✓ Passed: All 13 module panels exist in the DOM');
+console.log('✓ Passed: All module panels exist in the DOM');
 
 // 4. Check critical DOM IDs are preserved and title text is removed
 console.log('Test 4: Verifying map title text is completely removed...');
@@ -67,9 +75,7 @@ const criticalIds = [
   'newsList',
   'newsBadge',
   'incidentList',
-  'radiationPrimary',
-  'aqiMain',
-  'earthquakeList',
+  'toggleLayerAqi',
   'wildfireList',
   'aviationList',
   'telegramList',

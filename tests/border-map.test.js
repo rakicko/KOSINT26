@@ -103,14 +103,15 @@ assert.strictEqual(appJs.includes('function selectBorderCrossing(crossingId)'), 
 assert.strictEqual(appJs.includes('function focusBorderCrossing(crossingId)'), true, 'focusBorderCrossing function defined');
 console.log('✓ Passed: All border popup interaction handlers present');
 
-// 6. Verify nav rail module button preserved
-console.log('Test 6: Verifying navigation rail border button...');
-assert.strictEqual(indexHtml.includes('data-panel="borderPanel"'), true, 'borderPanel button in nav rail');
-assert.strictEqual(indexHtml.includes("onclick=\"toggleModule('borderPanel')\""), true, 'borderPanel button triggers toggleModule');
-console.log('✓ Passed: Navigation rail button intact');
+// 6. Verify border is in OPERATIONAL ZONES & CORRIDORS and removed from main menu nav rail
+console.log('Test 6: Verifying border crossing in OPERATIONAL ZONES & CORRIDORS...');
+assert.strictEqual(indexHtml.includes('id="toggleLayerBorder"'), true, 'toggleLayerBorder in tactical layers menu');
+assert.strictEqual(indexHtml.includes('data-panel="borderPanel"'), false, 'borderPanel button removed from main nav rail');
+console.log('✓ Passed: Border crossing is in OPERATIONAL ZONES & CORRIDORS and removed from main menu');
 
 // 7. Verify runtime execution of renderBorderMapMarkers
 console.log('Test 7: Verifying runtime execution of renderBorderMapMarkers without exceptions...');
+global.$ = (id) => ({ checked: true });
 global.document = {
   createElement: (tag) => {
     let _rawClass = '';

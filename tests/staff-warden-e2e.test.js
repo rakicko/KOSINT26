@@ -48,8 +48,16 @@ async function runE2eTest() {
 
   // 4. Live Server Verification
   console.log('4. Verifying live HTTP server on port 3000...');
-  const indexRes = await axios.get('http://localhost:3000/');
-  assert.strictEqual(indexRes.status, 200, 'Frontend must serve HTTP 200');
+  let indexRes;
+  for (let i = 0; i < 5; i++) {
+    try {
+      indexRes = await axios.get('http://localhost:3000/');
+      if (indexRes.status === 200) break;
+    } catch (e) {
+      await new Promise(r => setTimeout(r, 250));
+    }
+  }
+  assert.strictEqual(indexRes?.status, 200, 'Frontend must serve HTTP 200');
 
   // Unauthenticated API request must return 401
   try {
