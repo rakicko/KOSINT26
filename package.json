@@ -5,18 +5,24 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "nodemon server/index.js"
+    "dev": "nodemon server/index.js",
+    "test": "node test/run-all-tests.js",
+    "user:create": "node server/cli/create-user.js"
   },
   "dependencies": {
     "axios": "^1.6.7",
-    "cors": "^2.8.5",
+    "better-sqlite3": "^13.0.3",
     "dotenv": "^16.4.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
     "maplibre-gl": "^6.4.0",
-    "telegram": "^2.26.22",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }

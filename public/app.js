@@ -523,14 +523,179 @@ function setMapViewMode(mode) {
 
 window.setMapViewMode = setMapViewMode;
 
-document.addEventListener('DOMContentLoaded', () => {
+// ── Authentication & Delegated Event Handlers ────────────────────────────────
+function showLoginModal() {
+  const modal = $('loginModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function hideLoginModal() {
+  const modal = $('loginModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function updateUserBadgeUI() {
+  const badge = $('userBadge');
+  const roleEl = $('userRoleBadge');
+  const nameEl = $('userName');
+  if (!badge) return;
+
+  if (state.user) {
+    badge.style.display = 'flex';
+    if (roleEl) roleEl.textContent = (state.user.role || 'OPERATOR').toUpperCase();
+    if (nameEl) nameEl.textContent = state.user.username || 'Observer';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function setupAuthEventListeners() {
+  const loginForm = $('loginForm');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userEl = $('loginUsername');
+      const passEl = $('loginPassword');
+      const errEl = $('loginError');
+      const btn = $('loginSubmitBtn');
+
+      if (!userEl || !passEl) return;
+      if (errEl) errEl.style.display = 'none';
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: userEl.value.trim(), password: passEl.value })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          state.user = data.user;
+          state.csrfToken = data.csrfToken;
+          updateUserBadgeUI();
+          hideLoginModal();
+          initAuthenticatedDashboard();
+        } else {
+          if (errEl) {
+            errEl.textContent = data.error || 'Authentication failed';
+            errEl.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        if (errEl) {
+          errEl.textContent = 'Connection error. Please try again.';
+          errEl.style.display = 'block';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+  }
+
+  const logoutBtn = $('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': state.csrfToken || ''
+          }
+        });
+      } catch {}
+      state.user = null;
+      state.csrfToken = null;
+      updateUserBadgeUI();
+      showLoginModal();
+    });
+  }
+}
+
+function setupDelegatedEventListeners() {
+  const alertLog = $('alertLog');
+  if (alertLog) {
+    alertLog.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-alert-id]');
+      if (item && item.dataset.alertId) {
+        handleAlertClick(item.dataset.alertId);
+      }
+    });
+  }
+
+  const borderList = $('borderList');
+  if (borderList) {
+    borderList.addEventListener('click', (e) => {
+      const card = e.target.closest('[data-crossing-id]');
+      if (card && card.dataset.crossingId && !e.target.closest('a')) {
+        focusBorderCrossing(card.dataset.crossingId);
+      }
+    });
+  }
+
+  const aviationList = $('aviationList');
+  if (aviationList) {
+    aviationList.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-icao]');
+      if (item && item.dataset.icao) {
+        const lat = parseFloat(item.dataset.lat);
+        const lon = parseFloat(item.dataset.lon);
+        centerMapOnAircraft(lat, lon, item.dataset.icao);
+      }
+    });
+  }
+
+  const chips = $('keywordChips');
+  if (chips) {
+    chips.addEventListener('click', (e) => {
+      const rm = e.target.closest('[data-keyword]');
+      if (rm && rm.dataset.keyword) {
+        removeKeyword(rm.dataset.keyword);
+      }
+    });
+  }
+}
+
+let dashboardInitialized = false;
+function initAuthenticatedDashboard() {
+  if (dashboardInitialized) {
+    startMonitor();
+    return;
+  }
+  dashboardInitialized = true;
   startClock();
   connectSSE();
   loadAlertHistory();
   initMap();
   startMonitor();
-  
   setupCCTVPanelButtons();
+}
+
+async function checkAuthAndInit() {
+  setupDelegatedEventListeners();
+  setupAuthEventListeners();
+
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.authenticated && data.user) {
+      state.user = data.user;
+      state.csrfToken = data.csrfToken;
+      updateUserBadgeUI();
+      hideLoginModal();
+      initAuthenticatedDashboard();
+    } else {
+      showLoginModal();
+    }
+  } catch (err) {
+    console.warn('Failed to verify session:', err);
+    showLoginModal();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  checkAuthAndInit();
 });
 
 function setupCCTVPanelButtons() {
@@ -619,10 +784,12 @@ async function startMonitor() {
   }
 }
 
-async function fetchAndRender(location, timeline, forceRefresh = false) {
   const res = await fetch('/api/status', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': state.csrfToken || ''
+    },
     body: JSON.stringify({ location, lat: DEFAULT_MAP_CENTER.lat, lon: DEFAULT_MAP_CENTER.lon, timeline, forceRefresh, customKeywords: state.customKeywords }),
   });
   if (!res.ok) throw new Error(`Server error ${res.status}`);
@@ -664,18 +831,60 @@ function updatePollInterval() {
 function renderThreatLevel(tl) {
   if (!tl) return;
   const widget = $('threatWidget');
+  if (!widget) return;
   widget.style.display = 'flex';
-  $('threatFill').style.width = `${tl.score}%`;
-  $('threatFill').style.background = tl.color;
+
+  const fill = $('threatFill');
   const text = $('threatText');
-  text.textContent = `${tl.level}  ${tl.score}`;
-  text.style.color = tl.color;
-  document.querySelector('.header').style.borderBottomColor = tl.score >= 80 ? tl.color : '';
+  const confEl = $('threatConfidence');
+
+  if (fill) {
+    fill.style.width = `${tl.score}%`;
+    fill.style.background = tl.color;
+  }
+
+  const isBlackout = tl.activeFeeds === 0 || tl.level === 'NO TELEMETRY' || tl.isBlackout;
+  const isDegraded = tl.isDegraded || tl.level === 'DEGRADED';
+
+  if (text) {
+    if (isBlackout) {
+      text.textContent = 'NO TELEMETRY · UNKNOWN';
+      text.style.color = '#94a3b8';
+    } else if (isDegraded) {
+      text.textContent = `${tl.level}  ${tl.score} (DEGRADED · ${tl.activeFeeds}/10 FEEDS)`;
+      text.style.color = tl.color || '#eab308';
+    } else {
+      text.textContent = `${tl.level}  ${tl.score}`;
+      text.style.color = tl.color;
+    }
+  }
+
+  if (confEl) {
+    confEl.style.display = 'block';
+    if (isBlackout) {
+      confEl.textContent = '0% CONFIDENCE · 0/10 FEEDS';
+      confEl.className = 'threat-confidence confidence-blackout';
+    } else if (isDegraded) {
+      confEl.textContent = `${tl.confidenceScore}% CONFIDENCE (${tl.activeFeeds}/10 FEEDS)`;
+      confEl.className = 'threat-confidence confidence-degraded';
+    } else {
+      confEl.textContent = `${tl.confidenceScore}% CONFIDENCE (HEALTHY · ${tl.activeFeeds}/10 FEEDS)`;
+      confEl.className = 'threat-confidence confidence-healthy';
+    }
+  }
+
+  const header = document.querySelector('.header');
+  if (header) {
+    header.style.borderBottomColor = tl.score >= 80 ? tl.color : (isDegraded ? '#eab308' : (isBlackout ? '#94a3b8' : ''));
+  }
 }
 
 function renderNews(news) {
   const panel = $('newsPanel');
-  if (!news || news.error) { $('newsList').innerHTML = `<div class="error-state">News unavailable: ${news?.error || ''}</div>`; return; }
+  if (!news || news.error) {
+    $('newsList').innerHTML = `<div class="error-state">News unavailable: ${escHtml(news?.error || '')}</div>`;
+    return;
+  }
 
   const items = news.items || [];
   const totalEvents = news.summary?.total || items.length;
@@ -837,6 +1046,25 @@ function renderWeather(weather, explicitCityName) {
   }
 }
 
+/* ── Strict Color Validator (Prevents CSS Injection in style attributes) ── */
+function sanitizeColor(col) {
+  if (!col || typeof col !== 'string') return '';
+  const trimmed = col.trim();
+  // Strict check: valid hex #rgb, #rgba, #rrggbb, #rrggbbaa
+  if (/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(trimmed)) {
+    return trimmed;
+  }
+  // Safe CSS variable
+  if (/^var\(--[a-zA-Z0-9_-]+\)$/.test(trimmed)) {
+    return trimmed;
+  }
+  const SAFE_NAMES = ['red', 'green', 'blue', 'orange', 'yellow', 'white', 'gray', 'grey', 'transparent', 'cyan'];
+  if (SAFE_NAMES.includes(trimmed.toLowerCase())) {
+    return trimmed.toLowerCase();
+  }
+  return '';
+}
+
 /* ── Unified Map Popup System (Design System Reference: Weather Popup) ─────── */
 function buildMapPopupHtml({
   icon = '📍',
@@ -850,8 +1078,9 @@ function buildMapPopupHtml({
   sections = '', // raw custom html like hourly forecast
   footer = '' // raw footer html or text
 }) {
+  const safeBadgeColor = sanitizeColor(badge?.color) || 'var(--cyan)';
   const badgeHtml = badge ? `
-    <span class="map-popup-badge" style="background:${badge.color || 'var(--cyan)'}20; color:${badge.color || 'var(--cyan)'}; border:1px solid ${badge.color || 'var(--cyan)'}40;">
+    <span class="map-popup-badge" style="background:${safeBadgeColor}20; color:${safeBadgeColor}; border:1px solid ${safeBadgeColor}40;">
       ${escHtml(badge.text)}
     </span>
   ` : '';
@@ -859,8 +1088,8 @@ function buildMapPopupHtml({
   const primaryHtml = primary ? `
     <div class="map-popup-primary">
       <div class="map-popup-primary-row">
-        <span class="map-popup-primary-val">${primary.val}</span>
-        ${primary.sub ? `<span class="map-popup-primary-sub">${primary.sub}</span>` : ''}
+        <span class="map-popup-primary-val">${escHtml(primary.val)}</span>
+        ${primary.sub ? `<span class="map-popup-primary-sub">${escHtml(primary.sub)}</span>` : ''}
       </div>
       ${primary.secondary ? `<div class="map-popup-secondary">${escHtml(primary.secondary)}</div>` : ''}
     </div>
@@ -868,12 +1097,15 @@ function buildMapPopupHtml({
 
   const statsHtml = Array.isArray(stats) && stats.length > 0 ? `
     <div class="map-popup-grid">
-      ${stats.map(s => `
+      ${stats.map(s => {
+        const safeColor = sanitizeColor(s.color);
+        return `
         <div class="map-popup-stat">
           <span class="map-popup-stat-label">${escHtml(s.label)}</span>
-          <span class="map-popup-stat-val" ${s.color ? `style="color:${s.color}"` : ''}>${escHtml(String(s.val ?? 'N/A'))}</span>
+          <span class="map-popup-stat-val" ${safeColor ? `style="color:${safeColor}"` : ''}>${escHtml(String(s.val ?? 'N/A'))}</span>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>
   ` : '';
 
@@ -898,7 +1130,7 @@ function buildMapPopupHtml({
         ${contentHtml}
         ${sections || ''}
       </div>
-      ${footer ? `<div class="map-popup-footer">${footer}</div>` : ''}
+      ${footer ? `<div class="map-popup-footer">${escHtml(footer)}</div>` : ''}
     </div>
   `;
 }
@@ -2027,7 +2259,7 @@ function renderAviation(aviationData) {
       const time = formatTimeAgo(ac.timestamp);
 
       return `
-        <div class="aviation-item cat-${cat}" onclick="centerMapOnAircraft(${ac.latitude}, ${ac.longitude}, '${ac.icao24}')">
+        <div class="aviation-item cat-${cat}" data-lat="${ac.latitude}" data-lon="${ac.longitude}" data-icao="${escHtml(ac.icao24)}">
           <div class="aviation-item-header">
             <div>
               <span class="aviation-callsign">${escHtml(callsign)}</span>
@@ -2686,6 +2918,7 @@ function loadCustomKeywords() {
 
 function addKeyword() {
   const input = $('keywordInput');
+  if (!input) return;
   const kw = input.value.trim().toLowerCase();
   if (!kw || state.customKeywords.includes(kw)) { input.value = ''; return; }
   state.customKeywords.push(kw);
@@ -2695,14 +2928,17 @@ function addKeyword() {
 }
 
 function removeKeyword(kw) {
+  if (!kw) return;
   state.customKeywords = state.customKeywords.filter(k => k !== kw);
   localStorage.setItem('sentinel_keywords', JSON.stringify(state.customKeywords));
   renderKeywordChips();
 }
 
 function renderKeywordChips() {
-  $('keywordChips').innerHTML = state.customKeywords.map(kw =>
-    `<div class="keyword-chip">${escHtml(kw)}<span class="keyword-remove" onclick="removeKeyword('${escHtml(kw)}')">✕</span></div>`
+  const container = $('keywordChips');
+  if (!container) return; // Safely return if element was removed from DOM
+  container.innerHTML = state.customKeywords.map(kw =>
+    `<div class="keyword-chip">${escHtml(kw)}<span class="keyword-remove" data-keyword="${escHtml(kw)}">✕</span></div>`
   ).join('');
 }
 
@@ -2741,6 +2977,28 @@ function exportReport() {
     ``,
     `── SEISMIC ACTIVITY ───────────────`,
     ...(d.earthquakes?.earthquakes || []).map(e => `M${e.magnitude.toFixed(1)} ${e.label} — ${e.place} (${e.distanceKm}km away)`),
+    ``,
+    `── BORDER CROSSINGS ───────────────`,
+    `Source: ${d.borders?.source || 'QKMK'}`,
+    ...(d.borders?.crossings || []).map(c => {
+      const entryW = c.direction?.entry?.waitingMinutesText || (c.entryWaitMinutes ? `${c.entryWaitMinutes} min` : 'Normal');
+      const exitW = c.direction?.exit?.waitingMinutesText || (c.exitWaitMinutes ? `${c.exitWaitMinutes} min` : 'Normal');
+      return `  • ${c.name} [${c.status || 'OPEN'}]: Entry ${entryW}, Exit ${exitW}`;
+    }),
+    ``,
+    `── WILDFIRES & THERMAL ─────────────`,
+    `Source: ${d.wildfire?.provider || 'NASA FIRMS'}`,
+    d.wildfire?.detections?.length ? `Detections: ${d.wildfire.detections.length}` : 'No active fire detections',
+    ...(d.wildfire?.detections || []).slice(0, 10).map(w => `  • Thermal anomaly: ${w.distanceKm || '?'}km away (FRP: ${w.frp || 'N/A'}, Conf: ${w.confidence || '?'}%)`),
+    ``,
+    `── AIRSPACE & AVIATION ─────────────`,
+    `Source: ${d.aviation?.source || 'OpenSky'}`,
+    d.aviation?.summary ? `Airspace: ${d.aviation.summary.total || 0} tracks (Mil: ${d.aviation.summary.military || 0}, Comm: ${d.aviation.summary.commercial || 0}, Pvt: ${d.aviation.summary.private || 0})` : 'N/A',
+    ...(d.aviation?.aircraft || []).filter(ac => ac.category === 'military').map(ac => `  ⚠ MILITARY: ${ac.callsign || ac.icao24} (${ac.country || 'Unknown'}) Alt: ${ac.altitude}m`),
+    ``,
+    `── TELEGRAM INTELLIGENCE ───────────`,
+    `Channels: ${(d.telegram?.channels || []).join(', ') || 'N/A'}`,
+    ...(d.telegram?.posts || []).slice(0, 10).map(p => `  • [@${p.channel || 'intel'}]: ${(p.text || '').slice(0, 80).replace(/\n/g, ' ')}...`),
     ``,
     `── ALERTS ─────────────────────────`,
     ...(d.alerts?.alerts || []).map(a => `[${a.severity.toUpperCase()}] ${a.title}: ${a.message}`),
@@ -3364,7 +3622,7 @@ function renderAlertLog(alerts = []) {
 
     return `
       <div class="alert-log-item severity-${sevClass} ${isUnread ? 'unread' : ''}" 
-           onclick="handleAlertClick('${escHtml(a.id)}')" 
+           data-alert-id="${escHtml(a.id)}" 
            title="Click to open ${escHtml(moduleName)} module">
         <div class="alert-log-header">
           <span class="alert-sev-tag sev-${sevClass}">[${sev}]</span>
@@ -3450,7 +3708,13 @@ async function markAllRead() {
     }
     renderAlertLog(Array.from(state.alertStore.values()));
   }
-  await fetch('/api/alerts/read', { method: 'POST' }).catch(() => {});
+  await fetch('/api/alerts/read', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': state.csrfToken || ''
+    }
+  }).catch(() => {});
 }
 
 async function loadLocationHistory() {
@@ -3468,7 +3732,31 @@ function hideWelcome() {
   if (panel) panel.style.display = 'none';
 }
 
-function escHtml(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;');
+}
+
+function safeUrl(url) {
+  if (!url || typeof url !== 'string') return '#';
+  const trimmed = url.trim();
+  if (/[\x00-\x1F\x7F]/.test(trimmed)) return '#';
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return escHtml(trimmed);
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return escHtml(trimmed);
+    }
+  } catch {}
+  return '#';
+}
+
 function isValidArticleUrl(url) {
   if (typeof url !== 'string') return false;
   const trimmed = url.trim();
@@ -3893,7 +4181,7 @@ function renderBorder(borderData) {
     const linkText = c.source === 'NAKORDONI' ? 'Nakordoni ↗' : 'Official Source ↗';
 
     return `
-      <div class="border-card ${delayClass}" data-crossing-id="${escHtml(c.id)}" onclick="focusBorderCrossing('${escHtml(c.id)}')">
+      <div class="border-card ${delayClass}" data-crossing-id="${escHtml(c.id)}">
         <div class="border-card-header">
           <div class="border-name-info">
             <span class="border-crossing-name">${escHtml(c.name)}</span>
@@ -3944,7 +4232,7 @@ function renderBorder(borderData) {
 
         <div class="border-card-footer">
           <span class="border-time-tag">UPDATED ${escHtml(timeAgoStr.toUpperCase())} · SOURCE ${escHtml(sourceLabel)}</span>
-          <a href="${escHtml(sourceLink)}" target="_blank" rel="noopener noreferrer" class="border-link-btn" onclick="event.stopPropagation()">
+          <a href="${safeUrl(sourceLink)}" target="_blank" rel="noopener noreferrer" class="border-link-btn">
             ${escHtml(linkText)}
           </a>
         </div>
@@ -4101,4 +4389,6 @@ window.renderNewsMapMarkers = renderNewsMapMarkers;
 window.renderAqiMapMarkers = renderAqiMapMarkers;
 window.renderAviationMapMarkers = renderAviationMapMarkers;
 window.renderBorderMapMarkers = renderBorderMapMarkers;
+window.sanitizeColor = sanitizeColor;
+window.renderThreatLevel = renderThreatLevel;
 window.state = state;

@@ -1,8 +1,8 @@
 ---
 name: weather-monitor
 description: |
-  Fetches current weather and short-term forecast for a location using Open-Meteo.
-  No API key required. Detects severe weather conditions automatically.
+  Fetches tactical weather and severe conditions for Kosovo locations using Open-Meteo.
+  Coordinates resolved via authoritative local geocoder. Detects severe weather and extreme wind.
 ---
 
 # Weather Monitor Skill
@@ -10,9 +10,9 @@ description: |
 ## Input
 ```json
 {
-  "location": "Mumbai, India",
-  "lat": 19.0760,    // optional — will geocode from location if not provided
-  "lon": 72.8777
+  "location": "Mitrovica, Kosovo",
+  "lat": 42.8914,
+  "lon": 20.8660
 }
 ```
 
@@ -20,46 +20,34 @@ description: |
 ```json
 {
   "skill": "weather-monitor",
-  "location": "Mumbai, India",
-  "coordinates": { "lat": 19.076, "lon": 72.877 },
+  "location": "Mitrovica, Kosovo",
+  "coordinates": { "lat": 42.8914, "lon": 20.8660 },
   "fetchedAt": "ISO timestamp",
   "current": {
-    "temp": 32,           // Celsius
-    "feelsLike": 36,
-    "humidity": 78,       // %
-    "windSpeed": 24,      // km/h
-    "windDirection": 220, // degrees
-    "precipitation": 0,   // mm
-    "weatherCode": 0,
-    "description": "Clear sky",
-    "visibility": 10,     // km
-    "uvIndex": 7
+    "temp": 18,
+    "feelsLike": 17,
+    "humidity": 65,
+    "windSpeed": 15,
+    "windDirection": 180,
+    "precipitation": 0,
+    "weatherCode": 1,
+    "description": "Mainly clear",
+    "visibility": 10,
+    "uvIndex": 4
   },
-  "forecast": [
-    { "time": "ISO", "temp": 30, "precipitation": 5, "weatherCode": 80 }
-  ],
-  "alerts": [
-    { "type": "STORM", "severity": "high", "message": "Heavy rainfall expected" }
-  ],
-  "source": "open-meteo | demo"
+  "forecast": [],
+  "alerts": [],
+  "source": "open-meteo"
 }
 ```
 
-## Weather Codes (WMO Standard)
-- 0: Clear sky
-- 45-48: Fog
-- 51-67: Rain/Drizzle
-- 71-77: Snow
-- 80-82: Showers
-- 95-99: Thunderstorm
-
 ## Alert Triggers
 - Wind speed > 50 km/h → STRONG_WIND
-- Precipitation > 20mm/h → HEAVY_RAIN
+- Wind speed > 80 km/h → EXTREME_WIND
 - Weather code 95-99 → THUNDERSTORM
 - Visibility < 1km → LOW_VISIBILITY
 
 ## Usage
 ```bash
-node skills/weather-monitor/skill.js --test --location "Mumbai"
+node skills/weather-monitor/skill.js --test --location "Mitrovica"
 ```

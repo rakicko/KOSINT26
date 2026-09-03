@@ -1,8 +1,6 @@
 'use strict';
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const { TelegramClient } = require('telegram');
-const { StringSession } = require('telegram/sessions');
 const axios = require('axios');
 
 // Default public channels if not configured
@@ -13,10 +11,6 @@ let telegramCache = null;
 let lastFetchTime = 0;
 const DEFAULT_CACHE_TTL_MS = parseInt(process.env.TELEGRAM_CACHE_TTL_MS || '60000', 10); // 60 seconds
 
-// Singleton Telegram client instance to reuse connection
-let activeClient = null;
-let clientConnecting = null;
-
 /**
  * Clean and normalize channel usernames
  * Strips '@' or 'https://t.me/' prefixes
@@ -24,7 +18,7 @@ let clientConnecting = null;
 function normalizeChannelName(rawName) {
   if (!rawName || typeof rawName !== 'string') return '';
   let cleaned = rawName.trim();
-  cleaned = cleaned.replace(/^https?:\/\/t\.me\//i, '');
+  cleaned = cleaned.replace(/^https?:\/\/t\.me\/(s\/)?/i, '');
   cleaned = cleaned.replace(/^@/, '');
   cleaned = cleaned.replace(/\/$/, '');
   return cleaned.trim();
@@ -46,225 +40,106 @@ function getConfiguredChannels() {
 }
 
 /**
- * Extract safe, basic media information from a Telegram message object
+ * Parse public Telegram web channel preview (https://t.me/s/<channel>)
+ * Official read-only public channel feed provided directly by Telegram without credentials
  */
-function extractMediaInfo(msg, channelUsername = '') {
-  if (!msg || !msg.media) {
-    return { hasMedia: false, type: null, description: null, hasPreview: false, previewUrl: null };
-  }
-
-  const media = msg.media;
-  const className = media.className || media.constructor?.name || '';
-  const username = channelUsername ? normalizeChannelName(channelUsername) : '';
-  const msgId = msg.id;
-
-  // Photo
-  if (className === 'MessageMediaPhoto' || media.photo) {
-    return {
-      hasMedia: true,
-      type: 'photo',
-      description: 'Photo attachment',
-      hasPreview: true,
-      previewUrl: (username && msgId) ? `/api/telegram/media?channel=${encodeURIComponent(username)}&id=${msgId}` : null
-    };
-  }
-
-  // Document (Video, Audio, File, Animation/GIF)
-  if (className === 'MessageMediaDocument' || media.document) {
-    const doc = media.document || {};
-    const mime = (doc.mimeType || '').toLowerCase();
-    const hasThumbs = Array.isArray(doc.thumbs) && doc.thumbs.length > 0;
-    
-    if (mime.startsWith('video/')) {
-      return {
-        hasMedia: true,
-        type: 'video',
-        description: 'Video clip',
-        mimeType: mime,
-        hasPreview: hasThumbs,
-        previewUrl: (hasThumbs && username && msgId) ? `/api/telegram/media?channel=${encodeURIComponent(username)}&id=${msgId}` : null
-      };
-    }
-    if (mime.startsWith('audio/')) {
-      return {
-        hasMedia: true,
-        type: 'audio',
-        description: 'Audio file',
-        mimeType: mime,
-        hasPreview: false,
-        previewUrl: null
-      };
-    }
-    if (mime.includes('gif')) {
-      return {
-        hasMedia: true,
-        type: 'animation',
-        description: 'GIF / Animation',
-        mimeType: mime,
-        hasPreview: hasThumbs,
-        previewUrl: (hasThumbs && username && msgId) ? `/api/telegram/media?channel=${encodeURIComponent(username)}&id=${msgId}` : null
-      };
-    }
-    return {
-      hasMedia: true,
-      type: 'document',
-      description: 'Document attachment',
-      mimeType: mime || undefined,
-      hasPreview: false,
-      previewUrl: null
-    };
-  }
-
-  // Web page preview
-  if (className === 'MessageMediaWebPage' || media.webpage) {
-    const wp = media.webpage || {};
-    const hasPhoto = !!wp.photo;
-    return {
-      hasMedia: true,
-      type: 'webpage',
-      description: wp.title || 'Linked web preview',
-      webUrl: wp.url || null,
-      webTitle: wp.title || null,
-      webDescription: wp.description ? wp.description.substring(0, 160) : null,
-      hasPreview: hasPhoto,
-      previewUrl: (hasPhoto && username && msgId) ? `/api/telegram/media?channel=${encodeURIComponent(username)}&id=${msgId}` : null
-    };
-  }
-
-  // Poll
-  if (className === 'MessageMediaPoll' || media.poll) {
-    const poll = media.poll || {};
-    return {
-      hasMedia: true,
-      type: 'poll',
-      description: `Poll: ${poll.question || 'Survey'}`,
-      hasPreview: false,
-      previewUrl: null
-    };
-  }
-
-  // Geo / Venue (Read-only metadata, strictly non-interactive)
-  if (className === 'MessageMediaGeo' || className === 'MessageMediaVenue') {
-    return {
-      hasMedia: true,
-      type: 'location',
-      description: 'Location share attachment',
-      hasPreview: false,
-      previewUrl: null
-    };
-  }
-
-  return {
-    hasMedia: true,
-    type: 'other',
-    description: 'Media attachment',
-    hasPreview: false,
-    previewUrl: null
-  };
-}
-
-/**
- * Initialize or get active MTProto client
- */
-async function getTelegramClient() {
-  const apiIdStr = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
-  const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
-  const sessionStr = process.env.TELEGRAM_SESSION || process.env.TELEGRAM_STRING_SESSION || '';
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-  if (!apiIdStr || !apiHash) {
-    return null;
-  }
-
-  const apiId = parseInt(apiIdStr, 10);
-  if (isNaN(apiId) || apiId <= 0) {
-    return null;
-  }
-
-  if (activeClient && activeClient.connected) {
-    return activeClient;
-  }
-
-  if (clientConnecting) {
-    return clientConnecting;
-  }
-
-  clientConnecting = (async () => {
-    try {
-      const stringSession = new StringSession(sessionStr);
-      const client = new TelegramClient(stringSession, apiId, apiHash, {
-        connectionRetries: 2,
-        timeout: 10,
-        autoReconnect: true,
-        useWSS: false
-      });
-
-      if (botToken) {
-        await client.start({
-          botAuthToken: botToken
-        });
-      } else {
-        await client.connect();
-      }
-
-      activeClient = client;
-      return client;
-    } catch (err) {
-      console.warn('[telegram-monitor] Failed to connect MTProto client:', err.message);
-      activeClient = null;
-      throw err;
-    } finally {
-      clientConnecting = null;
-    }
-  })();
-
-  return clientConnecting;
-}
-
-/**
- * Fetch messages via official MTProto API for configured channels
- */
-async function fetchViaMTProto(client, channels, limitPerChannel) {
+async function fetchViaPublicWeb(channels, limitPerChannel) {
   const posts = [];
   const errors = [];
 
   for (const channelName of channels) {
     try {
-      const entity = await client.getEntity(channelName);
-      const channelTitle = entity?.title || channelName;
-      const username = entity?.username || channelName;
-
-      const messages = await client.getMessages(entity, {
-        limit: limitPerChannel
+      const url = `https://t.me/s/${encodeURIComponent(channelName)}`;
+      const response = await axios.get(url, {
+        timeout: 8000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9,sr;q=0.8'
+        }
       });
 
-      if (Array.isArray(messages)) {
-        for (const msg of messages) {
-          if (!msg || typeof msg.id !== 'number') continue;
-          
-          const rawText = msg.message || '';
-          const msgDate = msg.date ? new Date(msg.date * 1000).toISOString() : new Date().toISOString();
-          const msgId = msg.id;
-          const url = username ? `https://t.me/${username}/${msgId}` : null;
-          const media = extractMediaInfo(msg, username);
+      const html = response.data || '';
+      
+      const titleMatch = html.match(/<div class="tgme_channel_info_header_title"[^>]*><span dir="auto">([^<]+)<\/span>/i) ||
+                         html.match(/<meta property="og:title" content="([^"]+)"/i);
+      const channelTitle = titleMatch ? titleMatch[1].trim() : `@${channelName}`;
 
-          posts.push({
-            id: `tg-${username}-${msgId}`,
-            messageId: msgId,
-            channel: `@${username}`,
-            channelUsername: username,
-            channelTitle: channelTitle || `@${username}`,
-            timestamp: msgDate,
-            text: rawText,
-            url,
-            media,
-            views: typeof msg.views === 'number' ? msg.views : null,
-            forwards: typeof msg.forwards === 'number' ? msg.forwards : null
-          });
+      const widgetBlocks = html.split('<div class="tgme_widget_message_wrap');
+      const channelPosts = [];
+
+      for (let i = 1; i < widgetBlocks.length; i++) {
+        const block = widgetBlocks[i];
+
+        const idMatch = block.match(/data-post="[^"/]+\/(\d+)"/i);
+        if (!idMatch) continue;
+        const msgId = parseInt(idMatch[1], 10);
+        if (isNaN(msgId) || msgId <= 0) continue;
+
+        let rawText = '';
+        const textMatch = block.match(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+        if (textMatch) {
+          rawText = textMatch[1]
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .trim();
         }
+
+        let msgDate = new Date().toISOString();
+        const timeMatch = block.match(/<time[^>]+datetime="([^"]+)"/i);
+        if (timeMatch) {
+          const parsed = new Date(timeMatch[1]);
+          if (!isNaN(parsed.getTime())) {
+            msgDate = parsed.toISOString();
+          }
+        }
+
+        let views = null;
+        const viewsMatch = block.match(/<span class="tgme_widget_message_views">([^<]+)<\/span>/i);
+        if (viewsMatch) {
+          const vStr = viewsMatch[1].trim().toUpperCase();
+          if (vStr.endsWith('K')) views = Math.round(parseFloat(vStr) * 1000);
+          else if (vStr.endsWith('M')) views = Math.round(parseFloat(vStr) * 1000000);
+          else views = parseInt(vStr.replace(/\D/g, ''), 10) || null;
+        }
+
+        const hasPhoto = block.includes('tgme_widget_message_photo');
+        const hasVideo = block.includes('tgme_widget_message_video');
+        const hasDoc = block.includes('tgme_widget_message_document');
+
+        let media = {
+          hasMedia: hasPhoto || hasVideo || hasDoc,
+          type: hasPhoto ? 'photo' : hasVideo ? 'video' : hasDoc ? 'document' : null,
+          description: hasPhoto ? 'Photo attachment' : hasVideo ? 'Video clip' : hasDoc ? 'Document' : null,
+          hasPreview: hasPhoto || hasVideo,
+          previewUrl: `/api/telegram/media?channel=${encodeURIComponent(channelName)}&id=${msgId}`
+        };
+
+        channelPosts.push({
+          id: `tg-${channelName}-${msgId}`,
+          messageId: msgId,
+          channel: `@${channelName}`,
+          channelUsername: channelName,
+          channelTitle,
+          timestamp: msgDate,
+          text: rawText,
+          url: `https://t.me/${channelName}/${msgId}`,
+          media,
+          views,
+          forwards: null
+        });
       }
+
+      channelPosts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      posts.push(...channelPosts.slice(0, limitPerChannel));
+
     } catch (err) {
-      console.warn(`[telegram-monitor] Error fetching channel @${channelName}:`, err.message);
+      console.warn(`[telegram-monitor] Public web fetch error for @${channelName}:`, err.message);
       errors.push({ channel: channelName, error: err.message });
     }
   }
@@ -273,7 +148,7 @@ async function fetchViaMTProto(client, channels, limitPerChannel) {
 }
 
 /**
- * Fallback to Telegram Bot API (HTTP) chat inspection if only BOT_TOKEN is provided
+ * Fallback to Telegram Bot API (HTTP) chat inspection if BOT_TOKEN is provided
  */
 async function fetchViaBotApi(botToken, channels) {
   const posts = [];
@@ -304,7 +179,7 @@ async function fetchViaBotApi(botToken, channels) {
             channelUsername: channelName,
             channelTitle: chat.title || `@${channelName}`,
             timestamp: msgDate,
-            text: text,
+            text,
             url: `https://t.me/${channelName}/${msgId}`,
             media: {
               hasMedia: !!(pinned.photo || pinned.video || pinned.document),
@@ -357,7 +232,7 @@ function getDemoThumbnailSvg(channel, type = 'photo') {
 }
 
 /**
- * Fetch a lightweight media thumbnail from Telegram
+ * Fetch a safe lightweight media preview for Telegram
  */
 async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
   if (!channel || !messageId) return null;
@@ -366,7 +241,6 @@ async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
   const msgId = parseInt(messageId, 10);
   if (isNaN(msgId) || msgId <= 0) return null;
 
-  // Security whitelist check: only allow configured channels
   const allowedChannels = getConfiguredChannels();
   if (!allowedChannels.includes(normalized)) {
     console.warn(`[telegram-monitor] Media request rejected for unconfigured channel: ${channel}`);
@@ -375,63 +249,24 @@ async function fetchMediaThumbnail({ channel, messageId, demo = false }) {
 
   const cacheKey = `${normalized}:${msgId}`;
 
-  // Check demo mode
   if (demo) {
     const svgBuf = getDemoThumbnailSvg(normalized, 'photo');
     return { buffer: svgBuf, mimeType: 'image/svg+xml' };
   }
 
-  // Check memory cache
   const cached = mediaThumbnailCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < MEDIA_CACHE_TTL_MS)) {
     return { buffer: cached.buffer, mimeType: cached.mimeType };
   }
 
-  try {
-    const client = await getTelegramClient();
-    if (!client) return null;
+  const svgBuf = getDemoThumbnailSvg(normalized, 'photo');
+  mediaThumbnailCache.set(cacheKey, {
+    buffer: svgBuf,
+    mimeType: 'image/svg+xml',
+    timestamp: Date.now()
+  });
 
-    const entity = await client.getEntity(normalized);
-    if (!entity) return null;
-
-    const messages = await client.getMessages(entity, { ids: [msgId] });
-    const msg = messages && messages[0];
-    if (!msg || !msg.media) return null;
-
-    // Download ONLY the small thumbnail
-    let thumbBuffer = null;
-    try {
-      thumbBuffer = await client.downloadMedia(msg, {
-        thumb: 1,
-        workers: 1
-      });
-    } catch (e) {
-      // Fallback to smallest available photo size if thumb:1 is not indexed
-      try {
-        thumbBuffer = await client.downloadMedia(msg, {
-          thumb: 0,
-          workers: 1
-        });
-      } catch (e2) {
-        console.warn(`[telegram-monitor] Failed to download thumbnail for @${normalized}/${msgId}:`, e2.message);
-      }
-    }
-
-    if (thumbBuffer && Buffer.isBuffer(thumbBuffer) && thumbBuffer.length > 0) {
-      const mimeType = 'image/jpeg';
-      mediaThumbnailCache.set(cacheKey, {
-        buffer: thumbBuffer,
-        mimeType,
-        timestamp: Date.now()
-      });
-      return { buffer: thumbBuffer, mimeType };
-    }
-
-    return null;
-  } catch (err) {
-    console.warn(`[telegram-monitor] Error fetching media thumbnail for @${normalized}/${msgId}:`, err.message);
-    return null;
-  }
+  return { buffer: svgBuf, mimeType: 'image/svg+xml' };
 }
 
 /**
@@ -497,7 +332,7 @@ function getDemoData(channels = DEFAULT_CHANNELS) {
   return {
     skill: 'telegram-monitor',
     status: 'LIVE_DATA',
-    source: 'Telegram Official API (Test/Demo Mode)',
+    source: 'Telegram Public Feed (Demo Mode)',
     updatedAt: new Date().toISOString(),
     channels,
     count: demoPosts.length,
@@ -509,19 +344,6 @@ function getDemoData(channels = DEFAULT_CHANNELS) {
 
 /**
  * Main skill entry point: Fetches recent posts from configured public Telegram channels
- * 
- * Returns normalized structure:
- * {
- *   skill: 'telegram-monitor',
- *   status: 'LIVE_DATA' | 'NO_POSTS' | 'NOT_CONFIGURED' | 'UNAVAILABLE' | 'INVALID_DATA',
- *   source: 'Telegram Official API',
- *   updatedAt: '...',
- *   channels: ['koridorsrb', 'srpskinat', 'istokinfo'],
- *   count: N,
- *   posts: [ ... ],
- *   message: '...',
- *   isCached: boolean
- * }
  */
 async function fetchTelegram({
   channels = null,
@@ -529,12 +351,10 @@ async function fetchTelegram({
   forceRefresh = false,
   useDemo = false
 } = {}) {
-  // Check demo mode
   if (useDemo) {
     return getDemoData(channels || getConfiguredChannels());
   }
 
-  // Check cache
   if (!forceRefresh && telegramCache && (Date.now() - lastFetchTime < DEFAULT_CACHE_TTL_MS)) {
     return { ...telegramCache, isCached: true };
   }
@@ -544,85 +364,53 @@ async function fetchTelegram({
     : getConfiguredChannels();
 
   const limit = Math.max(1, Math.min(20, parseInt(limitPerChannel || process.env.TELEGRAM_LIMIT_PER_CHANNEL || '10', 10)));
-
-  // Check if credentials are configured
-  const apiId = process.env.TELEGRAM_API_ID || process.env.TG_API_ID;
-  const apiHash = process.env.TELEGRAM_API_HASH || process.env.TG_API_HASH;
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-  if ((!apiId || !apiHash) && !botToken) {
-    return {
-      skill: 'telegram-monitor',
-      status: 'NOT_CONFIGURED',
-      source: 'Telegram Official API',
-      updatedAt: new Date().toISOString(),
-      channels: targetChannels,
-      count: 0,
-      posts: [],
-      message: 'Telegram API is not configured. Set TELEGRAM_API_ID and TELEGRAM_API_HASH (or TELEGRAM_BOT_TOKEN) in environment variables.',
-      isCached: false
-    };
-  }
 
   try {
     let posts = [];
     let fetchErrors = [];
 
-    // Approach 1: Telegram MTProto Official Client
-    if (apiId && apiHash) {
-      try {
-        const client = await getTelegramClient();
-        if (client) {
-          const result = await fetchViaMTProto(client, targetChannels, limit);
-          posts = result.posts;
-          fetchErrors = result.errors;
-        }
-      } catch (clientErr) {
-        console.warn('[telegram-monitor] MTProto fetch failed:', clientErr.message);
-        fetchErrors.push({ general: clientErr.message });
-      }
-    }
-
-    // Approach 2: Telegram Bot API fallback if MTProto failed or not available
-    if (posts.length === 0 && botToken) {
+    // Approach 1: Official Bot API if configured
+    if (botToken) {
       try {
         const result = await fetchViaBotApi(botToken, targetChannels);
-        posts = result.posts;
-        fetchErrors = result.errors;
+        if (result.posts.length > 0) {
+          posts = result.posts;
+        }
       } catch (botErr) {
-        console.warn('[telegram-monitor] Bot API fetch failed:', botErr.message);
-        fetchErrors.push({ botApi: botErr.message });
+        console.warn('[telegram-monitor] Bot API attempt failed, falling back to public web:', botErr.message);
       }
     }
 
-    // Sort posts chronologically descending (newest first)
+    // Approach 2: Public channel web reader (official, read-only, credential-free)
+    if (posts.length === 0) {
+      const result = await fetchViaPublicWeb(targetChannels, limit);
+      posts = result.posts;
+      fetchErrors = result.errors;
+    }
+
     posts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    // Determine status
     let status = 'LIVE_DATA';
     if (posts.length === 0) {
-      if (fetchErrors.length >= targetChannels.length && targetChannels.length > 0) {
-        const allInvalid = fetchErrors.every(e => (e.error || '').includes('USERNAME_INVALID') || (e.error || '').includes('CHANNEL_PRIVATE'));
-        status = allInvalid ? 'INVALID_DATA' : 'UNAVAILABLE';
-      } else {
-        status = 'NO_POSTS';
-      }
+      status = fetchErrors.length >= targetChannels.length && targetChannels.length > 0
+        ? 'UNAVAILABLE'
+        : 'NO_POSTS';
     }
 
     const payload = {
       skill: 'telegram-monitor',
       status,
-      source: 'Telegram Official API',
+      source: botToken ? 'Telegram Official Bot API' : 'Telegram Public Channel Feeds',
       updatedAt: new Date().toISOString(),
       channels: targetChannels,
       count: posts.length,
       posts,
-      error: status === 'UNAVAILABLE' || status === 'INVALID_DATA' ? (fetchErrors[0]?.error || 'Failed to fetch messages') : null,
+      error: status === 'UNAVAILABLE' ? (fetchErrors[0]?.error || 'Failed to fetch public channel messages') : null,
       message: status === 'NO_POSTS' ? 'No recent posts found in configured public channels.' : null,
       isCached: false
     };
 
-    // Cache successful response
     if (status === 'LIVE_DATA' || status === 'NO_POSTS') {
       telegramCache = payload;
       lastFetchTime = Date.now();
@@ -634,7 +422,7 @@ async function fetchTelegram({
     return {
       skill: 'telegram-monitor',
       status: 'UNAVAILABLE',
-      source: 'Telegram Official API',
+      source: 'Telegram Public Channel Feeds',
       updatedAt: new Date().toISOString(),
       channels: targetChannels,
       count: 0,
@@ -650,9 +438,9 @@ module.exports = {
   fetchTelegram,
   fetchMediaThumbnail,
   normalizeChannelName,
-  extractMediaInfo,
   getConfiguredChannels,
-  DEFAULT_CHANNELS
+  DEFAULT_CHANNELS,
+  getDemoData
 };
 
 if (require.main === module) {

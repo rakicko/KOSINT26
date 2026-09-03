@@ -750,6 +750,10 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 .threat-level-bar { height: 4px; background: var(--bg-surface); border-radius: 4px; overflow: hidden; }
 .threat-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease, background 0.4s; }
 .threat-text { font-size: 13px; font-weight: 700; font-family: var(--font-mono); letter-spacing: 2px; }
+.threat-confidence { font-size: 9px; font-family: var(--font-mono); letter-spacing: 1px; margin-top: 2px; text-transform: uppercase; }
+.confidence-healthy { color: #34d399; }
+.confidence-degraded { color: #eab308; font-weight: 600; }
+.confidence-blackout { color: #f87171; font-weight: 700; }
 
 /* ── Custom Keywords ───────────────────────────────────────────────────────── */
 .keyword-input-row { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -2528,6 +2532,175 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   border-color: var(--cyan);
   color: #fff;
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+/* ── Authentication Modal & User Badge ────────────────────────────── */
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.user-role-badge {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--cyan);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.user-name {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.btn-logout {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #f87171;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  transition: all 0.15s;
+}
+
+.btn-logout:hover {
+  background: rgba(248, 113, 113, 0.25);
+  color: #fff;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(2, 6, 23, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-card {
+  background: #0b1329;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  box-shadow: 0 0 35px rgba(0, 0, 0, 0.8), 0 0 20px rgba(56, 189, 248, 0.15);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+  padding: 32px 28px;
+  color: #f8fafc;
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.brand-badge-modal {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.modal-header h2 {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  margin: 0 0 6px;
+  color: #f8fafc;
+}
+
+.modal-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #94a3b8;
+}
+
+.modal-form .input-field {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #f8fafc;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.modal-form .input-field:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.modal-error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.btn-primary-modal {
+  background: #0284c7;
+  color: #fff;
+  border: 1px solid #38bdf8;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.btn-primary-modal:hover {
+  background: #0369a1;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
 }
 
 

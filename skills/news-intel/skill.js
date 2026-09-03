@@ -515,9 +515,11 @@ async function fetchNews({
 
   const now = Date.now();
   const timelineMs = {
+    '1h':   1 * 60 * 60 * 1000,
+    '6h':   6 * 60 * 60 * 1000,
     '24h': 24 * 60 * 60 * 1000,
     '48h': 48 * 60 * 60 * 1000,
-    '7d':  7 * 24 * 60 * 60 * 1000
+    '7d':   7 * 24 * 60 * 60 * 1000
   }[timeline] || (24 * 60 * 60 * 1000);
 
   let allArticles = feeds.flat().filter(a => {
@@ -526,6 +528,17 @@ async function fetchNews({
     const diff = now - pubTime;
     return diff >= -3600000 && diff <= timelineMs;
   });
+
+  // Apply custom keyword filters if provided
+  if (Array.isArray(keywords) && keywords.length > 0) {
+    const cleanKws = keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean);
+    if (cleanKws.length > 0) {
+      allArticles = allArticles.filter(a => {
+        const text = `${a.title} ${a.summary || ''}`.toLowerCase();
+        return cleanKws.some(kw => text.includes(kw));
+      });
+    }
+  }
 
   // Filter out non-security articles from the main intelligence dashboard feed
   const securityArticles = allArticles.filter(a => a.isSecurityRelevant);
@@ -557,6 +570,7 @@ async function fetchNews({
     fetchedAt: new Date().toISOString(),
     source: 'kosovo-local-rss',
     items: deduplicatedEvents.slice(0, 50),
+    articles: deduplicatedEvents.slice(0, 50),
     summary: {
       total: deduplicatedEvents.length,
       rawScanned: allArticles.length,

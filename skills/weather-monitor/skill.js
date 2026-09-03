@@ -16,15 +16,11 @@ const WMO_DESCRIPTIONS = {
 
 function describeCode(code) { return WMO_DESCRIPTIONS[code] || `Code ${code}`; }
 
-/** Geocode a location string via Nominatim */
+const { resolveCoordinates } = require('../../server/geocoder');
+
+/** Geocode a location string via authoritative geocoder */
 async function geocode(location) {
-  const res = await axios.get('https://nominatim.openstreetmap.org/search', {
-    params: { q: location, format: 'json', limit: 1 },
-    headers: { 'User-Agent': 'Sentinel-Dashboard/1.0' },
-    timeout: 6000,
-  });
-  if (!res.data.length) throw new Error(`Could not geocode ${location}`);
-  return { lat: parseFloat(res.data[0].lat), lon: parseFloat(res.data[0].lon) };
+  return await resolveCoordinates(location);
 }
 
 /** Derive weather alerts from current conditions */

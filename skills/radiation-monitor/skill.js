@@ -49,23 +49,22 @@ function getNeighborPoints(lat, lon, radiusKm) {
   return offsets.map(o => ({ name: `${o.name} Region`, lat: +(lat + o.dlat).toFixed(4), lon: +(lon + o.dlon).toFixed(4), distanceKm: Math.round(haversine(lat, lon, lat + o.dlat, lon + o.dlon)) }));
 }
 
+const { resolveCoordinates } = require('../../server/geocoder');
+
 async function fetchRadiation({ location, lat, lon, neighborRadiusKm = 200 }) {
   // Geocode if needed
   if (!lat || !lon) {
-    try {
-      const geo = await axios.get('https://nominatim.openstreetmap.org/search', {
-        params: { q: location, format: 'json', limit: 1 },
-        headers: { 'User-Agent': 'Sentinel-Dashboard/1.0' }, timeout: 5000,
-      });
-      if (geo.data.length) { lat = parseFloat(geo.data[0].lat); lon = parseFloat(geo.data[0].lon); }
-      else return getDemoData(location);
-    } catch { return getDemoData(location); }
+    const coords = await resolveCoordinates(location);
+    lat = coords.lat;
+    lon = coords.lon;
   }
 
   try {
+    const radmonUser = process.env.RADMON_USER || 'guest';
+    const radmonPass = process.env.RADMON_PASSWORD || 'guest';
     // Radmon.org — fetches last N readings sorted by proximity
     const res = await axios.get('https://radmon.org/radmon.php', {
-      params: { function: 'last10', user: 'guest', password: 'guest' },
+      params: { function: 'last10', user: radmonUser, password: radmonPass },
       timeout: 8000,
     });
 

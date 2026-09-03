@@ -48,6 +48,12 @@
         <div class="threat-fill" id="threatFill"></div>
       </div>
       <div class="threat-text" id="threatText">—</div>
+      <div class="threat-confidence" id="threatConfidence" style="display:none"></div>
+    </div>
+    <div class="user-badge" id="userBadge" style="display:none">
+      <span class="user-role-badge" id="userRoleBadge">OPERATOR</span>
+      <span class="user-name" id="userName">Observer</span>
+      <button class="btn-xs btn-logout" id="logoutBtn" title="Sign out of SENTINEL">Sign out</button>
     </div>
     <div id="liveIndicator" class="status-indicator offline">
       <span class="status-dot"></span>
@@ -356,6 +362,30 @@
     <div class="loading-spinner"></div>
     <div class="loading-text">ACQUIRING DATA</div>
     <div class="loading-sub" id="loadingSub">Connecting to intelligence feeds...</div>
+  </div>
+</div>
+<!-- ── Authentication Modal ────────────────────────────────────────────────── -->
+<div id="loginModal" class="modal-backdrop" style="display:none">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="brand-badge-modal">🛡️ RESTRICTED ACCESS</div>
+      <h2>SENTINEL DASHBOARD</h2>
+      <p class="modal-subtitle">OSCE Technical & Situational Operations Platform</p>
+    </div>
+    <form id="loginForm" class="modal-form">
+      <div class="form-group">
+        <label for="loginUsername">CALLSIGN / USERNAME</label>
+        <input type="text" id="loginUsername" class="input-field" placeholder="Enter username" autocomplete="username" required />
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">PASSPHRASE</label>
+        <input type="password" id="loginPassword" class="input-field" placeholder="Enter passphrase" autocomplete="current-password" required />
+      </div>
+      <div id="loginError" class="modal-error" style="display:none"></div>
+      <button type="submit" id="loginSubmitBtn" class="btn-primary-modal">
+        🔓 Authenticate & Connect
+      </button>
+    </form>
   </div>
 </div>
 

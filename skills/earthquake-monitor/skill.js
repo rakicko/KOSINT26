@@ -16,13 +16,10 @@ function classifyMagnitude(mag) {
   return                 { severity: 'low',      label: 'Micro', color: '#34d399'  };
 }
 
+const { resolveCoordinates } = require('../../server/geocoder');
+
 async function geocode(location) {
-  const res = await axios.get('https://nominatim.openstreetmap.org/search', {
-    params: { q: location, format: 'json', limit: 1 },
-    headers: { 'User-Agent': 'Sentinel-Dashboard/1.0' }, timeout: 5000,
-  });
-  if (!res.data.length) throw new Error(`Cannot geocode ${location}`);
-  return { lat: parseFloat(res.data[0].lat), lon: parseFloat(res.data[0].lon) };
+  return await resolveCoordinates(location);
 }
 
 function getDemoData(location) {

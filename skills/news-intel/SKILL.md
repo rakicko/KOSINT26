@@ -1,64 +1,58 @@
 ---
 name: news-intel
 description: |
-  Fetches and scores high-intensity news for a given location and time window.
-  Detects civil unrest, VIP movements, emergencies, and major security events.
-  Returns an array of scored news items ready for dashboard display.
+  Ingests, classifies, and scores security-relevant news across 10 regional Kosovo portals (Albanian and Serbian).
+  Detects protests, border tensions, blockades, police activity, and geopolitical developments.
+  Provides multi-source entity clustering and deduplication.
 ---
 
-# News Intel Skill
+# News Intelligence Skill
+
+## Target Regional Sources
+1. **KoSSev** (Serbian / North Kosovo)
+2. **Koha Ditore** (Albanian / Pristina)
+3. **Kosovo Online** (Serbian)
+4. **Telegrafi** (Albanian)
+5. **Indeksonline** (Albanian)
+6. **Radio Kontakt Plus** (Serbian / North Mitrovica)
+7. **Klan Kosova** (Albanian)
+8. **Gazeta Express** (Albanian)
+9. **Danas — Kosovo** (Serbian regional)
+10. **Balkan Insight — BIRN** (English/Regional)
 
 ## Input
 ```json
 {
-  "location": "Mumbai, India",
-  "timeline": "24h",     // "1h" | "6h" | "24h" | "7d"
-  "keywords": []         // optional extra keywords
+  "location": "Mitrovica, Kosovo",
+  "timeline": "24h",
+  "keywords": ["kp", "kfor", "eulex"]
 }
 ```
+
+## Supported Timelines
+- `1h`: Last 60 minutes
+- `6h`: Last 6 hours
+- `24h`: Last 24 hours
+- `48h`: Last 48 hours
+- `7d`: Last 7 days
 
 ## Output
 ```json
 {
   "skill": "news-intel",
-  "location": "Mumbai, India",
+  "location": "Mitrovica, Kosovo",
   "fetchedAt": "ISO timestamp",
-  "items": [
-    {
-      "id": "unique-id",
-      "title": "string",
-      "description": "string",
-      "url": "string",
-      "source": "string",
-      "publishedAt": "ISO timestamp",
-      "intensityScore": 8,      // 1-10
-      "category": "civil_unrest | vip_movement | emergency | traffic | other",
-      "tags": ["riot", "police"],
-      "imageUrl": "string | null"
-    }
-  ],
+  "articles": [],
+  "events": [],
   "summary": {
-    "total": 5,
-    "highIntensity": 2,    // score >= 7
-    "maxScore": 9
-  },
-  "source": "gnews | demo"
+    "total": 12,
+    "highIntensity": 3,
+    "maxScore": 8.5
+  }
 }
 ```
 
-## Intensity Scoring
-- Base score from keyword matching (each keyword = +1, max 5)
-- Doubles if: title matches (vs body only)
-- +3 if source is major outlet
-- Category bonuses: civil_unrest +2, emergency +2, vip_movement +1
-
-## High-Intensity Keywords Tracked
-civil_unrest: riot, protest, unrest, clash, violence, mob, strike, siege, coup
-vip_movement: VIP, convoy, motorcade, president, prime minister, security cordon, dignitary
-emergency: explosion, blast, fire, collapse, accident, crash, evacuation, disaster
-traffic: road closure, blockade, diversion, curfew
-
-## Usage
+## CLI Usage
 ```bash
-node skills/news-intel/skill.js --test --location "Mumbai" --timeline "24h"
+node skills/news-intel/skill.js --test --location "Mitrovica" --timeline "24h"
 ```

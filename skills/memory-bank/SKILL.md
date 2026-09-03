@@ -1,67 +1,35 @@
 ---
 name: memory-bank
 description: |
-  Persistent JSON-based storage for location history, alert history, and user preferences.
-  Used by all other skills to store and retrieve state across sessions.
+  Embedded SQLite persistent storage for alerts, locations, preferences, sessions, and cache.
+  Supports ACID transactions, WAL mode, and parameterized queries.
 ---
 
 # Memory Bank Skill
 
-## Schema
-```json
-{
-  "version": 1,
-  "locations": [
-    {
-      "id": "uuid",
-      "name": "Mumbai, India",
-      "lat": 19.076,
-      "lon": 72.877,
-      "addedAt": "ISO",
-      "lastMonitored": "ISO",
-      "monitorCount": 5
-    }
-  ],
-  "alerts": [
-    {
-      "id": "uuid",
-      "timestamp": "ISO",
-      "severity": "high",
-      "category": "news",
-      "title": "string",
-      "message": "string",
-      "location": "string",
-      "read": false
-    }
-  ],
-  "preferences": {
-    "defaultLocation": "Mumbai, India",
-    "defaultTimeline": "24h",
-    "alertThresholds": {
-      "news": 7,
-      "trafficIncidents": 3,
-      "radiation": "elevated"
-    },
-    "browserNotifications": true,
-    "pollIntervalMs": 300000
-  },
-  "cache": {
-    "lastFetch": "ISO",
-    "data": {}
-  }
-}
-```
+## Database Engine
+Backed by embedded SQLite (`server/data/sentinel.db`) with Write-Ahead Logging (WAL mode) and synchronous durability.
+
+## Database Tables
+- `users`: User callsigns, scrypt password hashes, 32-byte salts, and RBAC roles.
+- `sessions`: Active authenticated session tokens, CSRF tokens, and TTL expirations.
+- `locations`: Tracked monitoring hubs (e.g. Mitrovica, Prishtina, Peja).
+- `alerts`: Ingested multi-domain incident alerts with severity, source, coordinates, and read status.
+- `preferences`: System operational thresholds and configuration.
+- `cache`: Intelligence orchestrator cache payloads.
 
 ## API
-- `get(key)` → returns value at key
-- `set(key, value)` → sets value
-- `addLocation(locationObj)` → upserts location
-- `addAlert(alertObj)` → prepends alert (max 100 stored)
-- `markAlertsRead()` → marks all as read
-- `getUnreadCount()` → returns count
-- `clearCache()` → clears cached data
+- `get(key)` → returns records at key (`alerts`, `locations`, `preferences`)
+- `set(key, value)` → updates configuration
+- `addLocation(locationObj)` → upserts location with timestamp and count
+- `addAlerts(alertsArray)` → inserts newly triggered alerts into database
+- `markAlertsRead()` → marks all active alerts as read
+- `getUnreadCount()` → returns count of unread alerts
+- `setCache(data)` → caches orchestrator intelligence payload
+- `getCache(maxAgeMs)` → retrieves valid cached data
+- `clearCache()` → invalidates cached intelligence
 
 ## Usage
 ```bash
-node skills/memory-bank/skill.js --test
+node skills/memory-bank/skill.js
 ```

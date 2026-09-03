@@ -3,3 +3,9 @@ node_modules/
 server/db.json
 *.log
 .DS_Store
+skills/wildfire-monitor/.wildfire_cache.json
+.*_cache.json
+*.db
+*.db-wal
+*.db-shm
+server/data/

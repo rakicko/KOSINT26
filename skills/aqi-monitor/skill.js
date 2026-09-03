@@ -24,21 +24,10 @@ function classifyAQI(europeanAQI) {
 const aqiCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+const { resolveCoordinates } = require('../../server/geocoder');
+
 async function geocode(location) {
-  try {
-    const res = await axios.get('https://nominatim.openstreetmap.org/search', {
-      params: { q: location, format: 'json', limit: 1 },
-      headers: { 'User-Agent': 'SENTINEL-Intelligence/1.0' },
-      timeout: 5000,
-    });
-    if (!res.data || !res.data.length) {
-      // Default to Kosovo central coordinates if geocoding yields nothing
-      return { lat: 42.6026, lon: 20.9030 };
-    }
-    return { lat: parseFloat(res.data[0].lat), lon: parseFloat(res.data[0].lon) };
-  } catch {
-    return { lat: 42.6026, lon: 20.9030 };
-  }
+  return await resolveCoordinates(location);
 }
 
 async function fetchAQI({ location = 'Kosovo', lat, lon, forceRefresh = false } = {}) {

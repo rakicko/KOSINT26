@@ -140,29 +140,39 @@ const NAKORDONI_PPID_MAP = {
   'id_513': { key: 'qafe-e-morines', dir: 'entry', name: 'Qafë Morinë (AL) – Qafë Morinë (KS)' }
 };
 
-// In-memory & persistent cache
-const CACHE_FILE = path.join(__dirname, '.border_cache.json');
+// In-memory & SQLite persistent cache
+const memoryBank = require('../memory-bank/skill');
 let borderCache = null;
 let lastFetchTime = 0;
+
 try {
-  if (fs.existsSync(CACHE_FILE)) {
-    const rawCache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
-    if (rawCache && rawCache.status === 'LIVE_DATA' && Array.isArray(rawCache.crossings) && rawCache.crossings.length > 0) {
-      borderCache = rawCache;
-      lastFetchTime = Date.now();
-    }
+  // Purge legacy flat-file cache if present
+  const legacyCacheFile = path.join(__dirname, '.border_cache.json');
+  if (fs.existsSync(legacyCacheFile)) {
+    fs.unlinkSync(legacyCacheFile);
   }
 } catch (e) {}
+
+function loadBorderCache() {
+  try {
+    const cached = memoryBank.getCache('border_cache', BORDER_CACHE_TTL_MS);
+    if (cached && cached.status === 'LIVE_DATA' && Array.isArray(cached.crossings) && cached.crossings.length > 0) {
+      borderCache = cached;
+      lastFetchTime = Date.now();
+    }
+  } catch (e) {}
+}
 
 function persistCache(data) {
   borderCache = data;
   lastFetchTime = Date.now();
   try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
+    memoryBank.setCache('border_cache', data, BORDER_CACHE_TTL_MS);
   } catch (e) {}
 }
 
 const BORDER_CACHE_TTL_MS = parseInt(process.env.BORDER_CACHE_TTL_MS || '300000', 10); // 5 min
+loadBorderCache();
 const DEFAULT_SOURCE_URL = 'https://mpb.rks-gov.net/?culture=sr-latn-rs';
 const DEFAULT_NAKORDONI_BASE_URL = 'https://nakordoni.eu';
 const DEFAULT_NAKORDONI_PPIDS = 'id_512,id_513,id_530,id_531,id_560,id_561,id_564,id_565,id_566,id_567,id_568,id_569,id_592,id_593,id_594,id_595';
@@ -574,6 +584,8 @@ function normalizeCrossing({
     country: 'Kosovo',
     neighborCountry,
     coordinates: coords,
+    entryWaitMinutes: entryMinutes,
+    exitWaitMinutes: exitMinutes,
     direction: {
       entry: {
         waitingMinutes: entryMinutes,
