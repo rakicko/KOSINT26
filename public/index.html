@@ -195,33 +195,17 @@
 
         <!-- ── Floating Tactical Layers Switcher ────────────────────────── -->
         <div class="tactical-layers-widget" id="tacticalLayersWidget">
-          <button class="tactical-layers-btn" id="btnTacticalLayersToggle" onclick="toggleTacticalLayersMenu()" title="Tactical Map Layers (ABL, Municipalities, KFOR Sectors, Corridors)">
+          <button class="tactical-layers-btn" id="btnTacticalLayersToggle" onclick="toggleTacticalLayersMenu()" title="Tactical Map Layers (KFOR Sectors, Strategic Corridors)">
             <span class="layers-icon">🗺️</span>
             <span class="layers-label">TACTICAL LAYERS</span>
-            <span class="layers-badge" id="tacticalLayersActiveBadge">2 Active</span>
+            <span class="layers-badge" id="tacticalLayersActiveBadge">0 Active</span>
           </button>
           <div class="tactical-layers-menu" id="tacticalLayersMenu" style="display:none">
             <div class="layers-menu-header">
-              <span class="layers-menu-title">OPERATIONAL ZONES & DEMARCATION</span>
+              <span class="layers-menu-title">OPERATIONAL ZONES & CORRIDORS</span>
               <button class="layers-menu-close" onclick="toggleTacticalLayersMenu(false)">✕</button>
             </div>
             <div class="layers-menu-body">
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerAbl" checked onchange="toggleTacticalLayer('abl', this.checked)">
-                <span class="layer-toggle-indicator indicator-abl"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Administrativna linija (ABL)</span>
-                  <span class="layer-toggle-sub">Administrative boundary line & border crossings</span>
-                </div>
-              </label>
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerMunicipalities" checked onchange="toggleTacticalLayer('municipalities', this.checked)">
-                <span class="layer-toggle-indicator indicator-mun"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Opštine Severnog Kosova</span>
-                  <span class="layer-toggle-sub">Severna Mitrovica, Zvečan, Leposavić, Zubin Potok</span>
-                </div>
-              </label>
               <label class="layer-toggle-item">
                 <input type="checkbox" id="toggleLayerKfor" onchange="toggleTacticalLayer('kfor', this.checked)">
                 <span class="layer-toggle-indicator indicator-kfor"></span>
@@ -236,14 +220,6 @@
                 <div class="layer-toggle-info">
                   <span class="layer-toggle-name">Mostovi na Ibru & Zaštićene zone (SPZ)</span>
                   <span class="layer-toggle-sub">Ibar transition bridges, SPZ Banjska, M-22 corridor</span>
-                </div>
-              </label>
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerMines" checked onchange="toggleTacticalLayer('mines', this.checked)">
-                <span class="layer-toggle-indicator indicator-mines"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Minska Polja & Kasetna Municija (CHA/SHA)</span>
-                  <span class="layer-toggle-sub">Hazard perimeters, cluster footprints & EOD buffers</span>
                 </div>
               </label>
             </div>
@@ -829,7 +805,7 @@
 </div>
 
 <!-- ── Staff Add/Edit Modal ────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="staffAddModal" style="display:none">
+<div class="modal-backdrop staff-modal-backdrop" id="staffAddModal" style="display:none">
   <div class="modal-card staff-add-card">
     <div class="modal-header">
       <h3 class="modal-title" id="staffAddModalTitle">ADD STAFF LOCATION / SAFE HAVEN</h3>

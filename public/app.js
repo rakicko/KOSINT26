@@ -1,8 +1,5 @@
 import * as maplibregl from './vendor/maplibre-gl.mjs';
 import {
-  ABL_GEOJSON,
-  MUNICIPALITIES_NORTH_GEOJSON,
-  MUNICIPALITIES_CENTROIDS_GEOJSON,
   KFOR_BASES_GEOJSON,
   SENSITIVE_CORRIDORS_GEOJSON,
   MINEFIELDS_KOSOVO_GEOJSON
@@ -530,6 +527,15 @@ const moduleLayers = {
       clearRoute(false);
       closeMapPopup();
     }
+  },
+  mines: {
+    markers: [],
+    render: () => {
+      toggleMinefieldsLayer(true);
+    },
+    clear: () => {
+      toggleMinefieldsLayer(false);
+    }
   }
 };
 
@@ -575,6 +581,13 @@ function updateMapBadgeAndMeta() {
   if (mod === 'telegram') {
     badge.style.display = 'none';
     meta.textContent = 'Telegram Public Channels · Read-Only Feed';
+    return;
+  }
+  if (mod === 'mines') {
+    const count = MINEFIELDS_KOSOVO_GEOJSON.features.length;
+    badge.style.display = '';
+    badge.textContent = `${count} HAZARDS`;
+    meta.textContent = `${count} Hazardous Sectors & Cluster Footprints · KMAC / EOD`;
     return;
   }
   if (mod === 'border') {
@@ -3554,9 +3567,7 @@ function toggleModule(panelId) {
       fetchStaffLocations();
     } else if (targetModule === 'mines') {
       renderMinefieldsList();
-      toggleTacticalLayer('mines', true);
-      const cb = $('toggleLayerMines');
-      if (cb) cb.checked = true;
+      toggleMinefieldsLayer(true);
     }
   }
 
@@ -4181,9 +4192,8 @@ function initMap() {
   setTimeout(() => { if (state.map) state.map.resize(); }, 200);
 }
 
-// ─── Tactical Operational Zones & Boundaries (ABL, Municipalities, KFOR, Mines) ──
+// ─── Tactical Operational Zones (KFOR Sectors, Strategic Corridors, Mines) ───
 let tacticalKforMarkers = [];
-let tacticalMunLabels = [];
 let tacticalMineMarkers = [];
 
 function buildMinefieldPopupHtml(p) {
@@ -4277,124 +4287,10 @@ function renderTacticalKforBases(visible) {
   });
 }
 
-function renderTacticalMunLabels(visible) {
-  tacticalMunLabels.forEach(m => m.remove());
-  tacticalMunLabels = [];
-  if (!visible || !state.map) return;
-
-  MUNICIPALITIES_CENTROIDS_GEOJSON.features.forEach(feat => {
-    const p = feat.properties;
-    const coords = feat.geometry.coordinates;
-
-    const el = document.createElement('div');
-    el.className = 'mun-tactical-label';
-    el.style.borderColor = p.color || '#38bdf8';
-    el.innerHTML = `<span class="mun-label-text">${p.nameSr}</span>`;
-
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const parentMun = MUNICIPALITIES_NORTH_GEOJSON.features.find(f => f.properties.id === p.id.replace('-label', ''));
-      if (parentMun) {
-        const mp = parentMun.properties;
-        const html = `
-          <div class="tactical-layer-popup">
-            <div class="layer-popup-badge badge-mun">NORTH MUNICIPALITY · ${mp.code}</div>
-            <div class="layer-popup-title">${mp.name}</div>
-            <div class="layer-popup-meta">Area: <strong>${mp.areaKm2} km²</strong> · Population: <strong>~${mp.populationEst}</strong></div>
-            <div class="layer-popup-row"><span>HQ:</span> ${mp.hq}</div>
-            <div class="layer-popup-row"><span>Police:</span> ${mp.policeStation}</div>
-            <div class="layer-popup-row"><span>Access:</span> ${mp.primaryAccess}</div>
-            <div class="layer-popup-row"><span>Key Sectors:</span> ${mp.keyLocations}</div>
-          </div>
-        `;
-        openMapPopup(coords, html);
-      }
-    });
-
-    const marker = new maplibregl.Marker({ element: el })
-      .setLngLat(coords)
-      .addTo(state.map);
-
-    tacticalMunLabels.push(marker);
-  });
-}
-
 function initTacticalLayers(map) {
   if (!map) return;
 
-  // 1. ABL (Administrative Boundary Line)
-  if (!map.getSource('abl-source')) {
-    map.addSource('abl-source', {
-      type: 'geojson',
-      data: ABL_GEOJSON
-    });
-  }
-  if (!map.getLayer('abl-glow')) {
-    map.addLayer({
-      id: 'abl-glow',
-      type: 'line',
-      source: 'abl-source',
-      layout: { visibility: 'visible' },
-      paint: {
-        'line-color': '#f59e0b',
-        'line-width': 7,
-        'line-opacity': 0.38,
-        'line-blur': 2.5
-      }
-    });
-  }
-  if (!map.getLayer('abl-line')) {
-    map.addLayer({
-      id: 'abl-line',
-      type: 'line',
-      source: 'abl-source',
-      layout: { visibility: 'visible', 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': '#f59e0b',
-        'line-width': 2.8,
-        'line-dasharray': [3, 2],
-        'line-opacity': 0.95
-      }
-    });
-  }
-
-  // 2. Municipalities (4 Northern Kosovo Municipalities)
-  if (!map.getSource('municipalities-source')) {
-    map.addSource('municipalities-source', {
-      type: 'geojson',
-      data: MUNICIPALITIES_NORTH_GEOJSON
-    });
-  }
-  if (!map.getLayer('municipalities-fill')) {
-    map.addLayer({
-      id: 'municipalities-fill',
-      type: 'fill',
-      source: 'municipalities-source',
-      layout: { visibility: 'visible' },
-      paint: {
-        'fill-color': ['get', 'color'],
-        'fill-opacity': 0.16
-      }
-    });
-  }
-  if (!map.getLayer('municipalities-line')) {
-    map.addLayer({
-      id: 'municipalities-line',
-      type: 'line',
-      source: 'municipalities-source',
-      layout: { visibility: 'visible' },
-      paint: {
-        'line-color': ['get', 'borderColor'],
-        'line-width': 2.2,
-        'line-opacity': 0.9
-      }
-    });
-  }
-
-  // Render initial municipal center labels
-  renderTacticalMunLabels(true);
-
-  // 3. Sensitive Corridors & Bridges
+  // 1. Sensitive Corridors & Bridges
   if (!map.getSource('corridors-source')) {
     map.addSource('corridors-source', {
       type: 'geojson',
@@ -4433,7 +4329,7 @@ function initTacticalLayers(map) {
     });
   }
 
-  // 4. Minefields & Explosive Hazards (CHA / SHA / CBU)
+  // 2. Minefields & Explosive Hazards (Controlled via UXO module)
   if (!map.getSource('minefields-source')) {
     map.addSource('minefields-source', {
       type: 'geojson',
@@ -4445,7 +4341,7 @@ function initTacticalLayers(map) {
       id: 'minefields-fill',
       type: 'fill',
       source: 'minefields-source',
-      layout: { visibility: 'visible' },
+      layout: { visibility: 'none' },
       paint: {
         'fill-color': '#dc2626',
         'fill-opacity': 0.22
@@ -4457,7 +4353,7 @@ function initTacticalLayers(map) {
       id: 'minefields-line',
       type: 'line',
       source: 'minefields-source',
-      layout: { visibility: 'visible', 'line-cap': 'round', 'line-join': 'round' },
+      layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
       paint: {
         'line-color': '#ef4444',
         'line-width': 2.4,
@@ -4468,24 +4364,6 @@ function initTacticalLayers(map) {
   }
 
   // Interactive Clicks:
-  map.on('click', 'municipalities-fill', (e) => {
-    if (e.features && e.features.length > 0) {
-      const p = e.features[0].properties;
-      const html = `
-        <div class="tactical-layer-popup">
-          <div class="layer-popup-badge badge-mun">NORTH MUNICIPALITY · ${p.code || 'NORTH'}</div>
-          <div class="layer-popup-title">${p.name}</div>
-          <div class="layer-popup-meta">Area: <strong>${p.areaKm2} km²</strong> · Population: <strong>~${p.populationEst}</strong></div>
-          <div class="layer-popup-row"><span>HQ:</span> ${p.hq}</div>
-          <div class="layer-popup-row"><span>Police:</span> ${p.policeStation}</div>
-          <div class="layer-popup-row"><span>Access:</span> ${p.primaryAccess}</div>
-          <div class="layer-popup-row"><span>Key Sectors:</span> ${p.keyLocations}</div>
-        </div>
-      `;
-      openMapPopup(e.lngLat, html);
-    }
-  });
-
   map.on('click', 'corridors-points', (e) => {
     if (e.features && e.features.length > 0) {
       const p = e.features[0].properties;
@@ -4509,7 +4387,7 @@ function initTacticalLayers(map) {
   });
 
   // Cursor pointers
-  ['municipalities-fill', 'corridors-points', 'minefields-fill'].forEach(layerId => {
+  ['corridors-points', 'minefields-fill'].forEach(layerId => {
     map.on('mouseenter', layerId, () => {
       if (map.getCanvas()) map.getCanvas().style.cursor = 'pointer';
     });
@@ -4517,29 +4395,13 @@ function initTacticalLayers(map) {
       if (map.getCanvas()) map.getCanvas().style.cursor = '';
     });
   });
-
-  // Render initial minefield markers
-  renderTacticalMineMarkers(true);
 }
 
 function toggleTacticalLayer(layerGroup, isVisible) {
   if (!state.map) return;
   const visibility = isVisible ? 'visible' : 'none';
 
-  if (layerGroup === 'abl') {
-    ['abl-glow', 'abl-line'].forEach(layerId => {
-      if (state.map.getLayer(layerId)) {
-        state.map.setLayoutProperty(layerId, 'visibility', visibility);
-      }
-    });
-  } else if (layerGroup === 'municipalities') {
-    ['municipalities-fill', 'municipalities-line'].forEach(layerId => {
-      if (state.map.getLayer(layerId)) {
-        state.map.setLayoutProperty(layerId, 'visibility', visibility);
-      }
-    });
-    renderTacticalMunLabels(isVisible);
-  } else if (layerGroup === 'kfor') {
+  if (layerGroup === 'kfor') {
     renderTacticalKforBases(isVisible);
   } else if (layerGroup === 'corridors') {
     ['corridors-line', 'corridors-points'].forEach(layerId => {
@@ -4547,27 +4409,28 @@ function toggleTacticalLayer(layerGroup, isVisible) {
         state.map.setLayoutProperty(layerId, 'visibility', visibility);
       }
     });
-  } else if (layerGroup === 'mines') {
-    ['minefields-fill', 'minefields-line'].forEach(layerId => {
-      if (state.map.getLayer(layerId)) {
-        state.map.setLayoutProperty(layerId, 'visibility', visibility);
-      }
-    });
-    renderTacticalMineMarkers(isVisible);
   }
 
   let activeCount = 0;
-  if ($('toggleLayerAbl')?.checked) activeCount++;
-  if ($('toggleLayerMunicipalities')?.checked) activeCount++;
   if ($('toggleLayerKfor')?.checked) activeCount++;
   if ($('toggleLayerCorridors')?.checked) activeCount++;
-  if ($('toggleLayerMines')?.checked) activeCount++;
 
   const badge = $('tacticalLayersActiveBadge');
   if (badge) {
     badge.textContent = `${activeCount} Active`;
     badge.classList.toggle('active', activeCount > 0);
   }
+}
+
+function toggleMinefieldsLayer(visible) {
+  if (!state.map) return;
+  const visibility = visible ? 'visible' : 'none';
+  ['minefields-fill', 'minefields-line'].forEach(layerId => {
+    if (state.map.getLayer(layerId)) {
+      state.map.setLayoutProperty(layerId, 'visibility', visibility);
+    }
+  });
+  renderTacticalMineMarkers(visible);
 }
 
 function toggleTacticalLayersMenu(forceState) {
