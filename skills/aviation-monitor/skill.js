@@ -17,25 +17,52 @@ let lastFetchTime = 0;
 const CACHE_TTL_MS = 15 * 1000; // 15 seconds
 
 // Military callsign prefixes & keywords
+// Military callsign prefixes & keywords
 const MILITARY_PREFIXES = [
-  'NATO', 'RFR', 'RRR', 'ASY', 'CFC', 'BAF', 'GAF', 'FAF', 'IAM', 'HAF',
+  'NATO', 'KFOR', 'RFR', 'RRR', 'ASY', 'CFC', 'BAF', 'GAF', 'FAF', 'IAM', 'HAF',
   'THK', 'TUAF', 'ROF', 'SVF', 'AME', 'PLF', 'HRZ', 'SAF', 'NVF', 'DAF',
-  'NOW', 'FNF', 'CEF', 'UAF', 'RFF', 'IRF'
+  'NOW', 'FNF', 'CEF', 'UAF', 'RFF', 'IRF', 'FRO', 'EULEX', 'FXY', 'FRA'
 ];
 
 const MILITARY_TACTICAL = [
   'VIPER', 'FORTE', 'JAKE', 'HOMER', 'REDEYE', 'LAGR', 'NCHO', 'TITAN',
   'VALOR', 'DUKE', 'EVAC', 'BART', 'COBRA', 'HAWK', 'REAPER', 'HERKY',
   'KNIFE', 'TOPCAT', 'TALON', 'GHOST', 'BOXER', 'SWIFT', 'SPAR', 'SAM',
-  'EXEC', 'BOMBER', 'DRAG', 'RCH', 'REACH', 'PAT', 'MOOSE', 'MAKO'
+  'EXEC', 'BOMBER', 'DRAG', 'RCH', 'REACH', 'PAT', 'MOOSE', 'MAKO',
+  'KFOR', 'NATO', 'BLACK', 'RAVEN', 'GUARDIAN', 'SENTRY', 'SHADOW'
 ];
 
+const MILITARY_ROTARY_TYPES = new Set([
+  'UH60', 'HH60', 'MH60', 'CH47', 'AH64', 'MI8', 'MI17', 'MI24', 'MI35',
+  'H145', 'H135', 'H225', 'EC45', 'EC35', 'A109', 'A139', 'AS32', 'NH90',
+  'B412', 'UH1', 'OH58'
+]);
+
+const MILITARY_UAV_TYPES = new Set([
+  'MQ9', 'RQ4', 'TB2', 'AKNC', 'MQ1', 'SCAN', 'HERN', 'WJ60'
+]);
+
+const MILITARY_TRANSPORT_TYPES = new Set([
+  'C17', 'C130', 'C30J', 'A400', 'KC30', 'K35R', 'KC135', 'IL76', 'AN12',
+  'AN26', 'C295', 'CN35', 'C27J', 'C160'
+]);
+
+const MILITARY_RECON_TYPES = new Set([
+  'E3TF', 'E3CF', 'RC135', 'P8', 'U2', 'E2', 'R135', 'CL60', 'B350'
+]);
+
+const MILITARY_FIGHTER_TYPES = new Set([
+  'EUFI', 'F16', 'F18', 'F35', 'MG29', 'SU27', 'SU30', 'SU35', 'JAS39', 'TOR',
+  'B52', 'B1', 'B2', 'MIR2', 'RAFA'
+]);
+
 const MILITARY_TYPES = new Set([
-  'C17', 'C130', 'C30J', 'A400', 'KC30', 'K35R', 'E3TF', 'E3CF', 'EUFI',
-  'F16', 'F18', 'F35', 'MG29', 'SU27', 'SU30', 'SU35', 'JAS39', 'TOR',
-  'B52', 'B1', 'B2', 'U2', 'RC135', 'RQ4', 'MQ9', 'P8', 'V22', 'V280',
-  'UH60', 'AH64', 'CH47', 'MI8', 'MI24', 'MI17', 'IL76', 'AN12', 'AN26',
-  'C295', 'CN35', 'T129', 'TB2', 'AKNC'
+  ...MILITARY_ROTARY_TYPES,
+  ...MILITARY_UAV_TYPES,
+  ...MILITARY_TRANSPORT_TYPES,
+  ...MILITARY_RECON_TYPES,
+  ...MILITARY_FIGHTER_TYPES,
+  'T129', 'V22', 'V280'
 ]);
 
 // Private / Executive Jet operators & types
@@ -91,71 +118,110 @@ function classifyAircraft({ callsign = '', typeCode = '', squawk = '', dbFlags =
   const cs = (callsign || '').toUpperCase().trim();
   const type = (typeCode || '').toUpperCase().trim();
 
+  // Helper to determine specific military role
+  function getMilitaryDetails(defaultRole = 'military', reason = '', confidence = 0.90) {
+    let role = defaultRole;
+    let subType = 'jet';
+    let isKfor = cs.startsWith('KFOR') || cs.startsWith('NATO') || cs.startsWith('SVF') || cs.startsWith('IAM');
+    let isFrontex = cs.startsWith('FRO') || cs.startsWith('EULEX') || cs.startsWith('FXY') || cs.startsWith('FRA');
+
+    if (MILITARY_ROTARY_TYPES.has(type) || emitterCategory === 7) {
+      role = 'rotary';
+      subType = 'helicopter';
+    } else if (MILITARY_UAV_TYPES.has(type) || emitterCategory === 14) {
+      role = 'uav';
+      subType = 'uav';
+    } else if (MILITARY_RECON_TYPES.has(type) || cs.startsWith('FORTE') || cs.startsWith('JAKE') || cs.startsWith('REDEYE')) {
+      role = 'recon';
+      subType = 'recon';
+    } else if (MILITARY_TRANSPORT_TYPES.has(type) || cs.startsWith('RCH') || cs.startsWith('REACH') || cs.startsWith('MOOSE') || cs.startsWith('HERKY')) {
+      role = 'transport';
+      subType = 'heavy';
+    } else if (MILITARY_FIGHTER_TYPES.has(type) || cs.startsWith('VIPER') || cs.startsWith('COBRA') || cs.startsWith('HAWK')) {
+      role = 'fighter';
+      subType = 'fighter';
+    }
+
+    if (isKfor) role = 'kfor';
+    else if (isFrontex) role = 'frontex';
+
+    return {
+      category: 'military',
+      militaryRole: role,
+      subType,
+      isSpecialMilitary: true,
+      isKfor,
+      isFrontex,
+      reason,
+      confidence
+    };
+  }
+
   // 1. Military Check
   if (dbFlags === 1 || (dbFlags & 1) === 1) {
-    return { category: 'military', reason: 'ADS-B database military flag', confidence: 0.98 };
+    return getMilitaryDetails('military', 'ADS-B database military flag', 0.98);
   }
   if (type && MILITARY_TYPES.has(type)) {
-    return { category: 'military', reason: `Military airframe type (${type})`, confidence: 0.95 };
+    return getMilitaryDetails('military', `Military airframe type (${type})`, 0.95);
   }
   if (cs) {
     for (const prefix of MILITARY_PREFIXES) {
       if (cs.startsWith(prefix)) {
-        return { category: 'military', reason: `Military callsign prefix (${prefix})`, confidence: 0.92 };
+        return getMilitaryDetails('military', `Military callsign prefix (${prefix})`, 0.92);
       }
     }
     for (const tac of MILITARY_TACTICAL) {
       if (cs.startsWith(tac)) {
-        return { category: 'military', reason: `Military tactical callsign (${tac})`, confidence: 0.90 };
+        return getMilitaryDetails('military', `Military tactical callsign (${tac})`, 0.90);
       }
     }
   }
   if (squawk === '7777') {
-    return { category: 'military', reason: 'Military intercept squawk (7777)', confidence: 0.85 };
+    return getMilitaryDetails('military', 'Military intercept squawk (7777)', 0.85);
   }
 
   // 2. Private Jet Check
   if (type && PRIVATE_JET_TYPES.has(type)) {
-    return { category: 'private_jet', reason: `Executive business jet type (${type})`, confidence: 0.92 };
+    return { category: 'private_jet', militaryRole: null, subType: 'jet', isSpecialMilitary: false, reason: `Executive business jet type (${type})`, confidence: 0.92 };
   }
   if (cs) {
     for (const op of PRIVATE_JET_OPERATORS) {
       if (cs.startsWith(op)) {
-        return { category: 'private_jet', reason: `Business jet operator prefix (${op})`, confidence: 0.90 };
+        return { category: 'private_jet', militaryRole: null, subType: 'jet', isSpecialMilitary: false, reason: `Business jet operator prefix (${op})`, confidence: 0.90 };
       }
     }
   }
 
   // 3. Commercial Airliner Check
   if (type && COMMERCIAL_TYPES.has(type)) {
-    return { category: 'commercial', reason: `Commercial airliner type (${type})`, confidence: 0.92 };
+    return { category: 'commercial', militaryRole: null, subType: 'heavy', isSpecialMilitary: false, reason: `Commercial airliner type (${type})`, confidence: 0.92 };
   }
   if (cs) {
     for (const air of COMMERCIAL_AIRLINES) {
       if (cs.startsWith(air)) {
-        return { category: 'commercial', reason: `Commercial airline prefix (${air})`, confidence: 0.90 };
+        return { category: 'commercial', militaryRole: null, subType: 'heavy', isSpecialMilitary: false, reason: `Commercial airline prefix (${air})`, confidence: 0.90 };
       }
     }
     // Generic airline callsign shape: 3 letters followed by numbers (e.g., AZA123, JAF54M)
     if (/^[A-Z]{3}[0-9]{1,4}[A-Z0-9]?$/i.test(cs) && !cs.startsWith('N')) {
-      return { category: 'commercial', reason: 'Standard commercial flight number pattern', confidence: 0.75 };
+      return { category: 'commercial', militaryRole: null, subType: 'heavy', isSpecialMilitary: false, reason: 'Standard commercial flight number pattern', confidence: 0.75 };
     }
   }
 
   // 4. Private / General Aviation Check
   if (type && GA_TYPES.has(type)) {
-    return { category: 'private', reason: `Light general aviation type (${type})`, confidence: 0.88 };
+    return { category: 'private', militaryRole: null, subType: 'piston', isSpecialMilitary: false, reason: `Light general aviation type (${type})`, confidence: 0.88 };
   }
   if (emitterCategory === 2 || emitterCategory === 3) {
-    return { category: 'private', reason: 'Light/small emitter category', confidence: 0.70 };
+    return { category: 'private', militaryRole: null, subType: 'piston', isSpecialMilitary: false, reason: 'Light/small emitter category', confidence: 0.70 };
   }
   // Registration format callsigns (e.g. YU-XYZ, N12345, D-EXYZ, ZA-XYZ)
   if (/^(N[0-9]{1,5}[A-Z]{0,2}|[A-Z0-9]{1,3}-[A-Z0-9]{2,5})$/i.test(cs)) {
-    return { category: 'private', reason: 'Civil aircraft registration callsign', confidence: 0.80 };
+    return { category: 'private', militaryRole: null, subType: 'piston', isSpecialMilitary: false, reason: 'Civil aircraft registration callsign', confidence: 0.80 };
   }
 
   // 5. Unknown
-  return { category: 'unknown', reason: 'Insufficient metadata for definitive classification', confidence: 0.30 };
+  return { category: 'unknown', militaryRole: null, subType: 'unknown', isSpecialMilitary: false, reason: 'Insufficient metadata for definitive classification', confidence: 0.30 };
 }
 
 /**
@@ -238,6 +304,11 @@ async function fetchFromOpenSky() {
       verticalRate: typeof verticalRate === 'number' && !isNaN(verticalRate) ? +verticalRate.toFixed(1) : null,
       onGround,
       squawk: squawk || null,
+      subType: classification.subType || 'unknown',
+      militaryRole: classification.militaryRole || null,
+      isSpecialMilitary: !!classification.isSpecialMilitary,
+      isKfor: !!classification.isKfor,
+      isFrontex: !!classification.isFrontex,
       originCountry: originCountry || null,
       aircraftType: null,
       aircraftDesc: null,
@@ -329,6 +400,11 @@ async function fetchFromAdsbFi() {
       verticalRate: vRate,
       onGround,
       squawk,
+      subType: classification.subType || 'unknown',
+      militaryRole: classification.militaryRole || null,
+      isSpecialMilitary: !!classification.isSpecialMilitary,
+      isKfor: !!classification.isKfor,
+      isFrontex: !!classification.isFrontex,
       originCountry: null,
       aircraftType: typeCode || null,
       aircraftDesc: desc || null,
@@ -403,6 +479,11 @@ async function fetchAviation({ forceRefresh = false } = {}) {
           existing.category = reclass.category;
           existing.classificationReason = reclass.reason;
           existing.confidence = reclass.confidence;
+          existing.militaryRole = reclass.militaryRole || existing.militaryRole;
+          existing.subType = reclass.subType || existing.subType;
+          existing.isSpecialMilitary = !!reclass.isSpecialMilitary || existing.isSpecialMilitary;
+          existing.isKfor = !!reclass.isKfor || existing.isKfor;
+          existing.isFrontex = !!reclass.isFrontex || existing.isFrontex;
         }
       } else {
         aircraftMap.set(ac.icao24, ac);
@@ -417,6 +498,10 @@ async function fetchAviation({ forceRefresh = false } = {}) {
       private: 0,
       privateJets: 0,
       military: 0,
+      militarySpecial: 0,
+      kforCount: 0,
+      militaryHeloCount: 0,
+      uavCount: 0,
       unknown: 0
     };
 
@@ -424,8 +509,13 @@ async function fetchAviation({ forceRefresh = false } = {}) {
       if (ac.category === 'commercial') summary.commercial++;
       else if (ac.category === 'private') summary.private++;
       else if (ac.category === 'private_jet') summary.privateJets++;
-      else if (ac.category === 'military') summary.military++;
-      else summary.unknown++;
+      else if (ac.category === 'military') {
+        summary.military++;
+        if (ac.isSpecialMilitary) summary.militarySpecial++;
+        if (ac.isKfor) summary.kforCount++;
+        if (ac.militaryRole === 'rotary') summary.militaryHeloCount++;
+        if (ac.militaryRole === 'uav') summary.uavCount++;
+      } else summary.unknown++;
     });
 
     const status = unifiedAircraft.length > 0 ? 'LIVE_DATA' : 'NO_AIRCRAFT';

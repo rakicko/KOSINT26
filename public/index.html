@@ -63,6 +63,16 @@
     </div>
   </div>
 
+  <!-- ── OSIRIS AI Header Telemetry Bar ──────────────────────────────────────── -->
+  <div class="osiris-header-telemetry" id="osirisHeaderTelemetry">
+    <div class="telemetry-chip zulu"><span class="chip-label">ZULU</span> <span class="chip-val" id="zuluTimeDisplay">00:00:00Z</span></div>
+    <div class="telemetry-chip status"><span class="chip-label">STATUS:</span> <span class="chip-val status-live">LIVE</span></div>
+    <div class="telemetry-chip layers"><span class="chip-val" id="telemetryActiveLayers">10</span> <span class="chip-label">LAYERS</span></div>
+    <div class="telemetry-chip entities"><span class="chip-val" id="telemetryEntityCount">1,480</span> <span class="chip-label">ENTITIES</span></div>
+    <div class="telemetry-chip solar"><span class="chip-label">SOLAR:</span> <span class="chip-val solar-val" id="solarFluxVal">Kp1</span></div>
+    <div class="telemetry-chip version"><span class="chip-val">V.4.2</span></div>
+  </div>
+
   <div class="header-controls">
     <div class="input-group slim">
       <div class="input-icon">🕒</div>
@@ -91,6 +101,29 @@
     <div class="clock" id="clockDisplay"></div>
   </div>
 </header>
+
+<!-- ── OSIRIS Sub-Header Operational Ribbon ────────────────────────────────── -->
+<div class="osiris-sub-ribbon" id="osirisSubRibbon">
+  <div class="ribbon-inner">
+    <span>REAL-TIME BALKAN MONITORING</span>
+    <span class="ribbon-dot">·</span>
+    <span>MILITARY FLIGHTS & TRAILS</span>
+    <span class="ribbon-dot">·</span>
+    <span>QKMK BORDER TELEMETRY</span>
+    <span class="ribbon-dot">·</span>
+    <span>CCTV SURVEILLANCE</span>
+    <span class="ribbon-dot">·</span>
+    <span>METEOROLOGICAL & AIR QUALITY</span>
+    <span class="ribbon-dot">·</span>
+    <span>NASA THERMAL WILDFIRES</span>
+    <span class="ribbon-dot">·</span>
+    <span>EMSC SEISMIC</span>
+    <span class="ribbon-dot">·</span>
+    <span>MINE HAZARDS & STANDOFF</span>
+    <span class="ribbon-dot">·</span>
+    <span>STAFF WARDEN EVACUATION</span>
+  </div>
+</div>
 
 <!-- ── Main Layout (OSIRIS AI Map-First Canvas) ────────────────────────────── -->
 <main class="main-layout">
@@ -132,6 +165,11 @@
         <span class="nav-rail-tooltip">CCTV Surveillance</span>
         <span class="nav-rail-active-indicator"></span>
       </button>
+      <button class="nav-rail-btn" data-panel="liveFeedsPanel" id="btnLiveFeedsNav" onclick="toggleModule('liveFeedsPanel')" aria-label="Live Broadcast Feeds">
+        <span class="nav-rail-icon">📺</span>
+        <span class="nav-rail-tooltip">Live News Feeds</span>
+        <span class="nav-rail-active-indicator"></span>
+      </button>
       <button class="nav-rail-btn" data-panel="staffPanel" id="btnStaffWarden" onclick="toggleModule('staffPanel')" aria-label="Staff Warden & Evacuation">
         <span class="nav-rail-icon">🛡️</span>
         <span class="nav-rail-lock-badge" id="staffNavLockBadge">🔒</span>
@@ -162,6 +200,79 @@
     <div class="map-card">
       <div class="panel map-panel" id="mapPanel">
         <div id="leafletMap"></div>
+
+        <!-- Virtual Directional Pan/Zoom Pad (Controlled by Style Studio) -->
+        <div class="osiris-pan-pad" id="osirisPanZoomPad" style="display:none;">
+          <button type="button" class="pan-pad-btn pan-up" onclick="state.map && state.map.panBy([0, -80])" title="Pan North">▲</button>
+          <div class="pan-pad-mid">
+            <button type="button" class="pan-pad-btn pan-left" onclick="state.map && state.map.panBy([-80, 0])" title="Pan West">◀</button>
+            <button type="button" class="pan-pad-btn pan-center" onclick="resetMapNorth()" title="Reset North">●</button>
+            <button type="button" class="pan-pad-btn pan-right" onclick="state.map && state.map.panBy([80, 0])" title="Pan East">▶</button>
+          </div>
+          <button type="button" class="pan-pad-btn pan-down" onclick="state.map && state.map.panBy([0, 80])" title="Pan South">▼</button>
+        </div>
+
+        <!-- ── OSIRIS Bottom-Left Floating Map Controls Pill ─────────────── -->
+        <div class="osiris-bottom-left-widget" id="osirisBottomLeftWidget">
+          <!-- 1. 3D / 2D Pill Group -->
+          <div class="osiris-pill-group">
+            <button class="osiris-pill-btn" id="btnOsiris3D" onclick="toggle3DView(true)" title="Switch to 3D Terrain Elevation & Extruded Buildings (3)">
+              <span class="pill-ico">🌐</span> 3D
+            </button>
+            <button class="osiris-pill-btn active" id="btnOsiris2D" onclick="toggle3DView(false)" title="Switch to 2D Tactical Plan View (2)">
+              <span class="pill-ico">👤</span> 2D
+            </button>
+          </div>
+
+          <!-- 2. Solar Day / Night Cycle Toggle -->
+          <div class="osiris-pill-group">
+            <button class="osiris-pill-btn" id="btnToggleDayNightCycle" onclick="toggleDayNightCycle()" title="Toggle Solar Day/Night Shading">
+              <span class="pill-ico" id="osirisDayNightIcon">☀️</span> <span id="osirisDayNightLabel">DAY</span>
+            </button>
+          </div>
+
+          <!-- 3. Reset Compass to North (Between 2D/3D & MAP/SAT) -->
+          <div class="osiris-pill-group">
+            <button class="osiris-pill-btn" id="btnOsirisResetNorth" onclick="resetMapNorth()" title="Reset Compass / Bearing to North (R)">
+              <span class="pill-ico">🧭</span> NORTH
+            </button>
+          </div>
+
+          <!-- 4. MAP / SAT Basemap Pill Group -->
+          <div class="osiris-pill-group">
+            <button class="osiris-pill-btn active" id="btnOsirisMap" onclick="switchOsirisBasemap('map')" title="Dark Tactical Vector Basemap">
+              <span class="pill-ico">🌙</span> MAP
+            </button>
+            <button class="osiris-pill-btn" id="btnOsirisSat" onclick="switchOsirisBasemap('satellite')" title="High-Resolution Satellite Imagery">
+              <span class="pill-ico">🛰️</span> SAT
+            </button>
+          </div>
+
+          <!-- 5. Scale Indicator -->
+          <div class="osiris-scale-pill" id="osirisScalePill">
+            <span class="scale-bar-line"></span>
+            <span class="scale-text" id="osirisScaleText">20 km</span>
+          </div>
+        </div>
+
+        <!-- ── OSIRIS Right-Side Floating Quick-Actions Rail ─────────────── -->
+        <div class="osiris-right-rail" id="osirisRightRail">
+          <button class="osiris-rail-btn" id="btnToggleDrawingTools" onclick="toggleDrawingToolsWidget()" title="Tactical Drawing Tools & AOI Measurement (D)">
+            <span class="rail-icon">📐</span>
+          </button>
+          <button class="osiris-rail-btn" id="btnDefenseMarkets" onclick="toggleDefenseMarketPanel()" title="Defense Equities, Market Breadth & Space Weather (M)">
+            <span class="rail-icon">📈</span>
+          </button>
+          <button class="osiris-rail-btn" onclick="focusKosovoBounds()" title="Focus Kosovo Theater">
+            <span class="rail-icon">🎯</span>
+          </button>
+          <button class="osiris-rail-btn" onclick="toggleTacticalLayersMenu()" title="Tactical Operational Layers (MSR, Bases, Mines)">
+            <span class="rail-icon">🗺️</span>
+          </button>
+          <button class="osiris-rail-btn" onclick="toggleFullScreenMode()" title="Toggle Fullscreen (F)">
+            <span class="rail-icon">⛶</span>
+          </button>
+        </div>
 
         <!-- ── Floating Tactical Layers Switcher ────────────────────────── -->
         <div class="tactical-layers-widget" id="tacticalLayersWidget">
@@ -268,6 +379,206 @@
             </div>
           </div>
         </div>
+
+        <!-- ── Tactical Drawing Tools & AOI Measurement Widget ─────────── -->
+        <div class="drawing-tools-widget" id="drawingToolsWidget" style="display:none">
+          <div class="drawing-widget-header">
+            <div class="drawing-widget-title">
+              <span class="drawing-icon">📐</span>
+              <span>TACTICAL DRAWING &amp; AOI</span>
+            </div>
+            <button class="drawing-widget-close" onclick="toggleDrawingToolsWidget(false)" title="Close drawing tools">✕</button>
+          </div>
+          <div class="drawing-widget-metrics">
+            <div class="drawing-metric-box">
+              <span class="drawing-metric-lbl">Tracked Area</span>
+              <span class="drawing-metric-val" id="aoiTrackedArea">0.0 km²</span>
+            </div>
+            <div class="drawing-metric-box">
+              <span class="drawing-metric-lbl">AOIs / Perim</span>
+              <span class="drawing-metric-val" id="aoiPerim">0 / 0.0 km</span>
+            </div>
+          </div>
+          <div class="drawing-step-title">STEP 1 — CHOOSE A SHAPE</div>
+          <div class="drawing-shapes-grid">
+            <button class="drawing-shape-btn active" id="btnShapeArea" onclick="setDrawingShape('area')">
+              <span class="shape-ico">⬡</span>
+              <div class="shape-text-wrap">
+                <span class="shape-name">AREA</span>
+                <span class="shape-desc">Any shape, corner by corner</span>
+              </div>
+            </button>
+            <button class="drawing-shape-btn" id="btnShapeBox" onclick="setDrawingShape('box')">
+              <span class="shape-ico">▭</span>
+              <div class="shape-text-wrap">
+                <span class="shape-name">BOX</span>
+                <span class="shape-desc">Two clicks, opposite corners</span>
+              </div>
+            </button>
+            <button class="drawing-shape-btn" id="btnShapeRadius" onclick="setDrawingShape('radius')">
+              <span class="shape-ico">◯</span>
+              <div class="shape-text-wrap">
+                <span class="shape-name">RADIUS</span>
+                <span class="shape-desc">Centre and radius circle</span>
+              </div>
+            </button>
+            <button class="drawing-shape-btn" id="btnShapePath" onclick="setDrawingShape('path')">
+              <span class="shape-ico">〰</span>
+              <div class="shape-text-wrap">
+                <span class="shape-name">PATH</span>
+                <span class="shape-desc">Distance along route</span>
+              </div>
+            </button>
+          </div>
+          <div class="drawing-status-hint" id="drawingStatusHint">
+            Click on map to place polygon vertices. Click first point or "Complete" to finish.
+          </div>
+          <div class="drawing-inside-container" id="drawingInsideBox" style="display:none">
+            <div class="drawing-inside-header">
+              <span class="drawing-inside-title">🎯 DETECTED IN AOI</span>
+              <span class="drawing-inside-badge" id="drawingInsideCount">0 items</span>
+            </div>
+            <div class="drawing-inside-list" id="drawingInsideList"></div>
+          </div>
+          <div class="drawing-actions-row">
+            <button class="btn-xs btn-drawing-action" onclick="clearDrawnAoi()">🗑️ Clear</button>
+            <button class="btn-xs btn-drawing-action primary" id="btnDrawingComplete" onclick="finishCurrentShape()" style="display:none">✓ Complete Shape</button>
+            <button class="btn-xs btn-drawing-action" onclick="exportAoiGeoJson()">💾 Export</button>
+          </div>
+        </div>
+
+        <!-- ── Defense Equities, Market Breadth & Space Weather Drawer ────── -->
+        <div class="osiris-market-drawer" id="defenseMarketPanel" style="display:none">
+          <div class="market-drawer-header">
+            <div class="market-header-title">
+              <span class="market-icon">📈</span>
+              <span>DEFENSE EQUITIES &amp; SPACE WEATHER</span>
+            </div>
+            <button class="market-drawer-close" onclick="toggleDefenseMarketPanel(false)" title="Close panel">✕</button>
+          </div>
+          <div class="market-drawer-body">
+            <!-- BREADTH CARD -->
+            <div class="market-section-card breadth-card">
+              <div class="market-section-label">BREADTH</div>
+              <div class="breadth-ratio-row">
+                <span class="breadth-ratio-highlight" id="marketBreadthRatio">17▲ / 11▼</span>
+                <span class="breadth-ratio-total" id="marketBreadthTotal">of 28</span>
+              </div>
+              <div class="breadth-movers-row">
+                <span class="mover-up" id="marketMoverUp">▲ Corn +4.17%</span>
+                <span class="mover-down" id="marketMoverDown">▼ PLTR -4.49%</span>
+              </div>
+            </div>
+
+            <!-- SPACE WEATHER CARD -->
+            <div class="market-section-card space-weather-card">
+              <div class="market-section-label">SPACE WEATHER</div>
+              <div class="space-weather-main">
+                <span class="kp-badge" id="spaceWeatherKpBadge">Kp 0 — Quiet</span>
+              </div>
+              <div class="space-flare-sub">
+                Latest flare: <span class="flare-val" id="spaceWeatherFlareVal">M1.0</span> · HF Propagation Nominal
+              </div>
+            </div>
+
+            <!-- SECTOR / OVERVIEW TABS -->
+            <div class="market-section-card sector-card">
+              <div class="market-tabs-row" id="marketTabsRow">
+                <div class="market-tab-item" data-sector="overview" onclick="switchDefenseSector('overview', this)"><span class="tab-name">AI OVERVIEW</span></div>
+                <div class="market-tab-item" data-sector="indices" onclick="switchDefenseSector('indices', this)"><span class="tab-name">INDICES</span> <span class="tab-cnt">5</span></div>
+                <div class="market-tab-item active-sector active" data-sector="defense" onclick="switchDefenseSector('defense', this)"><span class="tab-name">DEFENSE</span> <span class="tab-cnt">7</span></div>
+                <div class="market-tab-item" data-sector="energy" onclick="switchDefenseSector('energy', this)"><span class="tab-name">ENERGY</span> <span class="tab-cnt">3</span></div>
+                <div class="market-tab-item" data-sector="commodities" onclick="switchDefenseSector('commodities', this)"><span class="tab-name">COMMODITIES</span> <span class="tab-cnt">5</span></div>
+                <div class="market-tab-item" data-sector="crypto" onclick="switchDefenseSector('crypto', this)"><span class="tab-name">CRYPTO</span> <span class="tab-cnt">4</span></div>
+                <div class="market-tab-item" data-sector="fx" onclick="switchDefenseSector('fx', this)"><span class="tab-name">FX</span> <span class="tab-cnt">4</span></div>
+              </div>
+              <div class="market-session-status">
+                <span class="session-badge" id="marketSessionBadge">SESSION CLOSED</span>
+                <span class="session-preset" id="marketSessionPreset">DEFAULT</span>
+              </div>
+            </div>
+
+            <!-- DEFENSE QUOTES LIST -->
+            <div class="market-quotes-container">
+              <div class="market-quotes-header">
+                <span id="marketBasketTitle">DEFENSE &amp; AEROSPACE BASKET</span>
+                <span class="quotes-update-time" id="marketUpdateTime">REAL-TIME FEED</span>
+              </div>
+              <div class="market-quotes-list" id="defenseQuotesList">
+                <div class="quote-row">
+                  <div class="quote-ticker-wrap">
+                    <span class="quote-ticker">RTX</span>
+                    <span class="quote-corp">RTX Corporation / Raytheon</span>
+                  </div>
+                  <div class="quote-price-wrap">
+                    <span class="quote-price">200.79</span>
+                    <span class="quote-change down">-0.66%</span>
+                  </div>
+                </div>
+                <div class="quote-row">
+                  <div class="quote-ticker-wrap">
+                    <span class="quote-ticker">LMT</span>
+                    <span class="quote-corp">Lockheed Martin Corp</span>
+                  </div>
+                  <div class="quote-price-wrap">
+                    <span class="quote-price">525.28</span>
+                    <span class="quote-change down">-1.44%</span>
+                  </div>
+                </div>
+                <div class="quote-row">
+                  <div class="quote-ticker-wrap">
+                    <span class="quote-ticker">NOC</span>
+                    <span class="quote-corp">Northrop Grumman Corp</span>
+                  </div>
+                  <div class="quote-price-wrap">
+                    <span class="quote-price">514.98</span>
+                    <span class="quote-change down">-2.51%</span>
+                  </div>
+                </div>
+                <div class="quote-row">
+                  <div class="quote-ticker-wrap">
+                    <span class="quote-ticker">GD</span>
+                    <span class="quote-corp">General Dynamics Corp</span>
+                  </div>
+                  <div class="quote-price-wrap">
+                    <span class="quote-price">359.39</span>
+                    <span class="quote-change down">-1.77%</span>
+                  </div>
+                </div>
+                <div class="quote-row">
+                  <div class="quote-ticker-wrap">
+                    <span class="quote-ticker">BA</span>
+                    <span class="quote-corp">The Boeing Company</span>
+                  </div>
+                  <div class="quote-price-wrap">
+                    <span class="quote-price">212.25</span>
+                    <span class="quote-change up">+0.83%</span>
+                  </div>
+                </div>
+                <div class="quote-row">
+                  <div class="quote-ticker-wrap">
+                    <span class="quote-ticker">LHX</span>
+                    <span class="quote-corp">L3Harris Technologies</span>
+                  </div>
+                  <div class="quote-price-wrap">
+                    <span class="quote-price">256.45</span>
+                    <span class="quote-change down">-2.17%</span>
+                  </div>
+                </div>
+                <div class="quote-row">
+                  <div class="quote-ticker-wrap">
+                    <span class="quote-ticker">PLTR</span>
+                    <span class="quote-corp">Palantir Technologies</span>
+                  </div>
+                  <div class="quote-price-wrap">
+                    <span class="quote-price">174.33</span>
+                    <span class="quote-change down">-4.49%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ── Focused Module Overlay Panel ───────────────────────────────────── -->
@@ -282,6 +593,59 @@
           </div>
           <div class="overlay-content">
 
+            <!-- Live Feeds Broadcast Panel -->
+            <div class="panel overlay-panel" id="liveFeedsPanel" data-panel-title="Live Broadcast Feeds" style="display:none">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <span class="module-icon">📺</span>
+                  <span>FEEDS · LIVE SATELLITE &amp; BROADCAST</span>
+                  <span class="panel-badge" id="feedsLiveBadge">11 LIVE</span>
+                </div>
+                <div class="panel-meta">FREE BALKAN &amp; GLOBAL CHANNELS</div>
+              </div>
+
+              <!-- Active Video Player Frame -->
+              <div class="live-feed-player-card">
+                <div class="feed-player-header">
+                  <div class="feed-player-title">
+                    <span class="feed-pulse-dot">●</span>
+                    <span id="activeFeedName">Bloomberg TV</span>
+                    <span class="feed-player-loc" id="activeFeedLoc">New York, US</span>
+                  </div>
+                  <div class="feed-player-badges">
+                    <span class="badge-live-stream">LIVE STREAM</span>
+                    <a id="feedExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="feed-ext-btn" title="Open feed in browser tab">↗</a>
+                  </div>
+                </div>
+                <div class="feed-video-wrap">
+                  <iframe id="liveFeedVideoFrame" class="live-feed-iframe" src="" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+                  <div class="feed-video-fallback" id="feedVideoFallback" style="display:none; position:absolute; inset:0; background:rgba(2,6,23,0.95); z-index:10; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px; text-align:center;">
+                    <span style="font-size:24px;">📡</span>
+                    <span style="font-weight:700; color:#f8fafc; font-size:12px;" id="fallbackChannelTitle">Live Broadcast Feed</span>
+                    <p style="font-size:11px; color:#94a3b8; max-width:280px; margin:0;">Direct player embedding restricted by broadcaster security policies. Launch official high-definition live stream directly:</p>
+                    <a id="fallbackExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-xs btn-primary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none; padding:6px 12px; font-weight:700; margin-top:4px;">
+                      ↗ Watch Official Live Stream
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Custom Video / Stream URL Connect Row -->
+              <div class="feed-custom-connect-row" style="display:flex; gap:6px; margin: 0 14px 10px; align-items:center;">
+                <input type="text" id="feedCustomStreamInput" class="input-field" placeholder="Enter custom YouTube / HLS / MP4 live stream URL..." style="flex:1; font-size:11px; padding:6px 8px;">
+                <button type="button" class="btn-xs btn-primary" onclick="connectCustomFeedStream()" style="white-space:nowrap; padding:6px 10px; font-weight:700;">CONNECT</button>
+              </div>
+
+              <!-- Region & Channel Selector -->
+              <div class="feed-region-tabs">
+                <button class="filter-btn active" id="tabFeedsAll" onclick="switchFeedRegion('all', this)">🌐 ALL FEEDS</button>
+                <button class="filter-btn" id="tabFeedsBalkans" onclick="switchFeedRegion('balkans', this)">🇽🇰 BALKANS (FREE)</button>
+                <button class="filter-btn" id="tabFeedsGlobal" onclick="switchFeedRegion('global', this)">🇺🇸 US / GLOBAL</button>
+              </div>
+
+              <!-- Channels List -->
+              <div class="feed-channels-grid" id="feedChannelsGrid"></div>
+            </div>
 
             <!-- News Panel -->
             <div class="panel overlay-panel" id="newsPanel" data-panel-title="News Intelligence" style="display:none">
@@ -360,10 +724,13 @@
               </div>
               <div class="panel-filter-row aviation-filter-row" id="aviationFilterRow">
                 <button class="filter-btn active" data-category="all" onclick="filterAviation('all', this)">ALL <span class="aviation-pill-count" id="countAll">0</span></button>
+                <button class="filter-btn military-kfor-btn" data-category="kfor" onclick="filterAviation('kfor', this)">🛡️ KFOR / NATO <span class="aviation-pill-count" id="countKfor">0</span></button>
+                <button class="filter-btn military-rotary-btn" data-category="rotary" onclick="filterAviation('rotary', this)">🚁 HELICOPTERS <span class="aviation-pill-count" id="countRotary">0</span></button>
+                <button class="filter-btn military-uav-btn" data-category="uav" onclick="filterAviation('uav', this)">🛩️ UAV / RECON <span class="aviation-pill-count" id="countUav">0</span></button>
+                <button class="filter-btn" data-category="military" onclick="filterAviation('military', this)">MILITARY <span class="aviation-pill-count" id="countMilitary">0</span></button>
                 <button class="filter-btn" data-category="commercial" onclick="filterAviation('commercial', this)">COMMERCIAL <span class="aviation-pill-count" id="countCommercial">0</span></button>
                 <button class="filter-btn" data-category="private" onclick="filterAviation('private', this)">PRIVATE <span class="aviation-pill-count" id="countPrivate">0</span></button>
                 <button class="filter-btn" data-category="private_jet" onclick="filterAviation('private_jet', this)">PRIVATE JETS <span class="aviation-pill-count" id="countPrivateJets">0</span></button>
-                <button class="filter-btn" data-category="military" onclick="filterAviation('military', this)">MILITARY <span class="aviation-pill-count" id="countMilitary">0</span></button>
                 <button class="filter-btn" data-category="unknown" onclick="filterAviation('unknown', this)">UNKNOWN <span class="aviation-pill-count" id="countUnknown">0</span></button>
               </div>
               <div class="aviation-list" id="aviationList"></div>
@@ -564,6 +931,359 @@
                   <label class="setting-label">Map View</label>
                   <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide Map</button>
                 </div>
+
+                <!-- ══════════════════════════════════════════════════════════
+                     STYLE STUDIO — LIVE UI TOKENS & PRESETS
+                     ══════════════════════════════════════════════════════════ -->
+                <div class="style-studio-box">
+                  <div class="style-studio-heading-wrap">
+                    <div class="style-studio-title">Style Studio</div>
+                    <div class="style-studio-sub">Live UI tokens</div>
+                  </div>
+
+                  <!-- Presets -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Preset</div>
+                    <div class="studio-presets-row">
+                      <button type="button" class="studio-preset-btn active" data-preset="HORUS" onclick="StyleStudio.applyPreset('HORUS')">HORUS</button>
+                      <button type="button" class="studio-preset-btn" data-preset="PHANTOM" onclick="StyleStudio.applyPreset('PHANTOM')">PHANTOM</button>
+                      <button type="button" class="studio-preset-btn" data-preset="TERMINAL" onclick="StyleStudio.applyPreset('TERMINAL')">TERMINAL</button>
+                      <button type="button" class="studio-preset-btn" data-preset="CRIMSON" onclick="StyleStudio.applyPreset('CRIMSON')">CRIMSON</button>
+                      <button type="button" class="studio-preset-btn" data-preset="ARCTIC" onclick="StyleStudio.applyPreset('ARCTIC')">ARCTIC</button>
+                      <button type="button" class="studio-preset-btn" data-preset="BLACKOUT" onclick="StyleStudio.applyPreset('BLACKOUT')">BLACKOUT</button>
+                    </div>
+                  </div>
+
+                  <!-- Accent -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Accent</div>
+                    <div class="studio-row">
+                      <span class="studio-label">Primary</span>
+                      <div class="studio-color-picker-wrap">
+                        <input type="color" id="studioAccentPrimary" value="#d4af37" onchange="StyleStudio.setToken('accentPrimary', this.value)">
+                        <span class="studio-hex-tag" id="codeAccentPrimary">#d4af37</span>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Secondary</span>
+                      <div class="studio-color-picker-wrap">
+                        <input type="color" id="studioAccentSecondary" value="#00e5ff" onchange="StyleStudio.setToken('accentSecondary', this.value)">
+                        <span class="studio-hex-tag" id="codeAccentSecondary">#00e5ff</span>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Glow</span>
+                      <div class="studio-pills-row" id="glowOptionsGroup">
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('0%')">0%</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('15%')">15%</button>
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setGlow('30%')">30%</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('50%')">50%</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('80%')">80%</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Signal -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Signal</div>
+                    <div class="studio-grid-2">
+                      <div class="studio-row">
+                        <span class="studio-label">Critical</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSignalCritical" value="#ff3d3d" onchange="StyleStudio.setToken('signalCritical', this.value)">
+                          <span class="studio-hex-tag" id="codeSignalCritical">#ff3d3d</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Warning</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSignalWarning" value="#ff9500" onchange="StyleStudio.setToken('signalWarning', this.value)">
+                          <span class="studio-hex-tag" id="codeSignalWarning">#ff9500</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Nominal</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSignalNominal" value="#00e676" onchange="StyleStudio.setToken('signalNominal', this.value)">
+                          <span class="studio-hex-tag" id="codeSignalNominal">#00e676</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Info</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSignalInfo" value="#448aff" onchange="StyleStudio.setToken('signalInfo', this.value)">
+                          <span class="studio-hex-tag" id="codeSignalInfo">#448aff</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Map controls -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Map controls</div>
+                    <div class="studio-row">
+                      <span class="studio-label">Pan/zoom pad</span>
+                      <div class="studio-toggle-pair" id="panZoomPadToggle">
+                        <button type="button" class="studio-toggle-opt" id="btnPanZoomOn" onclick="StyleStudio.setPanZoomPad(true)">ON</button>
+                        <button type="button" class="studio-toggle-opt active" id="btnPanZoomOff" onclick="StyleStudio.setPanZoomPad(false)">OFF</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Map layers -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Map layers</div>
+                    
+                    <div class="studio-subheading">Cameras</div>
+                    <div class="studio-row">
+                      <span class="studio-label">Dots &amp; labels</span>
+                      <div class="studio-color-picker-wrap">
+                        <input type="color" id="studioLayerCameras" value="#00e676" onchange="StyleStudio.setLayerColor('cameras', this.value)">
+                        <span class="studio-hex-tag" id="codeLayerCameras">#00e676</span>
+                      </div>
+                    </div>
+
+                    <div class="studio-subheading" style="margin-top:8px;">Satellites</div>
+                    <div class="studio-caption-note">Default keeps each satellite's own mission colour. Change one and it takes over that whole category.</div>
+                    <div class="studio-grid-2">
+                      <div class="studio-row">
+                        <span class="studio-label">Comms</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSatComms" value="#00e676" onchange="StyleStudio.setLayerColor('satComms', this.value)">
+                          <span class="studio-hex-tag" id="codeSatComms">#00e676</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Military</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSatMilitary" value="#ff3d3d" onchange="StyleStudio.setLayerColor('satMilitary', this.value)">
+                          <span class="studio-hex-tag" id="codeSatMilitary">#ff3d3d</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Navigation</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSatNav" value="#448aff" onchange="StyleStudio.setLayerColor('satNav', this.value)">
+                          <span class="studio-hex-tag" id="codeSatNav">#448aff</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Earth obs</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSatEarth" value="#90ee90" onchange="StyleStudio.setLayerColor('satEarth', this.value)">
+                          <span class="studio-hex-tag" id="codeSatEarth">#90ee90</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Science</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSatScience" value="#ffd700" onchange="StyleStudio.setLayerColor('satScience', this.value)">
+                          <span class="studio-hex-tag" id="codeSatScience">#ffd700</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Other</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSatOther" value="#00e5ff" onchange="StyleStudio.setLayerColor('satOther', this.value)">
+                          <span class="studio-hex-tag" id="codeSatOther">#00e5ff</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="studio-subheading" style="margin-top:8px;">Aircraft</div>
+                    <div class="studio-grid-2">
+                      <div class="studio-row">
+                        <span class="studio-label">Civil</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioPlaneCivil" value="#00e5ff" onchange="StyleStudio.setLayerColor('planeCivil', this.value)">
+                          <span class="studio-hex-tag" id="codePlaneCivil">#00e5ff</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Private</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioPlanePrivate" value="#ffd700" onchange="StyleStudio.setLayerColor('planePrivate', this.value)">
+                          <span class="studio-hex-tag" id="codePlanePrivate">#ffd700</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Government</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioPlaneGov" value="#ff9500" onchange="StyleStudio.setLayerColor('planeGov', this.value)">
+                          <span class="studio-hex-tag" id="codePlaneGov">#ff9500</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Military</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioPlaneMil" value="#ff0000" onchange="StyleStudio.setLayerColor('planeMil', this.value)">
+                          <span class="studio-hex-tag" id="codePlaneMil">#ff0000</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Unknown</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioPlaneUnknown" value="#546e7a" onchange="StyleStudio.setLayerColor('planeUnknown', this.value)">
+                          <span class="studio-hex-tag" id="codePlaneUnknown">#546e7a</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Surface -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Surface</div>
+                    <div class="studio-row">
+                      <span class="studio-label">Background</span>
+                      <div class="studio-color-picker-wrap">
+                        <input type="color" id="studioSurfaceBg" value="#04040a" onchange="StyleStudio.setToken('surfaceBg', this.value)">
+                        <span class="studio-hex-tag" id="codeSurfaceBg">#04040a</span>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Panel</span>
+                      <div class="studio-pills-row" id="panelOptionsGroup">
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setPanelOpacity('70%')">70%</button>
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setPanelOpacity('88%')">88%</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setPanelOpacity('95%')">95%</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setPanelOpacity('100%')">100%</button>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Border</span>
+                      <div class="studio-pills-row" id="borderOptionsGroup">
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBorderOpacity('8%')">8%</button>
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setBorderOpacity('15%')">15%</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBorderOpacity('25%')">25%</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBorderOpacity('40%')">40%</button>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Blur</span>
+                      <div class="studio-pills-row" id="blurOptionsGroup">
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setBlur('AUTO')">AUTO</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBlur('OFF')">OFF</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBlur('HIGH')">HIGH</button>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Radius</span>
+                      <div class="studio-pills-row" id="radiusOptionsGroup">
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setRadius('0.50x')">0.50x</button>
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setRadius('1.00x')">1.00x</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setRadius('1.50x')">1.50x</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Text -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Text</div>
+                    <div class="studio-grid-2">
+                      <div class="studio-row">
+                        <span class="studio-label">Primary</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioTextPrimary" value="#e8e6e0" onchange="StyleStudio.setToken('textPrimary', this.value)">
+                          <span class="studio-hex-tag" id="codeTextPrimary">#e8e6e0</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Secondary</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioTextSecondary" value="#9b978e" onchange="StyleStudio.setToken('textSecondary', this.value)">
+                          <span class="studio-hex-tag" id="codeTextSecondary">#9b978e</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Muted</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioTextMuted" value="#5c5a54" onchange="StyleStudio.setToken('textMuted', this.value)">
+                          <span class="studio-hex-tag" id="codeTextMuted">#5c5a54</span>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Heading</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioTextHeading" value="#f5f0e0" onchange="StyleStudio.setToken('textHeading', this.value)">
+                          <span class="studio-hex-tag" id="codeTextHeading">#f5f0e0</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Typography -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Typography</div>
+                    <div class="studio-row">
+                      <span class="studio-label">UI font</span>
+                      <div class="studio-pills-row" id="uiFontGroup">
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setFont('ui', 'INTER')">INTER</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('ui', 'MONO')">MONO</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('ui', 'SYSTEM')">SYSTEM</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('ui', 'SERIF')">SERIF</button>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Mono font</span>
+                      <div class="studio-pills-row" id="monoFontGroup">
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setFont('mono', 'JETBRAINS')">JETBRAINS</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('mono', 'COURIER')">COURIER</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('mono', 'CONSOLAS')">CONSOLAS</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('mono', 'INTER')">INTER</button>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Tracking</span>
+                      <div class="studio-pills-row" id="trackingGroup">
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setTracking('AUTO')">AUTO</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setTracking('TIGHT')">TIGHT</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setTracking('WIDE')">WIDE</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Motion & FX -->
+                  <div class="studio-section">
+                    <div class="studio-section-label">Motion &amp; FX</div>
+                    <div class="studio-row">
+                      <span class="studio-label">Speed</span>
+                      <div class="studio-pills-row" id="speedGroup">
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setSpeed('0.50x')">0.50x</button>
+                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setSpeed('1.00x')">1.00x</button>
+                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setSpeed('1.50x')">1.50x</button>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Scanlines</span>
+                      <div class="studio-toggle-pair" id="scanlinesToggle">
+                        <button type="button" class="studio-toggle-opt active" id="btnScanlinesOff" onclick="StyleStudio.toggleFx('scanlines', false)">off</button>
+                        <button type="button" class="studio-toggle-opt" id="btnScanlinesOn" onclick="StyleStudio.toggleFx('scanlines', true)">on</button>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Grain</span>
+                      <div class="studio-toggle-pair" id="grainToggle">
+                        <button type="button" class="studio-toggle-opt active" id="btnGrainOff" onclick="StyleStudio.toggleFx('grain', false)">off</button>
+                        <button type="button" class="studio-toggle-opt" id="btnGrainOn" onclick="StyleStudio.toggleFx('grain', true)">on</button>
+                      </div>
+                    </div>
+                    <div class="studio-row">
+                      <span class="studio-label">Vignette</span>
+                      <div class="studio-toggle-pair" id="vignetteToggle">
+                        <button type="button" class="studio-toggle-opt active" id="btnVignetteOff" onclick="StyleStudio.toggleFx('vignette', false)">off</button>
+                        <button type="button" class="studio-toggle-opt" id="btnVignetteOn" onclick="StyleStudio.toggleFx('vignette', true)">on</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Studio Footer Notice & Reset -->
+                  <div class="studio-footer-note">
+                    Saved to this browser. AUTO leaves the app's own styling alone, and presets do not touch the map layers — those carry meaning, not just a look. Reset restores the active theme.
+                  </div>
+                  <div class="studio-reset-action">
+                    <button type="button" class="btn-xs btn-secondary" onclick="StyleStudio.resetActiveTheme()">🔄 Reset restores the active theme</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -667,12 +1387,27 @@
         <button id="cctvRawFeed" class="cctv-action-btn" style="flex: 1;">RAW FEED</button>
         <button id="cctvMapTargetBtn" class="cctv-action-btn" style="flex: 1;">MAP TARGET</button>
       </div>
+      <div class="cctv-custom-connect-row" style="display:flex; gap:6px; margin-top:8px; align-items:center;">
+        <input type="text" id="cctvCustomStreamInput" class="input-field" placeholder="Enter custom RTSP / HLS / Video stream URL..." style="flex:1; font-size:11px; padding:6px 8px;">
+        <button type="button" class="btn-xs btn-primary" onclick="connectCustomCCTVStream()" style="white-space:nowrap; padding:6px 10px; font-weight:700;">CONNECT</button>
+      </div>
     </div>
   </div>
 </main>
 
-<!-- ── Live Alert Ticker Bar ────────────────────────────────────────────── -->
+<!-- ── OSIRIS AI Inspired Bottom Telemetry & Live Alert Ticker Bar ─────────── -->
 <div class="live-alert-ticker-bar" id="liveAlertTickerBar">
+  <div class="telemetry-cursor-cluster" id="telemetryCursorCluster">
+    <span class="telemetry-label">CURSOR</span>
+    <span class="telemetry-data coords" id="telemetryCursor">42.6629, 21.1655</span>
+    <span class="telemetry-sep">·</span>
+    <span class="telemetry-label">LOCATION</span>
+    <span class="telemetry-data loc" id="telemetryLocation">Kosovo</span>
+    <span class="telemetry-sep">·</span>
+    <span class="telemetry-label">ZOOM</span>
+    <span class="telemetry-data zoom" id="telemetryZoom">8.2</span>
+  </div>
+
   <div class="ticker-prefix">
     <span class="ticker-pulse">●</span> LIVE ALERTS
   </div>
@@ -680,6 +1415,10 @@
     <div class="ticker-track" id="liveAlertTickerTrack">
       <span class="ticker-item-placeholder">INITIALIZING KOSINT REAL-TIME INTELLIGENCE ALERTS...</span>
     </div>
+  </div>
+
+  <div class="telemetry-footer-right">
+    <span class="telemetry-online-badge">● ONLINE</span>
   </div>
 </div>
 
@@ -844,6 +1583,11 @@
     </form>
   </div>
 </div>
+
+<!-- Style Studio FX Screen Overlays -->
+<div id="styleStudioScanlines" class="style-studio-scanlines" style="display:none;" aria-hidden="true"></div>
+<div id="styleStudioGrain" class="style-studio-grain" style="display:none;" aria-hidden="true"></div>
+<div id="styleStudioVignette" class="style-studio-vignette" style="display:none;" aria-hidden="true"></div>
 
 <script type="module" src="app.js?v=2.6.2"></script>
 </body>

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "nodemon server/index.js",
+    "test": "node tests/osiris-3d-aviation.test.js",
     "user:create": "node server/cli/create-user.js"
   },
   "dependencies": {

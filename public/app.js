@@ -490,6 +490,9 @@ const moduleLayers = {
     clear: () => {
       clearMarkerList(moduleLayers.aviation.markers);
       closeMapPopup();
+      if (state.map && typeof state.map.getSource === 'function' && state.map.getSource('aviation-flight-trails-source')) {
+        state.map.getSource('aviation-flight-trails-source').setData({ type: 'FeatureCollection', features: [] });
+      }
     }
   },
   telegram: {
@@ -545,7 +548,7 @@ function clearAllModuleLayers() {
   Object.keys(moduleLayers).forEach(mod => {
     // Preserve persistent tactical layers (earthquake, radiation, mines, weather, aqi, msr)
     if (['earthquake', 'radiation', 'mines', 'weather', 'aqi', 'msr'].includes(mod)) return;
-    if (mod === 'border' && $('toggleLayerBorder')?.checked) return;
+    if (mod === 'border' && typeof $ === 'function' && $('toggleLayerBorder')?.checked) return;
     try {
       moduleLayers[mod].clear();
     } catch (e) {
@@ -812,9 +815,17 @@ function setupCCTVPanelButtons() {
 
 function startClock() {
   const update = () => {
-    $('clockDisplay').textContent = new Date().toLocaleString('en-IN', {
-      hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short', hour12: false,
-    });
+    const now = new Date();
+    const clockEl = $('clockDisplay');
+    if (clockEl) {
+      clockEl.textContent = now.toLocaleString('en-IN', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short', hour12: false,
+      });
+    }
+    const zuluEl = $('zuluTimeDisplay');
+    if (zuluEl) {
+      zuluEl.textContent = now.toISOString().slice(11, 19) + 'Z';
+    }
   };
   update(); setInterval(update, 1000);
 }
@@ -888,6 +899,7 @@ async function fetchAndRender(location, timeline, forceRefresh = false) {
   fetchTelegram(forceRefresh);
   fetchBorder(forceRefresh);
   updateMap(data);
+  updateOsirisTelemetry(data);
   loadAlertHistory();
 }
 
@@ -3214,14 +3226,53 @@ function getAircraftCategoryColor(cat) {
 
 function createAircraftMarkerElement(aircraft) {
   const el = document.createElement('div');
-  el.className = `aircraft-marker-el aircraft-marker-${aircraft.category || 'unknown'}`;
-  const rot = typeof aircraft.heading === 'number' ? aircraft.heading : 0;
+  const cat = aircraft.category || 'unknown';
+  const isKfor = !!aircraft.isKfor;
+  const isMilitarySpecial = !!aircraft.isSpecialMilitary;
+  const isHelo = aircraft.militaryRole === 'rotary' || aircraft.subType === 'helicopter';
+  const isUav = aircraft.militaryRole === 'uav' || aircraft.subType === 'uav';
 
-  el.innerHTML = `
-    <svg class="aircraft-icon-svg" viewBox="0 0 24 24" style="transform: rotate(${rot}deg);">
-      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-    </svg>
-  `;
+  let markerClasses = `aircraft-marker-el aircraft-marker-${cat}`;
+  if (isKfor) markerClasses += ' kfor-asset pulse-kfor';
+  else if (isMilitarySpecial) markerClasses += ' military-special';
+  el.className = markerClasses;
+
+  const rot = typeof aircraft.heading === 'number' ? aircraft.heading : 0;
+  const iconColor = isKfor ? '#fbbf24' : (cat === 'military' ? '#ef4444' : getAircraftCategoryColor(cat));
+
+  if (isHelo) {
+    el.innerHTML = `
+      <svg class="aircraft-icon-svg" viewBox="0 0 24 24" style="transform: rotate(${rot}deg);" fill="${iconColor}">
+        <!-- Tactical Military Helicopter -->
+        <circle cx="12" cy="12" r="10.5" stroke="${iconColor}" stroke-dasharray="3 2" class="helicopter-rotor-spin" fill="none" opacity="0.6"/>
+        <path d="M12 4v4m0 8v4M4 12h16" stroke="${iconColor}" stroke-width="1.2" class="helicopter-rotor-spin" opacity="0.8"/>
+        <ellipse cx="12" cy="12" rx="3.8" ry="6.5" fill="${iconColor}" opacity="0.95"/>
+        <path d="M11 18.5h2v4.5h-2z" fill="${iconColor}"/>
+        <path d="M8 23h8v1H8z" fill="${iconColor}"/>
+      </svg>
+    `;
+  } else if (isUav) {
+    el.innerHTML = `
+      <svg class="aircraft-icon-svg" viewBox="0 0 24 24" style="transform: rotate(${rot}deg);" fill="${iconColor}">
+        <!-- Tactical Recon Drone / UAV -->
+        <path d="M12 2l1.5 5 8.5 2.5v1.5l-8.5-1v7l3.5 3.5v1.5l-4.5-1.5-4.5 1.5v-1.5l3.5-3.5v-7l-8.5 1v-1.5l8.5-2.5 1.5-5z" fill="${iconColor}"/>
+      </svg>
+    `;
+  } else if (cat === 'military') {
+    el.innerHTML = `
+      <svg class="aircraft-icon-svg" viewBox="0 0 24 24" style="transform: rotate(${rot}deg);" fill="${iconColor}">
+        <!-- Fast Jet / Fighter / Military Delta -->
+        <path d="M12 1.5L14 9l7 4.5v2l-7-2v5.5l2.5 2v1.5L12 21l-4.5 1.5v-1.5l2.5-2v-5.5l-7 2v-2l7-4.5 2-7.5z" fill="${iconColor}"/>
+      </svg>
+    `;
+  } else {
+    el.innerHTML = `
+      <svg class="aircraft-icon-svg" viewBox="0 0 24 24" style="transform: rotate(${rot}deg);" fill="${iconColor}">
+        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="${iconColor}"/>
+      </svg>
+    `;
+  }
+
   return el;
 }
 
@@ -3235,15 +3286,78 @@ function renderAviationMapMarkers(aviationData) {
 
   const data = aviationData || state.data?.aviation;
   if (!data || data.status !== 'LIVE_DATA' || !Array.isArray(data.aircraft)) {
+    if (state.map && state.map.getSource('aviation-flight-trails-source')) {
+      state.map.getSource('aviation-flight-trails-source').setData({ type: 'FeatureCollection', features: [] });
+    }
     updateMapBadgeAndMeta();
     return;
   }
 
+  state.aviationTrails = state.aviationTrails || new Map();
+
+  const currentFilter = state.aviationFilter || 'all';
   const filtered = data.aircraft.filter(ac => {
     if (typeof ac.latitude !== 'number' || typeof ac.longitude !== 'number') return false;
-    if (state.aviationFilter === 'all') return true;
-    return ac.category === state.aviationFilter;
+    if (currentFilter === 'all') return true;
+    if (currentFilter === 'kfor') return !!ac.isKfor || (ac.callsign && (ac.callsign.includes('KFOR') || ac.callsign.includes('NATO')));
+    if (currentFilter === 'rotary') return ac.militaryRole === 'rotary' || ac.subType === 'helicopter';
+    if (currentFilter === 'uav') return ac.militaryRole === 'uav' || ac.subType === 'uav' || ac.militaryRole === 'recon';
+    return ac.category === currentFilter;
   });
+
+  // Maintain Flight Trails Buffer
+  const trailFeatures = [];
+  data.aircraft.forEach(ac => {
+    if (typeof ac.latitude !== 'number' || typeof ac.longitude !== 'number') return;
+    const key = (ac.icao24 || '').toLowerCase();
+    if (!key) return;
+
+    let trail = state.aviationTrails.get(key) || [];
+    const last = trail[trail.length - 1];
+    if (!last || last[0] !== ac.longitude || last[1] !== ac.latitude) {
+      trail.push([ac.longitude, ac.latitude, ac.altitude || 0, Date.now()]);
+      if (trail.length > 25) trail.shift();
+      state.aviationTrails.set(key, trail);
+    }
+
+    // Synthesize historical flight vector if trail has only 1 point but heading and speed are present
+    if (trail.length === 1 && typeof ac.heading === 'number' && typeof ac.speedKts === 'number' && ac.speedKts > 20) {
+      const rad = (ac.heading + 180) * (Math.PI / 180);
+      const distDeg = (ac.speedKts * 0.0005) * 0.12; // ~5-10nm back
+      const prevLon = ac.longitude + distDeg * Math.sin(rad);
+      const prevLat = ac.latitude + distDeg * Math.cos(rad);
+      trail.unshift([prevLon, prevLat, ac.altitude || 0, Date.now() - 30000]);
+      state.aviationTrails.set(key, trail);
+    }
+  });
+
+  // Build GeoJSON features for filtered trails
+  filtered.forEach(ac => {
+    const key = (ac.icao24 || '').toLowerCase();
+    const trail = state.aviationTrails.get(key);
+    if (trail && trail.length >= 2) {
+      trailFeatures.push({
+        type: 'Feature',
+        properties: {
+          icao24: ac.icao24,
+          isMilitary: ac.category === 'military',
+          isSpecialMilitary: !!ac.isSpecialMilitary,
+          isKfor: !!ac.isKfor
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: trail.map(pt => [pt[0], pt[1]])
+        }
+      });
+    }
+  });
+
+  if (state.map.getSource('aviation-flight-trails-source')) {
+    state.map.getSource('aviation-flight-trails-source').setData({
+      type: 'FeatureCollection',
+      features: trailFeatures
+    });
+  }
 
   filtered.forEach(ac => {
     const el = createAircraftMarkerElement(ac);
@@ -3251,19 +3365,22 @@ function renderAviationMapMarkers(aviationData) {
     const altStr = ac.altitudeFt ? `${ac.altitudeFt.toLocaleString()} ft` : (ac.altitude ? `${ac.altitude} m` : 'N/A');
     const spdStr = ac.speedKts ? `${ac.speedKts} kts` : (ac.speed ? `${ac.speed} km/h` : 'N/A');
     const hdgStr = ac.heading !== null ? `${ac.heading}°` : 'N/A';
-    const typeStr = ac.aircraftDesc || ac.aircraftType || 'N/A';
+    const typeStr = ac.aircraftDesc || ac.aircraftType || (ac.subType ? ac.subType.toUpperCase() : 'N/A');
     const callsignStr = ac.callsign || ac.icao24.toUpperCase();
 
     const icao = (ac.icao24 || '').trim().toLowerCase();
     const callsign = (ac.callsign || '').trim();
     const adsbUrl = icao ? `https://globe.adsbexchange.com/?icao=${icao}` : (callsign ? `https://globe.adsbexchange.com/?callsign=${encodeURIComponent(callsign)}` : null);
 
+    const badgeText = ac.isKfor ? 'KFOR NATO ASSET' : (ac.militaryRole ? `MILITARY ${ac.militaryRole.toUpperCase()}` : ac.category.replace(/_/g, ' ').toUpperCase());
+    const badgeColor = ac.isKfor ? '#fbbf24' : catColor;
+
     const popupHtml = buildMapPopupHtml({
-      icon: '✈️',
+      icon: ac.isKfor ? '🛡️' : (ac.militaryRole === 'rotary' ? '🚁' : (ac.militaryRole === 'uav' ? '🛩️' : '✈️')),
       title: callsignStr,
       subtitle: ac.registration ? `Reg: ${ac.registration}` : (ac.operator || 'Aircraft In Flight'),
       source: 'OpenSky Network',
-      badge: { text: ac.category.replace(/_/g, ' ').toUpperCase(), color: catColor },
+      badge: { text: badgeText, color: badgeColor },
       primary: {
         val: callsignStr,
         sub: `ICAO: ${ac.icao24.toUpperCase()}`,
@@ -3303,6 +3420,9 @@ function renderAviation(aviationData) {
   const countPrivateJets = $('countPrivateJets');
   const countMilitary = $('countMilitary');
   const countUnknown = $('countUnknown');
+  const countKfor = $('countKfor');
+  const countRotary = $('countRotary');
+  const countUav = $('countUav');
 
   if (!list) return;
 
@@ -3362,11 +3482,17 @@ function renderAviation(aviationData) {
   if (countPrivateJets) countPrivateJets.textContent = summary.privateJets;
   if (countMilitary) countMilitary.textContent = summary.military;
   if (countUnknown) countUnknown.textContent = summary.unknown;
+  if (countKfor) countKfor.textContent = summary.kforCount || 0;
+  if (countRotary) countRotary.textContent = summary.militaryHeloCount || 0;
+  if (countUav) countUav.textContent = summary.uavCount || 0;
 
   // Filter aircraft for display
   const currentFilter = state.aviationFilter || 'all';
   const filtered = aircraftList.filter(ac => {
     if (currentFilter === 'all') return true;
+    if (currentFilter === 'kfor') return !!ac.isKfor || (ac.callsign && (ac.callsign.includes('KFOR') || ac.callsign.includes('NATO')));
+    if (currentFilter === 'rotary') return ac.militaryRole === 'rotary' || ac.subType === 'helicopter';
+    if (currentFilter === 'uav') return ac.militaryRole === 'uav' || ac.subType === 'uav' || ac.militaryRole === 'recon';
     return ac.category === currentFilter;
   });
 
@@ -3382,7 +3508,7 @@ function renderAviation(aviationData) {
       const callsign = ac.callsign || 'N/A';
       const icao = ac.icao24.toUpperCase();
       const cat = ac.category || 'unknown';
-      const catLabel = cat.toUpperCase().replace('_', ' ');
+      const catLabel = ac.isKfor ? 'KFOR NATO' : (ac.militaryRole ? `MIL ${ac.militaryRole.toUpperCase()}` : cat.toUpperCase().replace('_', ' '));
       const alt = ac.altitudeFt ? `${ac.altitudeFt.toLocaleString()} ft` : (ac.altitude ? `${ac.altitude} m` : 'N/A');
       const spd = ac.speedKts ? `${ac.speedKts} kts` : (ac.speed ? `${ac.speed} km/h` : 'N/A');
       const hdg = ac.heading !== null ? `${ac.heading}°` : 'N/A';
@@ -3392,7 +3518,7 @@ function renderAviation(aviationData) {
       const time = formatTimeAgo(ac.timestamp);
 
       return `
-        <div class="aviation-item cat-${cat}" onclick="centerMapOnAircraft(${ac.latitude}, ${ac.longitude}, '${ac.icao24}')">
+        <div class="aviation-item cat-${cat} ${ac.isKfor ? 'kfor-highlight' : ''}" onclick="centerMapOnAircraft(${ac.latitude}, ${ac.longitude}, '${ac.icao24}')">
           <div class="aviation-item-header">
             <div>
               <span class="aviation-callsign">${escHtml(callsign)}</span>
@@ -3607,6 +3733,7 @@ function toggleModule(panelId) {
     'telegramPanel': 'telegram',
     'borderPanel': 'border',
     'cctvIntelligencePanel': 'cctv',
+    'liveFeedsPanel': 'feeds',
     'routePanel': 'route',
     'alertPanel': 'alert',
     'settingsPanel': 'settings',
@@ -3696,6 +3823,9 @@ function toggleModule(panelId) {
     } else if (targetModule === 'mines') {
       renderMinefieldsList();
       toggleMinefieldsLayer(true);
+    } else if (targetModule === 'feeds') {
+      renderLiveFeeds();
+      switchFeedChannel(currentActiveFeedId);
     }
   }
 
@@ -4294,6 +4424,8 @@ function initMap() {
     }
 
     initTacticalLayers(state.map);
+    initOSIRISLayersAndControls(state.map);
+    initDrawingTools(state.map);
   });
 
   state.map.on('zoomend', () => {
@@ -4324,6 +4456,392 @@ function initMap() {
 
   setTimeout(() => { if (state.map) state.map.resize(); }, 200);
 }
+
+/* ── OSIRIS AI Map Layers & 3D / Solar / Controls ─────────────────────────── */
+
+function computeSolarTerminator() {
+  const now = new Date();
+  const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  const dayOfYear = Math.floor((now - startOfYear) / 86400000);
+  const declination = -23.44 * Math.cos((2 * Math.PI / 365.25) * (dayOfYear + 10)) * (Math.PI / 180);
+  const nowHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
+  const gha = (nowHours * 15) - 180; // approx subsolar longitude
+
+  const coords = [];
+  for (let lon = -180; lon <= 180; lon += 5) {
+    const hourAngle = (lon - gha) * (Math.PI / 180);
+    const tanLat = -Math.cos(hourAngle) / Math.tan(declination);
+    let lat = Math.atan(tanLat) * (180 / Math.PI);
+    lat = Math.max(-84, Math.min(84, lat));
+    coords.push([lon, lat]);
+  }
+
+  // Close polygon over the dark pole (clamped to 84 degrees for mercator safety)
+  if (declination >= 0) {
+    coords.push([180, -84], [-180, -84]);
+  } else {
+    coords.push([180, 84], [-180, 84]);
+  }
+  coords.push(coords[0]);
+
+  return {
+    type: 'FeatureCollection',
+    features: [{
+      type: 'Feature',
+      properties: { type: 'solar-terminator' },
+      geometry: { type: 'Polygon', coordinates: [coords] }
+    }]
+  };
+}
+
+function updateDayNightTerminator() {
+  if (!state.map) return;
+  const src = state.map.getSource('daynight-terminator-source');
+  if (src) {
+    try {
+      src.setData(computeSolarTerminator());
+    } catch (e) {
+      console.warn('[solar] Terminator update error:', e);
+    }
+  }
+}
+
+function updateOsirisScaleBar() {
+  const el = $('osirisScaleText');
+  if (!el || !state.map) return;
+  const zoom = state.map.getZoom() || 8;
+  const mPerPixel = 156543.03392 * Math.cos(42.6 * Math.PI / 180) / Math.pow(2, zoom);
+  const barPixels = 32;
+  const distKm = Math.round((mPerPixel * barPixels) / 1000);
+  el.textContent = distKm >= 1 ? `${distKm} km` : `${Math.round(mPerPixel * barPixels)} m`;
+}
+
+function initOSIRISLayersAndControls(map) {
+  if (!map) return;
+
+  // 1. 3D Terrain DEM Elevation Source
+  if (!map.getSource('terrain-dem')) {
+    map.addSource('terrain-dem', {
+      type: 'raster-dem',
+      tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+      encoding: 'terrarium',
+      tileSize: 256,
+      maxzoom: 15
+    });
+  }
+
+  // 2. 3D Building Extrusions Layer
+  if (!map.getLayer('3d-buildings') && map.getSource('openmaptiles')) {
+    map.addLayer({
+      id: '3d-buildings',
+      source: 'openmaptiles',
+      'source-layer': 'building',
+      type: 'fill-extrusion',
+      minzoom: 13,
+      layout: { visibility: 'visible' },
+      paint: {
+        'fill-extrusion-color': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          13, '#101827',
+          16, '#182438'
+        ],
+        'fill-extrusion-height': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          13, 0,
+          14.5, ['case', ['has', 'render_height'], ['get', 'render_height'], ['has', 'height'], ['get', 'height'], 12]
+        ],
+        'fill-extrusion-base': [
+          'case',
+          ['has', 'render_min_height'], ['get', 'render_min_height'],
+          ['has', 'min_height'], ['get', 'min_height'],
+          0
+        ],
+        'fill-extrusion-opacity': 0.82
+      }
+    });
+  }
+
+  // 3. Aviation Flight Trails GeoJSON LineString Layer
+  if (!map.getSource('aviation-flight-trails-source')) {
+    map.addSource('aviation-flight-trails-source', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
+    });
+  }
+  if (!map.getLayer('aviation-flight-trails-layer')) {
+    map.addLayer({
+      id: 'aviation-flight-trails-layer',
+      type: 'line',
+      source: 'aviation-flight-trails-source',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': [
+          'case',
+          ['get', 'isSpecialMilitary'], '#fbbf24',
+          ['get', 'isMilitary'], '#ef4444',
+          '#38bdf8'
+        ],
+        'line-width': ['case', ['get', 'isSpecialMilitary'], 3.2, 2],
+        'line-opacity': 0.8,
+        'line-dasharray': [2, 1]
+      }
+    });
+  }
+
+  // 4. Solar Day / Night Terminator Polygon Layer
+  if (!map.getSource('daynight-terminator-source')) {
+    map.addSource('daynight-terminator-source', {
+      type: 'geojson',
+      data: computeSolarTerminator()
+    });
+  }
+  if (!map.getLayer('daynight-terminator-layer')) {
+    map.addLayer({
+      id: 'daynight-terminator-layer',
+      type: 'fill',
+      source: 'daynight-terminator-source',
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-color': '#020617',
+        'fill-opacity': 0.55
+      }
+    });
+  }
+
+  // 4b. Tactical Full Atmosphere Night Shading Layer
+  if (!map.getSource('night-atmosphere-source')) {
+    map.addSource('night-atmosphere-source', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[-180, -84], [180, -84], [180, 84], [-180, 84], [-180, -84]]]
+          },
+          properties: {}
+        }]
+      }
+    });
+  }
+  if (!map.getLayer('tactical-night-atmosphere')) {
+    map.addLayer({
+      id: 'tactical-night-atmosphere',
+      type: 'fill',
+      source: 'night-atmosphere-source',
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-color': '#020617',
+        'fill-opacity': 0.45
+      }
+    });
+  }
+
+  // 5. Interactive Cursor & Zoom Telemetry
+  map.on('mousemove', (e) => {
+    const cursorEl = $('telemetryCursor');
+    if (cursorEl) {
+      cursorEl.textContent = `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`;
+    }
+  });
+
+  map.on('zoom', () => {
+    const zoomEl = $('telemetryZoom');
+    if (zoomEl && state.map) {
+      zoomEl.textContent = state.map.getZoom().toFixed(1);
+    }
+    updateOsirisScaleBar();
+  });
+
+  updateOsirisScaleBar();
+}
+
+window.toggle3DView = function(enable3D) {
+  state.is3D = enable3D;
+  const btn3D = $('btnOsiris3D');
+  const btn2D = $('btnOsiris2D');
+  if (btn3D && btn2D) {
+    btn3D.classList.toggle('active', enable3D);
+    btn2D.classList.toggle('active', !enable3D);
+  }
+  if (!state.map) return;
+
+  if (enable3D) {
+    try {
+      if (state.map.getSource('terrain-dem')) {
+        state.map.setTerrain({ source: 'terrain-dem', exaggeration: 1.6 });
+      }
+      state.map.easeTo({ pitch: 58, bearing: -12, duration: 1000 });
+      if (state.map.getLayer('3d-buildings')) {
+        state.map.setLayoutProperty('3d-buildings', 'visibility', 'visible');
+      }
+    } catch (e) {
+      console.warn('[3d] Terrain elevation activation error:', e);
+    }
+  } else {
+    try {
+      state.map.setTerrain(null);
+      state.map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+      if (state.map.getLayer('3d-buildings')) {
+        state.map.setLayoutProperty('3d-buildings', 'visibility', 'none');
+      }
+    } catch (e) {
+      console.warn('[3d] Terrain deactivation error:', e);
+    }
+  }
+};
+
+window.switchOsirisBasemap = function(type) {
+  state.basemapType = type;
+  const btnMap = $('btnOsirisMap');
+  const btnSat = $('btnOsirisSat');
+  if (btnMap && btnSat) {
+    btnMap.classList.toggle('active', type === 'map');
+    btnSat.classList.toggle('active', type === 'satellite');
+  }
+  if (!state.map) return;
+
+  if (state.map.getLayer('satellite-basemap')) {
+    state.map.setLayoutProperty('satellite-basemap', 'visibility', type === 'satellite' ? 'visible' : 'none');
+  }
+};
+
+window.resetMapNorth = function() {
+  if (!state.map) return;
+  state.map.easeTo({ bearing: 0, pitch: state.is3D ? 58 : 0, duration: 600 });
+};
+
+window.toggleTerrainElevation = function() {
+  if (!state.map) return;
+  const hasTerrain = !!state.map.getTerrain();
+  toggle3DView(!hasTerrain);
+};
+
+state.dayNightActive = false;
+window.toggleDayNightCycle = function(force) {
+  if (!state.map) return;
+  const btn = $('btnToggleDayNightCycle');
+  state.dayNightActive = force !== undefined ? Boolean(force) : !state.dayNightActive;
+  if (btn) btn.classList.toggle('active', state.dayNightActive);
+
+  const icon = $('osirisDayNightIcon');
+  const label = $('osirisDayNightLabel');
+  if (icon) icon.textContent = state.dayNightActive ? '🌙' : '☀️';
+  if (label) label.textContent = state.dayNightActive ? 'NIGHT' : 'DAY';
+
+  if (state.map.getLayer('daynight-terminator-layer')) {
+    state.map.setLayoutProperty('daynight-terminator-layer', 'visibility', state.dayNightActive ? 'visible' : 'none');
+  }
+  if (state.map.getLayer('tactical-night-atmosphere')) {
+    state.map.setLayoutProperty('tactical-night-atmosphere', 'visibility', state.dayNightActive ? 'visible' : 'none');
+  }
+
+  const solarChip = $('solarFluxVal');
+  if (solarChip) {
+    solarChip.textContent = state.dayNightActive ? 'NIGHT (Kp0)' : 'DAY (Kp1)';
+  }
+};
+
+window.focusKosovoBounds = function() {
+  if (!state.map) return;
+  state.map.fitBounds([[20.0, 41.85], [21.8, 43.25]], {
+    padding: { top: 60, bottom: 60, left: 80, right: 60 },
+    duration: 1000
+  });
+};
+
+window.toggleFullScreenMode = function() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => console.warn(err));
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+  }
+};
+
+window.connectCustomCCTVStream = function() {
+  const input = $('cctvCustomStreamInput');
+  if (!input || !input.value.trim()) return;
+  const url = input.value.trim();
+
+  const titleEl = $('cctvName');
+  if (titleEl) titleEl.textContent = 'CUSTOM TACTICAL STREAM';
+
+  const feedType = $('cctvFeedType');
+  if (feedType) feedType.textContent = 'IP / RTSP / HLS';
+
+  const feedStatus = $('cctvFeedStatus');
+  if (feedStatus) feedStatus.textContent = 'CONNECTING...';
+
+  const iframe = $('cctvVideoFrame');
+  const unavail = $('cctvVideoUnavailable');
+
+  if (iframe) {
+    iframe.src = url;
+    iframe.style.display = 'block';
+  }
+  if (unavail) unavail.style.display = 'none';
+
+  const panel = $('cctvIntelligencePanel');
+  if (panel) panel.style.display = 'flex';
+};
+
+function updateOsirisTelemetry(data) {
+  let activeLayers = 0;
+  if (state.tacticalLayers) {
+    Object.values(state.tacticalLayers).forEach(v => { if (v) activeLayers++; });
+  }
+  if (state.activeMapModule) activeLayers++;
+  const layersEl = $('telemetryActiveLayers');
+  if (layersEl) layersEl.textContent = activeLayers;
+
+  let entities = 0;
+  if (data) {
+    if (data.news?.articles) entities += data.news.articles.length;
+    if (data.aviation?.count) entities += data.aviation.count;
+    if (data.wildfire?.count) entities += data.wildfire.count;
+    if (data.earthquakes?.count) entities += data.earthquakes.count;
+    if (data.radiation?.stations) entities += data.radiation.stations.length;
+    if (data.traffic?.incidents) entities += data.traffic.incidents.length;
+  }
+  entities += 13; // 13 border crossings
+  entities += 16; // 16 strategic cctv points
+  const entEl = $('telemetryEntityCount');
+  if (entEl) entEl.textContent = entities.toLocaleString();
+
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const isDaylight = utcHours >= 4 && utcHours <= 18;
+  const solarEl = $('solarFluxVal');
+  if (solarEl) {
+    solarEl.textContent = isDaylight ? 'Kp1 · +34°' : 'Kp0 · NIGHT';
+  }
+}
+
+// Global hotkeys (F for fullscreen, R for reset north, 3 for 3D, 2 for 2D)
+document.addEventListener('keydown', (e) => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return;
+  if (e.key === 'f' || e.key === 'F') {
+    toggleFullScreenMode();
+  } else if (e.key === 'r' || e.key === 'R') {
+    resetMapNorth();
+  } else if (e.key === '3') {
+    toggle3DView(true);
+  } else if (e.key === '2') {
+    toggle3DView(false);
+  }
+});
+
+window.initOSIRISLayersAndControls = initOSIRISLayersAndControls;
+window.updateOsirisTelemetry = updateOsirisTelemetry;
+window.updateOsirisScaleBar = updateOsirisScaleBar;
 
 // ─── Tactical Operational Zones (KFOR Sectors, Strategic Corridors, Mines) ───
 let tacticalKforMarkers = [];
@@ -5554,7 +6072,8 @@ function renderLiveAlertTicker(alerts = []) {
 
 function renderAlertLog(alerts = []) {
   const cleanAlerts = (alerts || []).filter(a => a.module !== 'wildfire' && a.category !== 'wildfire');
-  renderLiveAlertTicker(cleanAlerts);
+  alerts = cleanAlerts;
+  renderLiveAlertTicker(alerts);
 
   const log = $('alertLog');
   const badge = $('unreadBadge');
@@ -7746,3 +8265,1583 @@ window.renderMinefieldsList = renderMinefieldsList;
 window.filterMinefieldsList = filterMinefieldsList;
 window.focusMinefield = focusMinefield;
 window.checkMineProximityCurrentMap = checkMineProximityCurrentMap;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   OSIRIS EXTENSIONS: DEFENSE EQUITIES, LIVE FEEDS & DRAWING TOOLS
+   ───────────────────────────────────────────────────────────────────────────── */
+
+// 1. DEFENSE EQUITIES, MARKET BREADTH & SPACE WEATHER PANEL
+const SECTOR_MARKET_DATA = {
+  defense: {
+    title: 'DEFENSE & AEROSPACE BASKET',
+    session: 'SESSION CLOSED',
+    preset: 'EQUITIES',
+    breadth: '2▲ / 5▼',
+    total: 'of 7',
+    topUp: '▲ BA +0.83%',
+    topDown: '▼ PLTR -4.49%',
+    quotes: [
+      { ticker: 'RTX', corp: 'RTX Corporation / Raytheon', price: '200.79', change: '-0.66%', isUp: false },
+      { ticker: 'LMT', corp: 'Lockheed Martin Corp', price: '525.28', change: '-1.44%', isUp: false },
+      { ticker: 'NOC', corp: 'Northrop Grumman Corp', price: '514.98', change: '-2.51%', isUp: false },
+      { ticker: 'GD', corp: 'General Dynamics Corp', price: '359.39', change: '-1.77%', isUp: false },
+      { ticker: 'BA', corp: 'The Boeing Company', price: '212.25', change: '+0.83%', isUp: true },
+      { ticker: 'LHX', corp: 'L3Harris Technologies', price: '256.45', change: '-2.17%', isUp: false },
+      { ticker: 'PLTR', corp: 'Palantir Technologies (Defense AI)', price: '174.33', change: '-4.49%', isUp: false }
+    ]
+  },
+  crypto: {
+    title: 'CRYPTO ASSETS & TACTICAL LIQUIDITY',
+    session: '24/7 ACTIVE',
+    preset: 'REAL-TIME SPOT',
+    breadth: '3▲ / 1▼',
+    total: 'of 4',
+    topUp: '▲ BTC +2.84%',
+    topDown: '▼ SOL -1.15%',
+    quotes: [
+      { ticker: 'BTC', corp: 'Bitcoin / Digital Gold', price: '$87,420.00', change: '+2.84%', isUp: true },
+      { ticker: 'ETH', corp: 'Ethereum Network', price: '$3,140.50', change: '+1.92%', isUp: true },
+      { ticker: 'SOL', corp: 'Solana High-Throughput', price: '$198.30', change: '-1.15%', isUp: false },
+      { ticker: 'USDT', corp: 'Tether USD (Operational Standoff)', price: '$1.0002', change: '+0.01%', isUp: true }
+    ]
+  },
+  indices: {
+    title: 'GLOBAL BENCHMARK INDICES',
+    session: 'SESSION CLOSED',
+    preset: 'CASH CLOSE',
+    breadth: '4▲ / 1▼',
+    total: 'of 5',
+    topUp: '▲ NASDAQ +1.18%',
+    topDown: '▼ DAX -0.24%',
+    quotes: [
+      { ticker: 'S&P 500', corp: 'Standard & Poor\'s 500', price: '5,864.67', change: '+0.74%', isUp: true },
+      { ticker: 'NASDAQ', corp: 'Nasdaq Composite Index', price: '18,518.61', change: '+1.18%', isUp: true },
+      { ticker: 'DOW', corp: 'Dow Jones Industrial Average', price: '42,863.86', change: '+0.52%', isUp: true },
+      { ticker: 'DAX', corp: 'DAX Performance-Index (Germany)', price: '19,373.83', change: '-0.24%', isUp: false },
+      { ticker: 'BELEX15', corp: 'Belgrade Stock Exchange 15 (Regional)', price: '1,128.40', change: '+0.15%', isUp: true }
+    ]
+  },
+  energy: {
+    title: 'STRATEGIC ENERGY & CRUDE OIL',
+    session: 'TRADING OPEN',
+    preset: 'NYMEX / ICE',
+    breadth: '2▲ / 1▼',
+    total: 'of 3',
+    topUp: '▲ BRENT +1.82%',
+    topDown: '▼ NAT GAS -0.95%',
+    quotes: [
+      { ticker: 'BRENT', corp: 'Brent Crude Oil (North Sea)', price: '$78.42 / bbl', change: '+1.82%', isUp: true },
+      { ticker: 'WTI', corp: 'Crude Oil WTI Light Sweet', price: '$74.15 / bbl', change: '+1.45%', isUp: true },
+      { ticker: 'NG', corp: 'Natural Gas Henry Hub', price: '$2.38 / MMBtu', change: '-0.95%', isUp: false }
+    ]
+  },
+  commodities: {
+    title: 'TACTICAL METALS & STRATEGIC GRAINS',
+    session: 'TRADING OPEN',
+    preset: 'COMEX / CBOT',
+    breadth: '4▲ / 1▼',
+    total: 'of 5',
+    topUp: '▲ CORN +4.17%',
+    topDown: '▼ COPPER -0.62%',
+    quotes: [
+      { ticker: 'GOLD', corp: 'Gold Bullion Spot (XAU/USD)', price: '$2,735.80 / oz', change: '+0.95%', isUp: true },
+      { ticker: 'SILVER', corp: 'Silver Spot (XAG/USD)', price: '$33.65 / oz', change: '+1.42%', isUp: true },
+      { ticker: 'CORN', corp: 'Corn Futures (CBOT Grain)', price: '$448.25', change: '+4.17%', isUp: true },
+      { ticker: 'WHEAT', corp: 'Wheat Futures (Chicago SRW)', price: '$582.00', change: '+1.10%', isUp: true },
+      { ticker: 'COPPER', corp: 'High Grade Copper (Critical Metal)', price: '$4.38 / lb', change: '-0.62%', isUp: false }
+    ]
+  },
+  fx: {
+    title: 'FOREIGN EXCHANGE & REGIONAL RESERVES',
+    session: '24/5 FX SPOT',
+    preset: 'GLOBAL INTERBANK',
+    breadth: '2▲ / 2▼',
+    total: 'of 4',
+    topUp: '▲ USD/CHF +0.38%',
+    topDown: '▼ EUR/USD -0.31%',
+    quotes: [
+      { ticker: 'EUR/USD', corp: 'Euro / US Dollar', price: '1.0842', change: '-0.31%', isUp: false },
+      { ticker: 'USD/RSD', corp: 'US Dollar / Serbian Dinar', price: '109.85', change: '+0.25%', isUp: true },
+      { ticker: 'EUR/RSD', corp: 'Euro / Serbian Dinar', price: '117.15', change: '+0.02%', isUp: true },
+      { ticker: 'USD/CHF', corp: 'US Dollar / Swiss Franc', price: '0.8654', change: '+0.38%', isUp: true }
+    ]
+  },
+  overview: {
+    title: 'MACRO INTELLIGENCE & SENTIMENT OVERVIEW',
+    session: 'AI SYNTHESIS ACTIVE',
+    preset: 'OSIRIS AI INTEL',
+    breadth: '17▲ / 11▼',
+    total: 'of 28',
+    topUp: '▲ Corn +4.17%',
+    topDown: '▼ PLTR -4.49%',
+    quotes: [
+      { ticker: 'DEFENSE', corp: 'Aerospace & Defense Composite Index', price: '1,492.10', change: '-1.85%', isUp: false },
+      { ticker: 'ENERGY', corp: 'Global Energy Risk Index', price: '488.30', change: '+1.62%', isUp: true },
+      { ticker: 'CRYPTO', corp: 'Digital Reserve Basket (BTC/ETH)', price: '$64,280.00', change: '+2.45%', isUp: true },
+      { ticker: 'METALS', corp: 'Strategic Rare Earth & Precious Metals', price: '$2,890.40', change: '+1.15%', isUp: true },
+      { ticker: 'BALKAN RISK', corp: 'KOSINT Regional Security Volatility', price: '24.2', change: '-0.80%', isUp: false }
+    ]
+  }
+};
+
+let currentDefenseSector = 'defense';
+
+function toggleDefenseMarketPanel(show) {
+  const panel = $('defenseMarketPanel');
+  const btn = $('btnDefenseMarkets');
+  if (!panel) return;
+  const isCurrentlyOpen = panel.style.display !== 'none';
+  const shouldOpen = show !== undefined ? Boolean(show) : !isCurrentlyOpen;
+  panel.style.display = shouldOpen ? 'flex' : 'none';
+  if (btn) btn.classList.toggle('active', shouldOpen);
+}
+
+function switchDefenseSector(sectorKey, tabEl) {
+  currentDefenseSector = sectorKey;
+  const data = SECTOR_MARKET_DATA[sectorKey] || SECTOR_MARKET_DATA.defense;
+
+  // Update tabs active state
+  document.querySelectorAll('.market-tab-item').forEach(t => {
+    t.classList.remove('active-sector', 'active');
+  });
+  if (tabEl) {
+    tabEl.classList.add('active-sector', 'active');
+  } else {
+    const el = document.querySelector(`.market-tab-item[data-sector="${sectorKey}"]`);
+    if (el) el.classList.add('active-sector', 'active');
+  }
+
+  // Update header and status
+  const titleEl = $('marketBasketTitle');
+  if (titleEl) titleEl.textContent = data.title;
+
+  const badgeEl = $('marketSessionBadge');
+  if (badgeEl) badgeEl.textContent = data.session;
+
+  const presetEl = $('marketSessionPreset');
+  if (presetEl) presetEl.textContent = data.preset;
+
+  const breadthRatioEl = $('marketBreadthRatio');
+  if (breadthRatioEl) breadthRatioEl.textContent = data.breadth;
+
+  const breadthTotalEl = $('marketBreadthTotal');
+  if (breadthTotalEl) breadthTotalEl.textContent = data.total;
+
+  const moverUpEl = $('marketMoverUp');
+  if (moverUpEl) moverUpEl.textContent = data.topUp;
+
+  const moverDownEl = $('marketMoverDown');
+  if (moverDownEl) moverDownEl.textContent = data.topDown;
+
+  const quotesList = $('defenseQuotesList');
+  if (quotesList) {
+    quotesList.innerHTML = data.quotes.map(q => `
+      <div class="quote-row">
+        <div class="quote-ticker-wrap">
+          <span class="quote-ticker">${q.ticker}</span>
+          <span class="quote-corp">${q.corp}</span>
+        </div>
+        <div class="quote-price-wrap">
+          <span class="quote-price">${q.price}</span>
+          <span class="quote-change ${q.isUp ? 'up' : 'down'}">${q.change}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+// 2. LIVE BROADCAST FEEDS (BALKANS & GLOBAL)
+const LIVE_FEEDS_CHANNELS = [
+  // Balkan Free Channels
+  {
+    id: 'aljazeera_balkans',
+    name: 'Al Jazeera Balkans',
+    location: 'Sarajevo, BA',
+    region: 'balkans',
+    icon: '📺',
+    tag: 'REGIONAL NEWS',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/bNyUyrR0PHo?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://balkans.aljazeera.net/live'
+  },
+  {
+    id: 'n1_info',
+    name: 'N1 Info Balkans',
+    location: 'Belgrade / Sarajevo / Zagreb',
+    region: 'balkans',
+    icon: '📡',
+    tag: 'CNN AFFILIATE',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/bNyUyrR0PHo?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://n1info.rs/live-tv/'
+  },
+  {
+    id: 'rts_svet',
+    name: 'RTS Svet / RTS Planeta',
+    location: 'Belgrade, RS',
+    region: 'balkans',
+    icon: '🇷🇸',
+    tag: 'PUBLIC BROADCASTER',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/bNyUyrR0PHo?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://www.rts.rs/rts/rts-uzivo.html'
+  },
+  {
+    id: 'rtk_live',
+    name: 'RTK 1 / RTK Live',
+    location: 'Prishtinë, XK',
+    region: 'balkans',
+    icon: '🇽🇰',
+    tag: 'PUBLIC BROADCASTER',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/bNyUyrR0PHo?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://www.rtklive.com/'
+  },
+  {
+    id: 'trt_balkan',
+    name: 'TRT Balkan',
+    location: 'Sarajevo / Skopje',
+    region: 'balkans',
+    icon: '📺',
+    tag: 'REGIONAL NEWS',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/s2P82L6jK1k?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://trtbalkan.com/'
+  },
+  {
+    id: 'euronews_serbia',
+    name: 'Euronews Serbia',
+    location: 'Belgrade, RS',
+    region: 'balkans',
+    icon: '🇪🇺',
+    tag: 'EUROPEAN NEWS',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/Lu_bQ2qB-1Y?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://www.euronews.rs/'
+  },
+
+  // US & Global Channels requested by user
+  {
+    id: 'bloomberg',
+    name: 'Bloomberg TV',
+    location: 'New York, US',
+    region: 'global',
+    icon: '📈',
+    tag: 'FINANCIAL / DEFENSE',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://www.bloomberg.com/live'
+  },
+  {
+    id: 'nbc_news_now',
+    name: 'NBC News NOW',
+    location: 'New York, US',
+    region: 'global',
+    icon: '🌐',
+    tag: '24/7 STREAMING',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/UKy3T_9g0F8?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://www.nbcnews.com/now'
+  },
+  {
+    id: 'cbs_news_247',
+    name: 'CBS News 24/7',
+    location: 'New York, US',
+    region: 'global',
+    icon: '👁️',
+    tag: 'NATIONAL & WORLD',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/gN0PZCe-5q0?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://www.cbsnews.com/live/'
+  },
+  {
+    id: 'abc_news_live',
+    name: 'ABC News Live',
+    location: 'New York, US',
+    region: 'global',
+    icon: '🔴',
+    tag: 'BREAKING NEWS',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/w_Ma8oQLmSM?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://abcnews.go.com/Live'
+  },
+  {
+    id: 'dw_news',
+    name: 'DW News Global 24/7',
+    location: 'Berlin, DE',
+    region: 'global',
+    icon: '🇩🇪',
+    tag: 'INTERNATIONAL NEWS',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/Lu_bQ2qB-1Y?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://www.dw.com/en/live-tv/s-100825'
+  },
+  {
+    id: 'c_span',
+    name: 'C-SPAN',
+    location: 'Washington DC, US',
+    region: 'global',
+    icon: '🏛️',
+    tag: 'PUBLIC AFFAIRS & CONGRESS',
+    badge: 'FREE',
+    embedUrl: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1&playsinline=1',
+    webUrl: 'https://www.c-span.org/'
+  }
+];
+
+let currentActiveFeedId = 'bloomberg';
+
+function formatFeedEmbedUrl(rawUrl) {
+  if (!rawUrl) return '';
+  let url = rawUrl.trim();
+  if (url.includes('youtube.com/watch?v=')) {
+    const vId = url.split('watch?v=')[1].split('&')[0];
+    return `https://www.youtube.com/embed/${vId}?autoplay=1&mute=1&playsinline=1&enablejsapi=1`;
+  }
+  if (url.includes('youtu.be/')) {
+    const vId = url.split('youtu.be/')[1].split('?')[0];
+    return `https://www.youtube.com/embed/${vId}?autoplay=1&mute=1&playsinline=1&enablejsapi=1`;
+  }
+  if (url.includes('youtube.com/embed') && !url.includes('autoplay=')) {
+    return url + (url.includes('?') ? '&' : '?') + 'autoplay=1&mute=1&playsinline=1&enablejsapi=1';
+  }
+  return url;
+}
+
+function renderLiveFeeds(region = 'all') {
+  const container = $('feedChannelsGrid');
+  if (!container) return;
+
+  const filtered = region === 'all'
+    ? LIVE_FEEDS_CHANNELS
+    : LIVE_FEEDS_CHANNELS.filter(c => c.region === region);
+
+  container.innerHTML = filtered.map(c => `
+    <div class="feed-card ${c.id === currentActiveFeedId ? 'active' : ''}" onclick="switchFeedChannel('${c.id}')" data-feed-id="${c.id}">
+      <div class="feed-card-info">
+        <span class="feed-card-icon">${c.icon}</span>
+        <div class="feed-card-meta">
+          <span class="feed-card-name">${c.name}</span>
+          <span class="feed-card-loc">${c.location}</span>
+        </div>
+      </div>
+      <div class="feed-card-tags">
+        <span class="feed-tag-badge">${c.tag}</span>
+        <span class="feed-badge-free">${c.badge}</span>
+      </div>
+    </div>
+  `).join('');
+
+  const activeBadge = $('feedsLiveBadge');
+  if (activeBadge) {
+    activeBadge.textContent = `${LIVE_FEEDS_CHANNELS.length} LIVE`;
+  }
+}
+
+function switchFeedRegion(region, btn) {
+  const tabs = document.querySelectorAll('.feed-region-tabs .filter-btn');
+  tabs.forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderLiveFeeds(region);
+}
+
+function switchFeedChannel(channelId) {
+  const channel = LIVE_FEEDS_CHANNELS.find(c => c.id === channelId);
+  if (!channel) return;
+  currentActiveFeedId = channelId;
+
+  const frame = $('liveFeedVideoFrame');
+  const nameEl = $('activeFeedName');
+  const locEl = $('activeFeedLoc');
+  const linkEl = $('feedExternalLink');
+  const fallback = $('feedVideoFallback');
+  const fallbackTitle = $('fallbackChannelTitle');
+  const fallbackLink = $('fallbackExternalLink');
+
+  if (nameEl) nameEl.textContent = channel.name;
+  if (locEl) locEl.textContent = channel.location;
+  if (linkEl) linkEl.href = channel.webUrl || channel.embedUrl || '#';
+  if (fallbackTitle) fallbackTitle.textContent = channel.name;
+  if (fallbackLink) fallbackLink.href = channel.webUrl || channel.embedUrl || '#';
+
+  if (frame) {
+    const finalUrl = formatFeedEmbedUrl(channel.embedUrl);
+    if (finalUrl) {
+      frame.src = finalUrl;
+      frame.style.display = 'block';
+      if (fallback) fallback.style.display = 'none';
+    } else {
+      frame.src = '';
+      frame.style.display = 'none';
+      if (fallback) fallback.style.display = 'flex';
+    }
+  }
+
+  document.querySelectorAll('.feed-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.feedId === channelId);
+  });
+}
+
+function connectCustomFeedStream() {
+  const input = $('feedCustomStreamInput');
+  if (!input || !input.value.trim()) return;
+  const rawUrl = input.value.trim();
+  const embedUrl = formatFeedEmbedUrl(rawUrl);
+
+  const frame = $('liveFeedVideoFrame');
+  const nameEl = $('activeFeedName');
+  const locEl = $('activeFeedLoc');
+  const linkEl = $('feedExternalLink');
+  const fallback = $('feedVideoFallback');
+
+  if (frame) {
+    frame.src = embedUrl;
+    frame.style.display = 'block';
+  }
+  if (fallback) fallback.style.display = 'none';
+  if (nameEl) nameEl.textContent = 'CUSTOM TACTICAL FEED';
+  if (locEl) locEl.textContent = 'USER STREAM';
+  if (linkEl) linkEl.href = rawUrl;
+}
+
+// 3. TACTICAL DRAWING TOOLS & AOI MEASUREMENT
+const drawingState = {
+  active: false,
+  mode: 'area',
+  points: [],
+  polygonCoords: null,
+  isDrawing: false,
+  trackedAreaKm2: 0,
+  perimeterKm: 0,
+  radiusKm: 0
+};
+
+let drawingListenersAttached = false;
+
+function initDrawingTools(map) {
+  if (!map || typeof map.getSource !== 'function') return;
+  try {
+    if (!map.getSource('drawing-source-polygon')) {
+      map.addSource('drawing-source-polygon', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+    }
+    if (!map.getSource('drawing-source-line')) {
+      map.addSource('drawing-source-line', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+    }
+    if (!map.getSource('drawing-source-points')) {
+      map.addSource('drawing-source-points', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+    }
+
+    if (!map.getLayer('drawing-layer-fill')) {
+      map.addLayer({
+        id: 'drawing-layer-fill',
+        type: 'fill',
+        source: 'drawing-source-polygon',
+        paint: {
+          'fill-color': '#00e5ff',
+          'fill-opacity': 0.18
+        }
+      });
+    }
+
+    if (!map.getLayer('drawing-layer-stroke')) {
+      map.addLayer({
+        id: 'drawing-layer-stroke',
+        type: 'line',
+        source: 'drawing-source-line',
+        paint: {
+          'line-color': '#00e5ff',
+          'line-width': 2.5,
+          'line-dasharray': [2, 1]
+        }
+      });
+    }
+
+    if (!map.getLayer('drawing-layer-points')) {
+      map.addLayer({
+        id: 'drawing-layer-points',
+        type: 'circle',
+        source: 'drawing-source-points',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#ffffff',
+          'circle-stroke-color': '#00e5ff',
+          'circle-stroke-width': 2
+        }
+      });
+    }
+
+    attachDrawingMapListeners(map);
+  } catch (err) {
+    console.warn('[drawing] Could not init drawing layers:', err);
+  }
+}
+
+function attachDrawingMapListeners(map) {
+  if (!map || drawingListenersAttached) return;
+  map.on('click', handleDrawingMapClick);
+  map.on('mousemove', handleDrawingMapMouseMove);
+  map.on('dblclick', handleDrawingMapDblClick);
+  drawingListenersAttached = true;
+}
+
+function toggleDrawingToolsWidget(show) {
+  const widget = $('drawingToolsWidget');
+  const btn = $('btnToggleDrawingTools');
+  if (!widget) return;
+  const isCurrentlyOpen = widget.style.display !== 'none';
+  const shouldOpen = show !== undefined ? Boolean(show) : !isCurrentlyOpen;
+
+  drawingState.active = shouldOpen;
+  widget.style.display = shouldOpen ? 'flex' : 'none';
+  if (btn) btn.classList.toggle('active', shouldOpen);
+
+  if (state.map && state.map.getCanvas()) {
+    state.map.getCanvas().style.cursor = shouldOpen ? 'crosshair' : '';
+  }
+
+  if (shouldOpen) {
+    setDrawingShape(drawingState.mode || 'area');
+    if (state.map) {
+      initDrawingTools(state.map);
+    }
+  }
+}
+
+function setDrawingShape(shape) {
+  drawingState.mode = shape;
+  drawingState.points = [];
+  drawingState.isDrawing = false;
+  drawingState.polygonCoords = null;
+
+  document.querySelectorAll('.drawing-shape-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = $(`btnShape${shape.charAt(0).toUpperCase() + shape.slice(1)}`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const btnComplete = $('btnDrawingComplete');
+  if (btnComplete) btnComplete.style.display = 'none';
+
+  const hint = $('drawingStatusHint');
+  if (hint) {
+    if (shape === 'area') {
+      hint.textContent = 'Click on map to place polygon vertices. Click first point, double-click, or click Complete Shape to close.';
+    } else if (shape === 'box') {
+      hint.textContent = 'Click 1st corner, move to opposite corner and click to lock rectangular box.';
+    } else if (shape === 'radius') {
+      hint.textContent = 'Click center point, then move and click to establish radial standoff circle.';
+    } else if (shape === 'path') {
+      hint.textContent = 'Click route waypoints to measure distance. Double-click or Complete Shape to finish.';
+    }
+  }
+}
+
+function handleDrawingMapClick(e) {
+  if (!drawingState.active) return;
+  const coord = [e.lngLat.lng, e.lngLat.lat];
+
+  if (drawingState.mode === 'area') {
+    if (drawingState.points.length >= 3) {
+      const first = drawingState.points[0];
+      const distKm = haversineDistanceKm(coord, first);
+      if (distKm < 1.5) {
+        finishCurrentShape();
+        return;
+      }
+    }
+    drawingState.points.push(coord);
+    drawingState.isDrawing = true;
+    updateDrawingSources();
+    const btnComplete = $('btnDrawingComplete');
+    if (btnComplete && drawingState.points.length >= 3) {
+      btnComplete.style.display = 'block';
+    }
+  } else if (drawingState.mode === 'box') {
+    if (!drawingState.isDrawing) {
+      drawingState.points = [coord];
+      drawingState.isDrawing = true;
+      const hint = $('drawingStatusHint');
+      if (hint) hint.textContent = 'Move cursor to opposite corner and click to seal rectangular AOI.';
+    } else {
+      const p1 = drawingState.points[0];
+      const p2 = coord;
+      const poly = [
+        [p1[0], p1[1]],
+        [p2[0], p1[1]],
+        [p2[0], p2[1]],
+        [p1[0], p2[1]],
+        [p1[0], p1[1]]
+      ];
+      drawingState.polygonCoords = poly;
+      drawingState.points = poly;
+      drawingState.isDrawing = false;
+      finishCurrentShape();
+    }
+  } else if (drawingState.mode === 'radius') {
+    if (!drawingState.isDrawing) {
+      drawingState.points = [coord];
+      drawingState.isDrawing = true;
+      const hint = $('drawingStatusHint');
+      if (hint) hint.textContent = 'Move cursor to desired standoff radius and click to lock circle.';
+    } else {
+      const center = drawingState.points[0];
+      const radiusKm = haversineDistanceKm(center, coord);
+      const circleCoords = createGeoJsonCircle(center, radiusKm);
+      drawingState.polygonCoords = circleCoords;
+      drawingState.points = circleCoords;
+      drawingState.radiusKm = radiusKm;
+      drawingState.isDrawing = false;
+      finishCurrentShape();
+    }
+  } else if (drawingState.mode === 'path') {
+    drawingState.points.push(coord);
+    drawingState.isDrawing = true;
+    updateDrawingSources();
+    const btnComplete = $('btnDrawingComplete');
+    if (btnComplete && drawingState.points.length >= 2) {
+      btnComplete.style.display = 'block';
+    }
+  }
+}
+
+function handleDrawingMapMouseMove(e) {
+  if (!drawingState.active || !drawingState.isDrawing) return;
+  const cursor = [e.lngLat.lng, e.lngLat.lat];
+
+  if (drawingState.mode === 'area') {
+    if (drawingState.points.length > 0) {
+      const previewLine = [...drawingState.points, cursor, drawingState.points[0]];
+      updateLineSource(previewLine);
+      const previewPoly = [...drawingState.points, cursor, drawingState.points[0]];
+      const area = calculatePolygonAreaKm2(previewPoly);
+      const perim = calculateLineDistanceKm(previewPoly);
+      updateMetricsDisplay(area, perim);
+    }
+  } else if (drawingState.mode === 'box') {
+    const p1 = drawingState.points[0];
+    const p2 = cursor;
+    const boxCoords = [
+      [p1[0], p1[1]],
+      [p2[0], p1[1]],
+      [p2[0], p2[1]],
+      [p1[0], p2[1]],
+      [p1[0], p1[1]]
+    ];
+    updatePolygonSource(boxCoords);
+    updateLineSource(boxCoords);
+    const area = calculatePolygonAreaKm2(boxCoords);
+    const perim = calculateLineDistanceKm(boxCoords);
+    updateMetricsDisplay(area, perim);
+  } else if (drawingState.mode === 'radius') {
+    const center = drawingState.points[0];
+    const radiusKm = haversineDistanceKm(center, cursor);
+    const circleCoords = createGeoJsonCircle(center, radiusKm);
+    updatePolygonSource(circleCoords);
+    updateLineSource(circleCoords);
+    const area = Math.PI * radiusKm * radiusKm;
+    const perim = 2 * Math.PI * radiusKm;
+    updateMetricsDisplay(area, perim);
+  } else if (drawingState.mode === 'path') {
+    if (drawingState.points.length > 0) {
+      const previewLine = [...drawingState.points, cursor];
+      updateLineSource(previewLine);
+      const perim = calculateLineDistanceKm(previewLine);
+      updateMetricsDisplay(0, perim);
+    }
+  }
+}
+
+function handleDrawingMapDblClick(e) {
+  if (!drawingState.active) return;
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  finishCurrentShape();
+}
+
+function finishCurrentShape() {
+  if (!drawingState.active) return;
+  drawingState.isDrawing = false;
+
+  let area = 0;
+  let perim = 0;
+  let poly = null;
+
+  if (drawingState.mode === 'area') {
+    if (drawingState.points.length < 3) return;
+    const pts = [...drawingState.points];
+    if (pts[0][0] !== pts[pts.length - 1][0] || pts[0][1] !== pts[pts.length - 1][1]) {
+      pts.push(pts[0]);
+    }
+    poly = pts;
+    area = calculatePolygonAreaKm2(poly);
+    perim = calculateLineDistanceKm(poly);
+  } else if (drawingState.mode === 'box' || drawingState.mode === 'radius') {
+    poly = drawingState.polygonCoords || drawingState.points;
+    if (poly && poly.length >= 3) {
+      area = calculatePolygonAreaKm2(poly);
+      perim = calculateLineDistanceKm(poly);
+    }
+  } else if (drawingState.mode === 'path') {
+    if (drawingState.points.length < 2) return;
+    area = 0;
+    perim = calculateLineDistanceKm(drawingState.points);
+    updateLineSource(drawingState.points);
+    updatePointsSource(drawingState.points);
+  }
+
+  if (poly && poly.length >= 3) {
+    drawingState.polygonCoords = poly;
+    updatePolygonSource(poly);
+    updateLineSource(poly);
+    updatePointsSource(poly);
+    checkEntitiesInAoi(poly);
+  }
+
+  drawingState.trackedAreaKm2 = area;
+  drawingState.perimeterKm = perim;
+  updateMetricsDisplay(area, perim);
+
+  const btnComplete = $('btnDrawingComplete');
+  if (btnComplete) btnComplete.style.display = 'none';
+
+  const hint = $('drawingStatusHint');
+  if (hint) {
+    hint.textContent = `AOI locked: ${area > 0 ? area.toFixed(2) + ' km² · ' : ''}${perim.toFixed(1)} km perimeter. Entities detected below.`;
+  }
+}
+
+function clearDrawnAoi() {
+  drawingState.points = [];
+  drawingState.polygonCoords = null;
+  drawingState.isDrawing = false;
+  drawingState.trackedAreaKm2 = 0;
+  drawingState.perimeterKm = 0;
+
+  updatePolygonSource([]);
+  updateLineSource([]);
+  updatePointsSource([]);
+  updateMetricsDisplay(0, 0);
+
+  const insideContainer = $('drawingInsideBox');
+  if (insideContainer) insideContainer.style.display = 'none';
+
+  const btnComplete = $('btnDrawingComplete');
+  if (btnComplete) btnComplete.style.display = 'none';
+
+  setDrawingShape(drawingState.mode);
+}
+
+function updateMetricsDisplay(areaKm2, perimKm) {
+  const areaEl = $('aoiTrackedArea');
+  const perimEl = $('aoiPerim');
+  if (areaEl) {
+    areaEl.textContent = `${Number(areaKm2 || 0).toFixed(1)} km²`;
+  }
+  if (perimEl) {
+    const aoiCount = (areaKm2 > 0 || perimKm > 0) ? 1 : 0;
+    perimEl.textContent = `${aoiCount} / ${Number(perimKm || 0).toFixed(1)} km`;
+  }
+}
+
+function updatePolygonSource(coords) {
+  if (!state.map || typeof state.map.getSource !== 'function') return;
+  const src = state.map.getSource('drawing-source-polygon');
+  if (!src) return;
+  const data = (coords && coords.length >= 3) ? {
+    type: 'FeatureCollection',
+    features: [{
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [coords] },
+      properties: {}
+    }]
+  } : { type: 'FeatureCollection', features: [] };
+  src.setData(data);
+}
+
+function updateLineSource(coords) {
+  if (!state.map || typeof state.map.getSource !== 'function') return;
+  const src = state.map.getSource('drawing-source-line');
+  if (!src) return;
+  const data = (coords && coords.length >= 2) ? {
+    type: 'FeatureCollection',
+    features: [{
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: coords },
+      properties: {}
+    }]
+  } : { type: 'FeatureCollection', features: [] };
+  src.setData(data);
+}
+
+function updatePointsSource(coords) {
+  if (!state.map || typeof state.map.getSource !== 'function') return;
+  const src = state.map.getSource('drawing-source-points');
+  if (!src) return;
+  const data = (coords && coords.length > 0) ? {
+    type: 'FeatureCollection',
+    features: coords.map((pt, idx) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: pt },
+      properties: { index: idx }
+    }))
+  } : { type: 'FeatureCollection', features: [] };
+  src.setData(data);
+}
+
+function updateDrawingSources() {
+  updateLineSource(drawingState.points);
+  updatePointsSource(drawingState.points);
+}
+
+function calculatePolygonAreaKm2(coords) {
+  if (!coords || coords.length < 3) return 0;
+  const rad = Math.PI / 180;
+  const R = 6371.0088;
+  let total = 0;
+  for (let i = 0; i < coords.length; i++) {
+    const p1 = coords[i];
+    const p2 = coords[(i + 1) % coords.length];
+    total += (p2[0] - p1[0]) * rad * (2 + Math.sin(p1[1] * rad) + Math.sin(p2[1] * rad));
+  }
+  return Math.abs(total * R * R / 2.0);
+}
+
+function haversineDistanceKm(coord1, coord2) {
+  if (!coord1 || !coord2) return 0;
+  const rad = Math.PI / 180;
+  const lat1 = coord1[1] * rad;
+  const lat2 = coord2[1] * rad;
+  const dLat = (coord2[1] - coord1[1]) * rad;
+  const dLon = (coord2[0] - coord1[0]) * rad;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1) * Math.cos(lat2) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return 6371.0088 * c;
+}
+
+function calculateLineDistanceKm(coords) {
+  if (!coords || coords.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    total += haversineDistanceKm(coords[i], coords[i + 1]);
+  }
+  return total;
+}
+
+function createGeoJsonCircle(center, radiusKm, points = 64) {
+  const coords = [];
+  const distanceX = radiusKm / (111.320 * Math.cos(center[1] * Math.PI / 180));
+  const distanceY = radiusKm / 110.574;
+  for (let i = 0; i < points; i++) {
+    const theta = (i / points) * (2 * Math.PI);
+    const x = distanceX * Math.cos(theta);
+    const y = distanceY * Math.sin(theta);
+    coords.push([center[0] + x, center[1] + y]);
+  }
+  coords.push(coords[0]);
+  return coords;
+}
+
+function pointInPolygon(point, polygon) {
+  if (!point || !polygon || polygon.length < 3) return false;
+  const x = point[0], y = point[1];
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function checkEntitiesInAoi(polygonCoords) {
+  const insideContainer = $('drawingInsideBox');
+  const insideList = $('drawingInsideList');
+  const countBadge = $('drawingInsideCount');
+  if (!insideContainer || !insideList) return;
+
+  if (!polygonCoords || polygonCoords.length < 3) {
+    insideContainer.style.display = 'none';
+    return;
+  }
+
+  const detected = [];
+
+  // 1. Aviation aircraft
+  if (state.data?.aviation?.states) {
+    state.data.aviation.states.forEach(plane => {
+      const lon = plane[5];
+      const lat = plane[6];
+      if (lon != null && lat != null && pointInPolygon([lon, lat], polygonCoords)) {
+        const cs = (plane[1] || plane[0] || 'Unknown').trim();
+        const alt = plane[7] != null ? `${Math.round(plane[7] * 3.28084)}ft` : 'N/A';
+        const isMil = typeof isMilitaryAircraft === 'function' ? isMilitaryAircraft(plane) : false;
+        detected.push({
+          type: 'aviation',
+          isMilitary: isMil,
+          icon: isMil ? '🛡️✈️' : '✈️',
+          title: `${cs} ${isMil ? '(MILITARY/KFOR)' : ''}`,
+          subtitle: `Alt: ${alt} · Spd: ${plane[9] ? Math.round(plane[9] * 1.94384) + 'kt' : 'N/A'}`
+        });
+      }
+    });
+  }
+
+  // 2. Border Checkpoints
+  const crossings = state.borderData?.crossings || [
+    { name: 'Jarinje (Leposavić / Raška)', lat: 43.2181, lon: 20.6975, waitEntry: 10, waitExit: 15 },
+    { name: 'Brnjak (Zubin Potok / Novi Pazar)', lat: 42.9644, lon: 20.5519, waitEntry: 5, waitExit: 10 },
+    { name: 'Merdare (Podujevo / Kuršumlija)', lat: 42.9431, lon: 21.2486, waitEntry: 15, waitExit: 20 },
+    { name: 'Mutivodë (Pristina / Medveđa)', lat: 42.7561, lon: 21.5033, waitEntry: 5, waitExit: 5 },
+    { name: 'Dheu i Bardhë (Gjilan / Bujanovac)', lat: 42.4744, lon: 21.6961, waitEntry: 20, waitExit: 25 },
+    { name: 'Vërmicë (Prizren / Morina)', lat: 42.1558, lon: 20.5489, waitEntry: 10, waitExit: 15 },
+    { name: 'Hani i Elezit (General Janković / Blace)', lat: 42.1469, lon: 21.2961, waitEntry: 15, waitExit: 25 }
+  ];
+  crossings.forEach(bc => {
+    const lat = bc.latitude || bc.lat;
+    const lon = bc.longitude || bc.lon;
+    if (lat != null && lon != null && pointInPolygon([lon, lat], polygonCoords)) {
+      detected.push({
+        type: 'border',
+        icon: '🛂',
+        title: bc.name || 'Border Crossing',
+        subtitle: `Transit Point · Queue: ${bc.waitExit || 10}m exit`
+      });
+    }
+  });
+
+  // 3. Minefields
+  if (typeof MINEFIELDS_DATA !== 'undefined' && Array.isArray(MINEFIELDS_DATA)) {
+    MINEFIELDS_DATA.forEach(m => {
+      if (pointInPolygon([m.lon, m.lat], polygonCoords)) {
+        detected.push({
+          type: 'minefield',
+          isHazard: true,
+          icon: '⚠️',
+          title: m.name || 'Mine Hazard Area',
+          subtitle: `Hazard: ${m.type || 'UXO/Mines'} · Standoff: ${m.standoffMeters || 100}m`
+        });
+      }
+    });
+  }
+
+  // 4. Wildfires
+  if (state.data?.wildfires && Array.isArray(state.data.wildfires)) {
+    state.data.wildfires.forEach(wf => {
+      if (pointInPolygon([wf.longitude, wf.latitude], polygonCoords)) {
+        detected.push({
+          type: 'wildfire',
+          isHazard: true,
+          icon: '🔥',
+          title: `Thermal Anomaly (FRP: ${wf.frp || 10}MW)`,
+          subtitle: `NASA FIRMS Fire Detection · Conf: ${wf.confidence || 'Nominal'}`
+        });
+      }
+    });
+  }
+
+  // 5. Staff Locations & Safe Havens
+  if (state.staffLocations && Array.isArray(state.staffLocations)) {
+    state.staffLocations.forEach(staff => {
+      if (staff.lon != null && staff.lat != null && pointInPolygon([staff.lon, staff.lat], polygonCoords)) {
+        detected.push({
+          type: 'staff',
+          icon: staff.category === 'safe_haven' ? '🛡️' : '👤',
+          title: `${staff.callsign || staff.name} (${staff.category === 'safe_haven' ? 'Safe Haven' : 'Staff'})`,
+          subtitle: `Zone: ${staff.zone || 'Kosovo'} · Radio: ${staff.radio_channel || 'Nominal'}`
+        });
+      }
+    });
+  }
+
+  if (countBadge) {
+    countBadge.textContent = `${detected.length} ${detected.length === 1 ? 'entity' : 'entities'}`;
+  }
+  if (detected.length === 0) {
+    insideList.innerHTML = '<div style="font-size:10px; color:#94a3b8; padding:4px 0;">No active tactical entities within selected AOI boundary.</div>';
+  } else {
+    insideList.innerHTML = detected.map(item => `
+      <div class="inside-entity-row ${item.isMilitary ? 'inside-military' : ''} ${item.isHazard ? 'inside-hazard' : ''}">
+        <span class="inside-ico">${item.icon}</span>
+        <div class="inside-info" style="display:flex; flex-direction:column; line-height:1.2;">
+          <strong style="color:#f8fafc; font-size:10px;">${item.title}</strong>
+          <span style="color:#94a3b8; font-size:9px;">${item.subtitle}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+  insideContainer.style.display = 'block';
+}
+
+function exportAoiGeoJson() {
+  if (!drawingState.polygonCoords || drawingState.polygonCoords.length < 3) {
+    alert('Draw an AOI shape on the map first before exporting.');
+    return;
+  }
+  const geojson = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {
+          aoiName: 'KOSINT Tactical AOI',
+          shapeType: drawingState.mode,
+          areaKm2: Number(drawingState.trackedAreaKm2.toFixed(2)),
+          perimeterKm: Number(drawingState.perimeterKm.toFixed(2)),
+          timestamp: new Date().toISOString()
+        },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [drawingState.polygonCoords]
+        }
+      }
+    ]
+  };
+  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(geojson, null, 2));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute('href', dataStr);
+  downloadAnchor.setAttribute('download', `KOSINT_AOI_${Date.now()}.geojson`);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STYLE STUDIO — LIVE UI TOKENS, PRESETS & MAP LAYERS ENGINE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const STYLE_STUDIO_PRESETS = {
+  HORUS: {
+    name: 'HORUS',
+    accentPrimary: '#d4af37',
+    accentSecondary: '#00e5ff',
+    glow: '30%',
+    signalCritical: '#ff3d3d',
+    signalWarning: '#ff9500',
+    signalNominal: '#00e676',
+    signalInfo: '#448aff',
+    surfaceBg: '#04040a',
+    panelOpacity: '88%',
+    borderOpacity: '15%',
+    blur: 'AUTO',
+    radius: '1.00x',
+    textPrimary: '#e8e6e0',
+    textSecondary: '#9b978e',
+    textMuted: '#5c5a54',
+    textHeading: '#f5f0e0',
+    uiFont: 'INTER',
+    monoFont: 'JETBRAINS',
+    tracking: 'AUTO',
+    speed: '1.00x'
+  },
+  PHANTOM: {
+    name: 'PHANTOM',
+    accentPrimary: '#00e5ff',
+    accentSecondary: '#a855f7',
+    glow: '50%',
+    signalCritical: '#f43f5e',
+    signalWarning: '#f59e0b',
+    signalNominal: '#10b981',
+    signalInfo: '#06b6d4',
+    surfaceBg: '#050811',
+    panelOpacity: '88%',
+    borderOpacity: '18%',
+    blur: 'AUTO',
+    radius: '1.00x',
+    textPrimary: '#e2e8f0',
+    textSecondary: '#94a3b8',
+    textMuted: '#475569',
+    textHeading: '#38bdf8',
+    uiFont: 'INTER',
+    monoFont: 'JETBRAINS',
+    tracking: 'AUTO',
+    speed: '1.00x'
+  },
+  TERMINAL: {
+    name: 'TERMINAL',
+    accentPrimary: '#00ff66',
+    accentSecondary: '#ffb000',
+    glow: '50%',
+    signalCritical: '#ff3333',
+    signalWarning: '#ffcc00',
+    signalNominal: '#00ff66',
+    signalInfo: '#00ccff',
+    surfaceBg: '#020d06',
+    panelOpacity: '95%',
+    borderOpacity: '25%',
+    blur: 'OFF',
+    radius: '0.50x',
+    textPrimary: '#00ff66',
+    textSecondary: '#00aa44',
+    textMuted: '#005522',
+    textHeading: '#66ff99',
+    uiFont: 'MONO',
+    monoFont: 'JETBRAINS',
+    tracking: 'WIDE',
+    speed: '0.50x'
+  },
+  CRIMSON: {
+    name: 'CRIMSON',
+    accentPrimary: '#ff2a4b',
+    accentSecondary: '#ff7b00',
+    glow: '30%',
+    signalCritical: '#ff1744',
+    signalWarning: '#ff9100',
+    signalNominal: '#00e676',
+    signalInfo: '#ff5252',
+    surfaceBg: '#0d0407',
+    panelOpacity: '88%',
+    borderOpacity: '20%',
+    blur: 'AUTO',
+    radius: '1.00x',
+    textPrimary: '#f8fafc',
+    textSecondary: '#fda4af',
+    textMuted: '#881337',
+    textHeading: '#ffe4e6',
+    uiFont: 'INTER',
+    monoFont: 'JETBRAINS',
+    tracking: 'AUTO',
+    speed: '1.00x'
+  },
+  ARCTIC: {
+    name: 'ARCTIC',
+    accentPrimary: '#38bdf8',
+    accentSecondary: '#a5f3fc',
+    glow: '30%',
+    signalCritical: '#ef4444',
+    signalWarning: '#f59e0b',
+    signalNominal: '#34d399',
+    signalInfo: '#38bdf8',
+    surfaceBg: '#030c1e',
+    panelOpacity: '85%',
+    borderOpacity: '15%',
+    blur: 'HIGH',
+    radius: '1.50x',
+    textPrimary: '#f0f9ff',
+    textSecondary: '#bae6fd',
+    textMuted: '#38bdf8',
+    textHeading: '#ffffff',
+    uiFont: 'INTER',
+    monoFont: 'JETBRAINS',
+    tracking: 'AUTO',
+    speed: '1.00x'
+  },
+  BLACKOUT: {
+    name: 'BLACKOUT',
+    accentPrimary: '#ffffff',
+    accentSecondary: '#94a3b8',
+    glow: '0%',
+    signalCritical: '#ff4444',
+    signalWarning: '#ffaa00',
+    signalNominal: '#00cc66',
+    signalInfo: '#888888',
+    surfaceBg: '#000000',
+    panelOpacity: '100%',
+    borderOpacity: '15%',
+    blur: 'OFF',
+    radius: '0.50x',
+    textPrimary: '#ffffff',
+    textSecondary: '#a1a1aa',
+    textMuted: '#52525b',
+    textHeading: '#ffffff',
+    uiFont: 'MONO',
+    monoFont: 'CONSOLAS',
+    tracking: 'AUTO',
+    speed: '1.00x'
+  }
+};
+
+const DEFAULT_MAP_LAYERS_COLORS = {
+  cameras: '#00e676',
+  satComms: '#00e676',
+  satMilitary: '#ff3d3d',
+  satNav: '#448aff',
+  satEarth: '#90ee90',
+  satScience: '#ffd700',
+  satOther: '#00e5ff',
+  planeCivil: '#00e5ff',
+  planePrivate: '#ffd700',
+  planeGov: '#ff9500',
+  planeMil: '#ff0000',
+  planeUnknown: '#546e7a'
+};
+
+const StyleStudio = {
+  activePreset: 'HORUS',
+  tokens: Object.assign({}, STYLE_STUDIO_PRESETS.HORUS),
+  layerColors: Object.assign({}, DEFAULT_MAP_LAYERS_COLORS),
+  panZoomPad: false,
+  fx: {
+    scanlines: false,
+    grain: false,
+    vignette: false
+  },
+
+  init() {
+    this.loadFromStorage();
+    this.applyAll();
+    this.syncControls();
+  },
+
+  applyPreset(name) {
+    if (!STYLE_STUDIO_PRESETS[name]) return;
+    this.activePreset = name;
+    // Presets intentionally do not touch map layers: "presets do not touch the map layers — those carry meaning, not just a look"
+    this.tokens = Object.assign({}, STYLE_STUDIO_PRESETS[name]);
+    this.applyAll();
+    this.syncControls();
+    this.saveToStorage();
+  },
+
+  setToken(key, value) {
+    this.tokens[key] = value;
+    this.applyToken(key, value);
+    const hexSpan = $(`code${key.charAt(0).toUpperCase() + key.slice(1)}`);
+    if (hexSpan && typeof value === 'string' && value.startsWith('#')) {
+      hexSpan.textContent = value;
+    }
+    this.saveToStorage();
+  },
+
+  setGlow(val) {
+    this.setToken('glow', val);
+    this.syncPillsGroup('glowOptionsGroup', val);
+  },
+
+  setPanelOpacity(val) {
+    this.setToken('panelOpacity', val);
+    this.syncPillsGroup('panelOptionsGroup', val);
+  },
+
+  setBorderOpacity(val) {
+    this.setToken('borderOpacity', val);
+    this.syncPillsGroup('borderOptionsGroup', val);
+  },
+
+  setBlur(val) {
+    this.setToken('blur', val);
+    this.syncPillsGroup('blurOptionsGroup', val);
+  },
+
+  setRadius(val) {
+    this.setToken('radius', val);
+    this.syncPillsGroup('radiusOptionsGroup', val);
+  },
+
+  setFont(type, val) {
+    if (type === 'ui') {
+      this.setToken('uiFont', val);
+      this.syncPillsGroup('uiFontGroup', val);
+    } else {
+      this.setToken('monoFont', val);
+      this.syncPillsGroup('monoFontGroup', val);
+    }
+  },
+
+  setTracking(val) {
+    this.setToken('tracking', val);
+    this.syncPillsGroup('trackingGroup', val);
+  },
+
+  setSpeed(val) {
+    this.setToken('speed', val);
+    this.syncPillsGroup('speedGroup', val);
+  },
+
+  setLayerColor(key, color) {
+    this.layerColors[key] = color;
+    const tag = $(`code${key.charAt(0).toUpperCase() + key.slice(1)}`);
+    if (tag) tag.textContent = color;
+    this.saveToStorage();
+  },
+
+  setPanZoomPad(enabled) {
+    this.panZoomPad = Boolean(enabled);
+    const pad = $('osirisPanZoomPad');
+    if (pad) pad.style.display = this.panZoomPad ? 'flex' : 'none';
+    const btnOn = $('btnPanZoomOn');
+    const btnOff = $('btnPanZoomOff');
+    if (btnOn && btnOff) {
+      btnOn.classList.toggle('active', this.panZoomPad);
+      btnOff.classList.toggle('active', !this.panZoomPad);
+    }
+    this.saveToStorage();
+  },
+
+  toggleFx(type, enabled) {
+    this.fx[type] = Boolean(enabled);
+    const idMap = {
+      scanlines: 'styleStudioScanlines',
+      grain: 'styleStudioGrain',
+      vignette: 'styleStudioVignette'
+    };
+    const el = $(idMap[type]);
+    if (el) el.style.display = this.fx[type] ? 'block' : 'none';
+
+    const btnOn = $(`btn${type.charAt(0).toUpperCase() + type.slice(1)}On`);
+    const btnOff = $(`btn${type.charAt(0).toUpperCase() + type.slice(1)}Off`);
+    if (btnOn && btnOff) {
+      btnOn.classList.toggle('active', this.fx[type]);
+      btnOff.classList.toggle('active', !this.fx[type]);
+    }
+    this.saveToStorage();
+  },
+
+  resetActiveTheme() {
+    this.tokens = Object.assign({}, STYLE_STUDIO_PRESETS[this.activePreset] || STYLE_STUDIO_PRESETS.HORUS);
+    this.layerColors = Object.assign({}, DEFAULT_MAP_LAYERS_COLORS);
+    this.fx = { scanlines: false, grain: false, vignette: false };
+    this.panZoomPad = false;
+    this.applyAll();
+    this.syncControls();
+    this.saveToStorage();
+  },
+
+  applyAll() {
+    const root = document.documentElement;
+    if (!root) return;
+
+    // Colors
+    root.style.setProperty('--amber', this.tokens.accentPrimary);
+    root.style.setProperty('--accent-primary', this.tokens.accentPrimary);
+    root.style.setProperty('--cyan', this.tokens.accentSecondary);
+    root.style.setProperty('--accent-secondary', this.tokens.accentSecondary);
+    root.style.setProperty('--bg-base', this.tokens.surfaceBg);
+
+    // Text
+    root.style.setProperty('--text-primary', this.tokens.textPrimary);
+    root.style.setProperty('--text-secondary', this.tokens.textSecondary);
+    root.style.setProperty('--text-dim', this.tokens.textMuted);
+
+    // Signals
+    root.style.setProperty('--red', this.tokens.signalCritical);
+    root.style.setProperty('--severity-critical', this.tokens.signalCritical);
+    root.style.setProperty('--orange', this.tokens.signalWarning);
+    root.style.setProperty('--severity-high', this.tokens.signalWarning);
+    root.style.setProperty('--green', this.tokens.signalNominal);
+    root.style.setProperty('--severity-low', this.tokens.signalNominal);
+
+    // Panel & Surface Opacity
+    const pOp = parseInt(this.tokens.panelOpacity, 10) / 100 || 0.88;
+    root.style.setProperty('--bg-panel', `rgba(17, 24, 39, ${pOp})`);
+    root.style.setProperty('--bg-surface', `rgba(13, 20, 32, ${pOp})`);
+    root.style.setProperty('--bg-elevated', `rgba(26, 36, 56, ${pOp})`);
+
+    // Border Opacity
+    const bOp = parseInt(this.tokens.borderOpacity, 10) / 100 || 0.15;
+    root.style.setProperty('--border', `rgba(99, 179, 237, ${bOp})`);
+
+    // Radius scale
+    const radFactor = parseFloat(this.tokens.radius) || 1.0;
+    root.style.setProperty('--r-sm', `${Math.round(6 * radFactor)}px`);
+    root.style.setProperty('--r-md', `${Math.round(10 * radFactor)}px`);
+    root.style.setProperty('--r-lg', `${Math.round(14 * radFactor)}px`);
+
+    // Typography
+    const uiFonts = {
+      INTER: "'Inter', system-ui, sans-serif",
+      MONO: "'JetBrains Mono', monospace",
+      SYSTEM: "system-ui, -apple-system, sans-serif",
+      SERIF: "'Georgia', 'Cambria', serif"
+    };
+    root.style.setProperty('--font-sans', uiFonts[this.tokens.uiFont] || uiFonts.INTER);
+
+    const monoFonts = {
+      JETBRAINS: "'JetBrains Mono', monospace",
+      COURIER: "'Courier New', monospace",
+      CONSOLAS: "'Consolas', monospace",
+      INTER: "'Inter', sans-serif"
+    };
+    root.style.setProperty('--font-mono', monoFonts[this.tokens.monoFont] || monoFonts.JETBRAINS);
+
+    // Tracking
+    const trackingMap = {
+      AUTO: 'normal',
+      TIGHT: '-0.5px',
+      WIDE: '1.2px'
+    };
+    root.style.letterSpacing = trackingMap[this.tokens.tracking] || 'normal';
+
+    // Glow
+    const glowPct = parseInt(this.tokens.glow, 10) || 30;
+    root.style.setProperty('--border-glow', `rgba(56, 189, 248, ${glowPct / 100})`);
+
+    // Overlays
+    ['scanlines', 'grain', 'vignette'].forEach(fx => {
+      this.toggleFx(fx, this.fx[fx]);
+    });
+
+    // Pan/zoom pad
+    this.setPanZoomPad(this.panZoomPad);
+  },
+
+  applyToken(key, value) {
+    const root = document.documentElement;
+    if (!root) return;
+
+    if (key === 'accentPrimary') {
+      root.style.setProperty('--amber', value);
+      root.style.setProperty('--accent-primary', value);
+    } else if (key === 'accentSecondary') {
+      root.style.setProperty('--cyan', value);
+      root.style.setProperty('--accent-secondary', value);
+    } else if (key === 'surfaceBg') {
+      root.style.setProperty('--bg-base', value);
+    } else if (key === 'textPrimary') {
+      root.style.setProperty('--text-primary', value);
+    } else if (key === 'textSecondary') {
+      root.style.setProperty('--text-secondary', value);
+    } else if (key === 'textMuted') {
+      root.style.setProperty('--text-dim', value);
+    } else if (key === 'signalCritical') {
+      root.style.setProperty('--red', value);
+      root.style.setProperty('--severity-critical', value);
+    } else if (key === 'signalWarning') {
+      root.style.setProperty('--orange', value);
+      root.style.setProperty('--severity-high', value);
+    } else if (key === 'signalNominal') {
+      root.style.setProperty('--green', value);
+      root.style.setProperty('--severity-low', value);
+    }
+  },
+
+  syncControls() {
+    // Preset buttons
+    document.querySelectorAll('.studio-preset-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.preset === this.activePreset);
+    });
+
+    // Color pickers & hex tags
+    const colorFields = [
+      ['studioAccentPrimary', 'codeAccentPrimary', this.tokens.accentPrimary],
+      ['studioAccentSecondary', 'codeAccentSecondary', this.tokens.accentSecondary],
+      ['studioSignalCritical', 'codeSignalCritical', this.tokens.signalCritical],
+      ['studioSignalWarning', 'codeSignalWarning', this.tokens.signalWarning],
+      ['studioSignalNominal', 'codeSignalNominal', this.tokens.signalNominal],
+      ['studioSignalInfo', 'codeSignalInfo', this.tokens.signalInfo],
+      ['studioSurfaceBg', 'codeSurfaceBg', this.tokens.surfaceBg],
+      ['studioTextPrimary', 'codeTextPrimary', this.tokens.textPrimary],
+      ['studioTextSecondary', 'codeTextSecondary', this.tokens.textSecondary],
+      ['studioTextMuted', 'codeTextMuted', this.tokens.textMuted],
+      ['studioTextHeading', 'codeTextHeading', this.tokens.textHeading],
+      ['studioLayerCameras', 'codeLayerCameras', this.layerColors.cameras],
+      ['studioSatComms', 'codeSatComms', this.layerColors.satComms],
+      ['studioSatMilitary', 'codeSatMilitary', this.layerColors.satMilitary],
+      ['studioSatNav', 'codeSatNav', this.layerColors.satNav],
+      ['studioSatEarth', 'codeSatEarth', this.layerColors.satEarth],
+      ['studioSatScience', 'codeSatScience', this.layerColors.satScience],
+      ['studioSatOther', 'codeSatOther', this.layerColors.satOther],
+      ['studioPlaneCivil', 'codePlaneCivil', this.layerColors.planeCivil],
+      ['studioPlanePrivate', 'codePlanePrivate', this.layerColors.planePrivate],
+      ['studioPlaneGov', 'codePlaneGov', this.layerColors.planeGov],
+      ['studioPlaneMil', 'codePlaneMil', this.layerColors.planeMil],
+      ['studioPlaneUnknown', 'codePlaneUnknown', this.layerColors.planeUnknown]
+    ];
+
+    colorFields.forEach(([inputElId, tagElId, val]) => {
+      const input = $(inputElId);
+      const tag = $(tagElId);
+      if (input && val) input.value = val;
+      if (tag && val) tag.textContent = val;
+    });
+
+    // Pills groups
+    this.syncPillsGroup('glowOptionsGroup', this.tokens.glow);
+    this.syncPillsGroup('panelOptionsGroup', this.tokens.panelOpacity);
+    this.syncPillsGroup('borderOptionsGroup', this.tokens.borderOpacity);
+    this.syncPillsGroup('blurOptionsGroup', this.tokens.blur);
+    this.syncPillsGroup('radiusOptionsGroup', this.tokens.radius);
+    this.syncPillsGroup('uiFontGroup', this.tokens.uiFont);
+    this.syncPillsGroup('monoFontGroup', this.tokens.monoFont);
+    this.syncPillsGroup('trackingGroup', this.tokens.tracking);
+    this.syncPillsGroup('speedGroup', this.tokens.speed);
+
+    // Pan/zoom pad toggle
+    const btnPanOn = $('btnPanZoomOn');
+    const btnPanOff = $('btnPanZoomOff');
+    if (btnPanOn && btnPanOff) {
+      btnPanOn.classList.toggle('active', this.panZoomPad);
+      btnPanOff.classList.toggle('active', !this.panZoomPad);
+    }
+
+    // FX Toggles
+    ['scanlines', 'grain', 'vignette'].forEach(fx => {
+      const bOn = $(`btn${fx.charAt(0).toUpperCase() + fx.slice(1)}On`);
+      const bOff = $(`btn${fx.charAt(0).toUpperCase() + fx.slice(1)}Off`);
+      if (bOn && bOff) {
+        bOn.classList.toggle('active', this.fx[fx]);
+        bOff.classList.toggle('active', !this.fx[fx]);
+      }
+    });
+  },
+
+  syncPillsGroup(groupId, val) {
+    const group = $(groupId);
+    if (!group) return;
+    group.querySelectorAll('.studio-pill-opt').forEach(btn => {
+      btn.classList.toggle('active', btn.textContent.trim() === val);
+    });
+  },
+
+  saveToStorage() {
+    try {
+      const data = {
+        activePreset: this.activePreset,
+        tokens: this.tokens,
+        layerColors: this.layerColors,
+        panZoomPad: this.panZoomPad,
+        fx: this.fx
+      };
+      localStorage.setItem('kosint_style_studio_tokens', JSON.stringify(data));
+    } catch (e) {
+      console.warn('[style-studio] localStorage save error:', e);
+    }
+  },
+
+  loadFromStorage() {
+    try {
+      const raw = localStorage.getItem('kosint_style_studio_tokens');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.activePreset) this.activePreset = data.activePreset;
+      if (data.tokens) this.tokens = Object.assign({}, this.tokens, data.tokens);
+      if (data.layerColors) this.layerColors = Object.assign({}, this.layerColors, data.layerColors);
+      if (data.panZoomPad !== undefined) this.panZoomPad = Boolean(data.panZoomPad);
+      if (data.fx) this.fx = Object.assign({}, this.fx, data.fx);
+    } catch (e) {
+      console.warn('[style-studio] localStorage load error:', e);
+    }
+  }
+};
+
+window.StyleStudio = StyleStudio;
+
+// Auto-initialize StyleStudio
+try {
+  StyleStudio.init();
+} catch (e) {
+  console.warn('[style-studio] init error:', e);
+}
+
+window.toggleDefenseMarketPanel = toggleDefenseMarketPanel;
+window.switchDefenseSector = switchDefenseSector;
+window.renderLiveFeeds = renderLiveFeeds;
+window.switchFeedRegion = switchFeedRegion;
+window.switchFeedChannel = switchFeedChannel;
+window.connectCustomFeedStream = connectCustomFeedStream;
+window.toggleDrawingToolsWidget = toggleDrawingToolsWidget;
+window.setDrawingShape = setDrawingShape;
+window.clearDrawnAoi = clearDrawnAoi;
+window.finishCurrentShape = finishCurrentShape;
+window.exportAoiGeoJson = exportAoiGeoJson;
