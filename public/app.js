@@ -1007,21 +1007,19 @@ function sortNewsByChronological(items) {
   });
 }
 
+function isPoliticalNewsItem(item) {
+  if (!item) return false;
+  return (item.category || '').toLowerCase() === 'political';
+}
+
 function isOperationalNewsItem(item) {
   if (!item) return false;
-  if (item.eventType === 'commentary' || item.category === 'commentary' || item.category === 'other') {
-    return false;
-  }
-  const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
-  // TV talk show punditry & studio debates
-  if (/aludon|opinionist|analist|në\s*studio|ne\s*studio|pressing|debat\s*plus|rubikon|dpt\s*te\s*fidani|shtron\s*pyetjen|polemik|replikë|replike|debat\s*politik/i.test(text)) {
-    return false;
-  }
-  // Administrative council / procedural voting without operational security incident
-  if (/nuk\s*miratohet\s*raporti|raporti\s*i\s*punës|raportin\s*e\s*punës|prokurorial\s*i\s*kosovës|këshilli\s*prokurorial|keshilli\s*prokurorial|kpk\b|seancë\s*solemne|mbledhje\s*e\s*rregullt/i.test(text)) {
-    return false;
-  }
-  return true;
+  return (item.category || '').toLowerCase() === 'operational';
+}
+
+function isOpinionNewsItem(item) {
+  if (!item) return false;
+  return (item.category || '').toLowerCase() === 'opinion';
 }
 
 const SERBIAN_NEWS_SOURCES = ['kossev', 'radio mitrovica sever', 'radio kim', 'kosova.info'];
@@ -1051,22 +1049,64 @@ function isAlbanianNewsItem(item) {
   return !isSerbianNewsItem(item);
 }
 
+function ensureTriageTabButtons() {
+  const container = document.querySelector('.news-triage-tabs');
+  if (!container) return;
+
+  if (!document.getElementById('tabNewsPolitical')) {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.id = 'tabNewsPolitical';
+    btn.onclick = function() { switchNewsTab('political', this); };
+    btn.innerHTML = '🏛️ Political';
+    const opBtn = document.getElementById('tabNewsOperational');
+    if (opBtn && opBtn.nextSibling) {
+      container.insertBefore(btn, opBtn.nextSibling);
+    } else {
+      container.appendChild(btn);
+    }
+  }
+
+  if (!document.getElementById('tabNewsOpinion')) {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.id = 'tabNewsOpinion';
+    btn.onclick = function() { switchNewsTab('opinion', this); };
+    btn.innerHTML = '🎙️ Opinion';
+    const polBtn = document.getElementById('tabNewsPolitical');
+    if (polBtn && polBtn.nextSibling) {
+      container.insertBefore(btn, polBtn.nextSibling);
+    } else {
+      container.appendChild(btn);
+    }
+  }
+}
+
 function filterNewsItems(items, filter) {
+  ensureTriageTabButtons();
   state.newsTab = filter || state.newsTab || 'all';
   state.newsFilter = state.newsTab;
   items = items || [];
 
   let filtered = items;
 
-  // 1. Language & Operational Tabs
+  // 1. Strict Mutually Exclusive Category Tabs & Language Views
   if (state.newsTab === 'all') {
-    filtered = items;
-  } else if (state.newsTab === 'serbian') {
-    filtered = items.filter(i => isSerbianNewsItem(i));
-  } else if (state.newsTab === 'albanian') {
-    filtered = items.filter(i => isAlbanianNewsItem(i));
+    // All tab: Shows all valid articles chronologically (deduplicated)
+    filtered = items.filter(i => i && i.category !== 'other');
   } else if (state.newsTab === 'operational') {
+    // Operational tab: Shows ONLY items where item.category === 'operational'
     filtered = items.filter(i => isOperationalNewsItem(i));
+  } else if (state.newsTab === 'political') {
+    // Political tab: Shows ONLY items where item.category === 'political'
+    filtered = items.filter(i => isPoliticalNewsItem(i));
+  } else if (state.newsTab === 'opinion') {
+    // Opinion tab: Shows ONLY items where item.category === 'opinion'
+    filtered = items.filter(i => isOpinionNewsItem(i));
+  } else if (state.newsTab === 'serbian') {
+    filtered = items.filter(i => isSerbianNewsItem(i) && i.category !== 'other');
+  } else if (state.newsTab === 'albanian') {
+    filtered = items.filter(i => isAlbanianNewsItem(i) && i.category !== 'other');
   } else if (state.newsTab === 'critical') {
     filtered = items.filter(i => i.severity === 'critical' || i.intensityScore >= 9);
   } else if (state.newsTab === 'high') {
@@ -1074,7 +1114,7 @@ function filterNewsItems(items, filter) {
   } else if (state.newsTab === 'medium') {
     filtered = items.filter(i => i.severity === 'medium' || (i.intensityScore >= 4 && i.intensityScore <= 6));
   } else {
-    filtered = items;
+    filtered = items.filter(i => i && i.category !== 'other');
   }
 
   // 2. Urgent Only Toggle (Filter Critical & High)
@@ -1092,7 +1132,12 @@ function filterNewsItems(items, filter) {
   if (!list) return;
 
   if (!sorted.length) {
-    const tabName = state.newsTab === 'serbian' ? 'Serbian' : state.newsTab === 'albanian' ? 'Albanian' : state.newsTab === 'operational' ? 'Operational' : 'All';
+    const tabName = state.newsTab === 'serbian' ? 'Serbian'
+      : state.newsTab === 'albanian' ? 'Albanian'
+      : state.newsTab === 'operational' ? 'Operational'
+      : state.newsTab === 'political' ? 'Political'
+      : state.newsTab === 'opinion' ? 'Opinion'
+      : 'All';
     list.innerHTML = `<div class="empty-state">No ${state.newsUrgentOnly ? 'urgent ' : ''}events in ${tabName} news feed</div>`;
     return;
   }
@@ -1104,7 +1149,7 @@ function filterNewsItems(items, filter) {
     const sevLabel = sev.toUpperCase();
 
     // Category / news type tag
-    const rawCat = (item.category || (isOperationalNewsItem(item) ? 'Security' : 'Commentary')).replace(/_/g, ' ');
+    const rawCat = (item.category || 'operational').replace(/_/g, ' ');
     const catLabel = rawCat.toUpperCase();
 
     const title = item.title || item.canonicalTitle || 'Untitled Intelligence Item';
@@ -7410,6 +7455,8 @@ window.switchNewsTab = switchNewsTab;
 window.toggleNewsUrgent = toggleNewsUrgent;
 window.isSerbianNewsItem = isSerbianNewsItem;
 window.isAlbanianNewsItem = isAlbanianNewsItem;
+window.isPoliticalNewsItem = isPoliticalNewsItem;
+window.isOpinionNewsItem = isOpinionNewsItem;
 window.closeModulePanel = closeModulePanel;
 window.exportReport = exportReport;
 window.markAllRead = markAllRead;
@@ -9581,19 +9628,25 @@ const StyleStudio = {
 
   toggleFx(type, enabled) {
     this.fx[type] = Boolean(enabled);
-    const idMap = {
-      scanlines: 'styleStudioScanlines',
-      grain: 'styleStudioGrain',
-      vignette: 'styleStudioVignette'
-    };
-    const el = $(idMap[type]);
-    if (el) el.style.display = this.fx[type] ? 'block' : 'none';
-
-    const btnOn = $(`btn${type.charAt(0).toUpperCase() + type.slice(1)}On`);
-    const btnOff = $(`btn${type.charAt(0).toUpperCase() + type.slice(1)}Off`);
+    this._applyFxOverlay(type, this.fx[type]);
+    const cap = type.charAt(0).toUpperCase() + type.slice(1);
+    const btnOn  = $(`btn${cap}On`);
+    const btnOff = $(`btn${cap}Off`);
     if (btnOn && btnOff) {
-      btnOn.classList.toggle('active', this.fx[type]);
+      btnOn.classList.toggle('active',  this.fx[type]);
       btnOff.classList.toggle('active', !this.fx[type]);
+    }
+    this.saveToStorage();
+  },
+
+  setPanZoomPad(enabled) {
+    this.panZoomPad = Boolean(enabled);
+    this._applyPanZoomPad(this.panZoomPad);
+    const btnOn  = $('btnPanZoomOn');
+    const btnOff = $('btnPanZoomOff');
+    if (btnOn && btnOff) {
+      btnOn.classList.toggle('active',  this.panZoomPad);
+      btnOff.classList.toggle('active', !this.panZoomPad);
     }
     this.saveToStorage();
   },
@@ -9612,108 +9665,240 @@ const StyleStudio = {
     const root = document.documentElement;
     if (!root) return;
 
-    // Colors
-    root.style.setProperty('--amber', this.tokens.accentPrimary);
-    root.style.setProperty('--accent-primary', this.tokens.accentPrimary);
-    root.style.setProperty('--cyan', this.tokens.accentSecondary);
-    root.style.setProperty('--accent-secondary', this.tokens.accentSecondary);
-    root.style.setProperty('--bg-base', this.tokens.surfaceBg);
+    const t = this.tokens;
+    const R = (prop, val) => root.style.setProperty(prop, val);
 
-    // Text
-    root.style.setProperty('--text-primary', this.tokens.textPrimary);
-    root.style.setProperty('--text-secondary', this.tokens.textSecondary);
-    root.style.setProperty('--text-dim', this.tokens.textMuted);
+    // ── Accent colours ────────────────────────────────────────────────────────
+    R('--accent-primary',   t.accentPrimary);
+    R('--accent-secondary', t.accentSecondary);
+    // Legacy aliases consumed across all existing CSS
+    R('--amber', t.accentPrimary);
+    R('--cyan',  t.accentSecondary);
 
-    // Signals
-    root.style.setProperty('--red', this.tokens.signalCritical);
-    root.style.setProperty('--severity-critical', this.tokens.signalCritical);
-    root.style.setProperty('--orange', this.tokens.signalWarning);
-    root.style.setProperty('--severity-high', this.tokens.signalWarning);
-    root.style.setProperty('--green', this.tokens.signalNominal);
-    root.style.setProperty('--severity-low', this.tokens.signalNominal);
+    // Derive dim / glow from accentSecondary so all hover/active states shift too
+    const sec = t.accentSecondary;
+    const secRgb = StyleStudio._hexToRgb(sec);
+    if (secRgb) {
+      R('--cyan-dim',    `rgba(${secRgb}, 0.08)`);
+      R('--border-glow', `rgba(${secRgb}, ${parseInt(t.glow, 10) / 100 || 0.30})`);
+    }
 
-    // Panel & Surface Opacity
-    const pOp = parseInt(this.tokens.panelOpacity, 10) / 100 || 0.88;
-    root.style.setProperty('--bg-panel', `rgba(17, 24, 39, ${pOp})`);
-    root.style.setProperty('--bg-surface', `rgba(13, 20, 32, ${pOp})`);
-    root.style.setProperty('--bg-elevated', `rgba(26, 36, 56, ${pOp})`);
+    // ── Surface & panel backgrounds ───────────────────────────────────────────
+    R('--bg-base', t.surfaceBg);
+    const bgRgb = StyleStudio._hexToRgb(t.surfaceBg) || '7,11,18';
+    const pOp = parseInt(t.panelOpacity, 10) / 100 || 0.88;
+    R('--bg-panel',    `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
+    R('--bg-surface',  `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
+    R('--bg-elevated', `rgba(${bgRgb}, ${Math.min(pOp + 0.12, 1).toFixed(2)})`);
+    // Header glass bg
+    R('--header-bg',   `rgba(${bgRgb}, 0.95)`);
 
-    // Border Opacity
-    const bOp = parseInt(this.tokens.borderOpacity, 10) / 100 || 0.15;
-    root.style.setProperty('--border', `rgba(99, 179, 237, ${bOp})`);
+    // ── Border ────────────────────────────────────────────────────────────────
+    const bOp = parseInt(t.borderOpacity, 10) / 100 || 0.15;
+    R('--border', `rgba(99, 179, 237, ${bOp})`);
 
-    // Radius scale
-    const radFactor = parseFloat(this.tokens.radius) || 1.0;
-    root.style.setProperty('--r-sm', `${Math.round(6 * radFactor)}px`);
-    root.style.setProperty('--r-md', `${Math.round(10 * radFactor)}px`);
-    root.style.setProperty('--r-lg', `${Math.round(14 * radFactor)}px`);
+    // ── Blur / glassmorphism ──────────────────────────────────────────────────
+    const blurMap = { AUTO: '16px', HIGH: '28px', OFF: '0px' };
+    R('--backdrop-blur', blurMap[t.blur] || '16px');
 
-    // Typography
+    // ── Border radius scale ───────────────────────────────────────────────────
+    const rad = parseFloat(t.radius) || 1.0;
+    R('--r-sm', `${Math.round(6  * rad)}px`);
+    R('--r-md', `${Math.round(10 * rad)}px`);
+    R('--r-lg', `${Math.round(14 * rad)}px`);
+
+    // ── Text colours ──────────────────────────────────────────────────────────
+    R('--text-primary',   t.textPrimary);
+    R('--text-secondary', t.textSecondary);
+    R('--text-dim',       t.textMuted);
+    R('--text-heading',   t.textHeading || t.textPrimary);
+
+    // ── Signal colours ────────────────────────────────────────────────────────
+    R('--red',              t.signalCritical);
+    R('--severity-critical', t.signalCritical);
+    R('--orange',           t.signalWarning);
+    R('--severity-high',    t.signalWarning);
+    R('--green',            t.signalNominal);
+    R('--severity-low',     t.signalNominal);
+    // severity-medium stays between warning & nominal
+    R('--severity-medium',  t.signalWarning);
+
+    // ── Typography ────────────────────────────────────────────────────────────
     const uiFonts = {
-      INTER: "'Inter', system-ui, sans-serif",
-      MONO: "'JetBrains Mono', monospace",
+      INTER:  "'Inter', system-ui, sans-serif",
+      MONO:   "'JetBrains Mono', monospace",
       SYSTEM: "system-ui, -apple-system, sans-serif",
-      SERIF: "'Georgia', 'Cambria', serif"
+      SERIF:  "'Georgia', 'Cambria', serif"
     };
-    root.style.setProperty('--font-sans', uiFonts[this.tokens.uiFont] || uiFonts.INTER);
+    R('--font-sans', uiFonts[t.uiFont] || uiFonts.INTER);
 
     const monoFonts = {
       JETBRAINS: "'JetBrains Mono', monospace",
-      COURIER: "'Courier New', monospace",
-      CONSOLAS: "'Consolas', monospace",
-      INTER: "'Inter', sans-serif"
+      COURIER:   "'Courier New', monospace",
+      CONSOLAS:  "'Consolas', monospace",
+      INTER:     "'Inter', sans-serif"
     };
-    root.style.setProperty('--font-mono', monoFonts[this.tokens.monoFont] || monoFonts.JETBRAINS);
+    R('--font-mono', monoFonts[t.monoFont] || monoFonts.JETBRAINS);
 
-    // Tracking
-    const trackingMap = {
-      AUTO: 'normal',
-      TIGHT: '-0.5px',
-      WIDE: '1.2px'
-    };
-    root.style.letterSpacing = trackingMap[this.tokens.tracking] || 'normal';
+    // ── Letter spacing via CSS variable (not root.style, so it cascades) ─────
+    const trackingMap = { AUTO: 'normal', TIGHT: '-0.5px', WIDE: '1.2px' };
+    R('--letter-spacing', trackingMap[t.tracking] || 'normal');
 
-    // Glow
-    const glowPct = parseInt(this.tokens.glow, 10) || 30;
-    root.style.setProperty('--border-glow', `rgba(56, 189, 248, ${glowPct / 100})`);
+    // ── Transition speed ──────────────────────────────────────────────────────
+    const speedMap = { '0.50x': '0.08s', '1.00x': '0.18s', '1.50x': '0.30s' };
+    R('--transition-speed', speedMap[t.speed] || '0.18s');
 
-    // Overlays
+    // ── Screen FX overlays ────────────────────────────────────────────────────
     ['scanlines', 'grain', 'vignette'].forEach(fx => {
-      this.toggleFx(fx, this.fx[fx]);
+      this._applyFxOverlay(fx, this.fx[fx]);
     });
 
-    // Pan/zoom pad
-    this.setPanZoomPad(this.panZoomPad);
+    // ── Pan/zoom pad ──────────────────────────────────────────────────────────
+    this._applyPanZoomPad(this.panZoomPad);
   },
 
   applyToken(key, value) {
+    // Re-run full applyAll for tokens that have cascading derived effects.
+    // For simple single-property tokens, update inline for immediate response.
     const root = document.documentElement;
     if (!root) return;
+    const R = (p, v) => root.style.setProperty(p, v);
+    const t = this.tokens; // already updated by setToken() before this is called
 
-    if (key === 'accentPrimary') {
-      root.style.setProperty('--amber', value);
-      root.style.setProperty('--accent-primary', value);
-    } else if (key === 'accentSecondary') {
-      root.style.setProperty('--cyan', value);
-      root.style.setProperty('--accent-secondary', value);
-    } else if (key === 'surfaceBg') {
-      root.style.setProperty('--bg-base', value);
-    } else if (key === 'textPrimary') {
-      root.style.setProperty('--text-primary', value);
-    } else if (key === 'textSecondary') {
-      root.style.setProperty('--text-secondary', value);
-    } else if (key === 'textMuted') {
-      root.style.setProperty('--text-dim', value);
-    } else if (key === 'signalCritical') {
-      root.style.setProperty('--red', value);
-      root.style.setProperty('--severity-critical', value);
-    } else if (key === 'signalWarning') {
-      root.style.setProperty('--orange', value);
-      root.style.setProperty('--severity-high', value);
-    } else if (key === 'signalNominal') {
-      root.style.setProperty('--green', value);
-      root.style.setProperty('--severity-low', value);
+    switch (key) {
+      case 'accentPrimary':
+        R('--amber', value);
+        R('--accent-primary', value);
+        break;
+      case 'accentSecondary': {
+        R('--cyan', value);
+        R('--accent-secondary', value);
+        const rgb = StyleStudio._hexToRgb(value);
+        if (rgb) {
+          R('--cyan-dim',    `rgba(${rgb}, 0.08)`);
+          R('--border-glow', `rgba(${rgb}, ${parseInt(t.glow, 10) / 100 || 0.30})`);
+        }
+        break;
+      }
+      case 'glow': {
+        const rgb = StyleStudio._hexToRgb(t.accentSecondary);
+        if (rgb) R('--border-glow', `rgba(${rgb}, ${parseInt(value, 10) / 100 || 0.30})`);
+        break;
+      }
+      case 'surfaceBg': {
+        R('--bg-base', value);
+        const bgRgb = StyleStudio._hexToRgb(value) || '7,11,18';
+        const pOp = parseInt(t.panelOpacity, 10) / 100 || 0.88;
+        R('--bg-panel',    `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
+        R('--bg-surface',  `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
+        R('--bg-elevated', `rgba(${bgRgb}, ${Math.min(pOp + 0.12, 1).toFixed(2)})`);
+        R('--header-bg',   `rgba(${bgRgb}, 0.95)`);
+        break;
+      }
+      case 'panelOpacity': {
+        const bgRgb = StyleStudio._hexToRgb(t.surfaceBg) || '7,11,18';
+        const pOp = parseInt(value, 10) / 100 || 0.88;
+        R('--bg-panel',    `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
+        R('--bg-surface',  `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
+        R('--bg-elevated', `rgba(${bgRgb}, ${Math.min(pOp + 0.12, 1).toFixed(2)})`);
+        break;
+      }
+      case 'borderOpacity':
+        R('--border', `rgba(99, 179, 237, ${parseInt(value, 10) / 100 || 0.15})`);
+        break;
+      case 'blur': {
+        const blurMap = { AUTO: '16px', HIGH: '28px', OFF: '0px' };
+        R('--backdrop-blur', blurMap[value] || '16px');
+        break;
+      }
+      case 'radius': {
+        const rad = parseFloat(value) || 1.0;
+        R('--r-sm', `${Math.round(6  * rad)}px`);
+        R('--r-md', `${Math.round(10 * rad)}px`);
+        R('--r-lg', `${Math.round(14 * rad)}px`);
+        break;
+      }
+      case 'textPrimary':   R('--text-primary',   value); break;
+      case 'textSecondary': R('--text-secondary',  value); break;
+      case 'textMuted':     R('--text-dim',        value); break;
+      case 'textHeading':   R('--text-heading',    value); break;
+      case 'signalCritical':
+        R('--red',              value);
+        R('--severity-critical', value);
+        break;
+      case 'signalWarning':
+        R('--orange',        value);
+        R('--severity-high', value);
+        break;
+      case 'signalNominal':
+        R('--green',        value);
+        R('--severity-low', value);
+        break;
+      case 'signalInfo':
+        R('--info', value);
+        break;
+      case 'uiFont': {
+        const uiFonts = {
+          INTER:  "'Inter', system-ui, sans-serif",
+          MONO:   "'JetBrains Mono', monospace",
+          SYSTEM: "system-ui, -apple-system, sans-serif",
+          SERIF:  "'Georgia', 'Cambria', serif"
+        };
+        R('--font-sans', uiFonts[value] || uiFonts.INTER);
+        break;
+      }
+      case 'monoFont': {
+        const monoFonts = {
+          JETBRAINS: "'JetBrains Mono', monospace",
+          COURIER:   "'Courier New', monospace",
+          CONSOLAS:  "'Consolas', monospace",
+          INTER:     "'Inter', sans-serif"
+        };
+        R('--font-mono', monoFonts[value] || monoFonts.JETBRAINS);
+        break;
+      }
+      case 'tracking': {
+        const trackingMap = { AUTO: 'normal', TIGHT: '-0.5px', WIDE: '1.2px' };
+        R('--letter-spacing', trackingMap[value] || 'normal');
+        break;
+      }
+      case 'speed': {
+        const speedMap = { '0.50x': '0.08s', '1.00x': '0.18s', '1.50x': '0.30s' };
+        R('--transition-speed', speedMap[value] || '0.18s');
+        break;
+      }
+      default:
+        break;
     }
+  },
+
+  // ── Private helpers ────────────────────────────────────────────────────────
+  _applyFxOverlay(type, enabled) {
+    const idMap = {
+      scanlines: 'styleStudioScanlines',
+      grain:     'styleStudioGrain',
+      vignette:  'styleStudioVignette'
+    };
+    const el = $(idMap[type]);
+    if (el) el.style.display = enabled ? 'block' : 'none';
+  },
+
+  _applyPanZoomPad(enabled) {
+    const pad = $('osirisPanZoomPad');
+    if (pad) pad.style.display = enabled ? 'flex' : 'none';
+  },
+
+  // Convert #rrggbb or #rgb to "r,g,b" string for use in rgba()
+  _hexToRgb(hex) {
+    if (!hex || !hex.startsWith('#')) return null;
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    if (h.length !== 6) return null;
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+    return `${r}, ${g}, ${b}`;
   },
 
   syncControls() {

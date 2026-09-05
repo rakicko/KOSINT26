@@ -11,15 +11,14 @@ const appJs = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8');
 const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
 const aviationSkill = require('../skills/aviation-monitor/skill');
 
-// 1. Verify OSIRIS Header Telemetry Elements in index.html
-console.log('Test 1: Verifying OSIRIS header telemetry in index.html...');
-assert.ok(indexHtml.includes('id="osirisHeaderTelemetry"'), 'Header telemetry container must exist');
-assert.ok(indexHtml.includes('id="zuluTimeDisplay"'), 'Zulu time display must exist');
-assert.ok(indexHtml.includes('id="telemetryActiveLayers"'), 'Active layers chip must exist');
-assert.ok(indexHtml.includes('id="telemetryEntityCount"'), 'Entity counter chip must exist');
-assert.ok(indexHtml.includes('id="solarFluxVal"'), 'Solar flux chip must exist');
-assert.ok(indexHtml.includes('id="osirisSubRibbon"'), 'Operational sub-ribbon must exist');
-console.log('✓ Passed: OSIRIS header telemetry markup verified');
+// 1. Verify Clean Header Elements in index.html
+console.log('Test 1: Verifying clean header layout in index.html...');
+assert.ok(indexHtml.includes('class="header"'), 'Header container must exist');
+assert.ok(indexHtml.includes('id="kosintLogo"'), 'Brand logo must exist');
+assert.ok(indexHtml.includes('id="monitorBtn"'), 'Refresh monitor button must exist');
+assert.ok(indexHtml.includes('id="liveIndicator"'), 'Live indicator must exist');
+assert.ok(indexHtml.includes('id="clockDisplay"'), 'Clock display must exist');
+console.log('✓ Passed: Clean header markup verified');
 
 // 2. Verify Floating Bottom-Left 3D/2D and Map/Sat Controls in index.html
 console.log('Test 2: Verifying OSIRIS floating map controls pill...');

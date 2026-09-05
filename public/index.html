@@ -1,1594 +1,1783 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KOSINT — Open-Source Intelligence Platform</title>
-  <meta name="description" content="KOSINT — Real-time Open-Source Intelligence Platform tracking news, weather, traffic, radiation, AQI, seismic activity, wildfires, aviation, and border crossings." />
+  <meta name="description"
+    content="KOSINT — Real-time Open-Source Intelligence Platform tracking news, weather, traffic, radiation, AQI, seismic activity, wildfires, aviation, and border crossings." />
   <link rel="icon" type="image/svg+xml" href="assets/kosint-logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet" />
   <link href="vendor/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css?v=2.6.2" />
 </head>
+
 <body>
 
-<!-- ── Header ──────────────────────────────────────────────────────────────── -->
-<header class="header">
-  <div class="header-brand">
-    <div class="brand-logo" id="kosintLogo">
-      <svg class="brand-logo-svg" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-          <linearGradient id="kosintGrad1" x1="2" y1="18" x2="34" y2="18" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.6"/>
-            <stop offset="50%" stop-color="#67e8f9"/>
-            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.6"/>
-          </linearGradient>
-          <linearGradient id="kosintCoreGrad" x1="12" y1="12" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#a5f3fc"/>
-            <stop offset="100%" stop-color="#0284c7"/>
-          </linearGradient>
-          <filter id="kosintGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="1.5" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-        
-        <!-- Outer Geospatial Observation Eye -->
-        <path d="M3 18C7.5 10.5 13.5 6.5 18 6.5C22.5 6.5 28.5 10.5 33 18C28.5 25.5 22.5 29.5 18 29.5C13.5 29.5 7.5 25.5 3 18Z" 
-              stroke="url(#kosintGrad1)" stroke-width="1.8" stroke-linejoin="round" opacity="0.95"/>
-        
-        <!-- Topographic Contour / Radar Rings -->
-        <ellipse cx="18" cy="18" rx="10" ry="8.5" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="2.5 1.5" opacity="0.5"/>
-        <ellipse cx="18" cy="18" rx="6.5" ry="6.5" stroke="url(#kosintGrad1)" stroke-width="1.4" opacity="0.85"/>
-        
-        <!-- Network Coordinate Lines (Intelligence Grid) -->
-        <line x1="18" y1="4" x2="18" y2="9" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
-        <line x1="18" y1="27" x2="18" y2="32" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
-        <line x1="1" y1="18" x2="6" y2="18" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
-        <line x1="30" y1="18" x2="35" y2="18" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
-        
-        <!-- Central Glowing Sensor Core / Focal Point -->
-        <circle cx="18" cy="18" r="3" fill="url(#kosintCoreGrad)" filter="url(#kosintGlow)"/>
-        <circle cx="18" cy="18" r="1" fill="#ffffff"/>
-      </svg>
-    </div>
-    <div class="brand-text">
-      <span class="brand-name">KOSINT</span>
-      <span class="brand-sub">Open-Source Intelligence Platform</span>
-    </div>
-  </div>
+  <!-- ── Header ──────────────────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="brand-logo" id="kosintLogo">
+        <svg class="brand-logo-svg" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true">
+          <defs>
+            <linearGradient id="kosintGrad1" x1="2" y1="18" x2="34" y2="18" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.6" />
+              <stop offset="50%" stop-color="#67e8f9" />
+              <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.6" />
+            </linearGradient>
+            <linearGradient id="kosintCoreGrad" x1="12" y1="12" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#a5f3fc" />
+              <stop offset="100%" stop-color="#0284c7" />
+            </linearGradient>
+            <filter id="kosintGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
 
-  <!-- ── OSIRIS AI Header Telemetry Bar ──────────────────────────────────────── -->
-  <div class="osiris-header-telemetry" id="osirisHeaderTelemetry">
-    <div class="telemetry-chip zulu"><span class="chip-label">ZULU</span> <span class="chip-val" id="zuluTimeDisplay">00:00:00Z</span></div>
-    <div class="telemetry-chip status"><span class="chip-label">STATUS:</span> <span class="chip-val status-live">LIVE</span></div>
-    <div class="telemetry-chip layers"><span class="chip-val" id="telemetryActiveLayers">10</span> <span class="chip-label">LAYERS</span></div>
-    <div class="telemetry-chip entities"><span class="chip-val" id="telemetryEntityCount">1,480</span> <span class="chip-label">ENTITIES</span></div>
-    <div class="telemetry-chip solar"><span class="chip-label">SOLAR:</span> <span class="chip-val solar-val" id="solarFluxVal">Kp1</span></div>
-    <div class="telemetry-chip version"><span class="chip-val">V.4.2</span></div>
-  </div>
+          <!-- Outer Geospatial Observation Eye -->
+          <path
+            d="M3 18C7.5 10.5 13.5 6.5 18 6.5C22.5 6.5 28.5 10.5 33 18C28.5 25.5 22.5 29.5 18 29.5C13.5 29.5 7.5 25.5 3 18Z"
+            stroke="url(#kosintGrad1)" stroke-width="1.8" stroke-linejoin="round" opacity="0.95" />
 
-  <div class="header-controls">
-    <div class="input-group slim">
-      <div class="input-icon">🕒</div>
-      <select id="timelineSelect" class="input-field select-field">
-        <option value="1h">Last 1h</option>
-        <option value="6h">Last 6h</option>
-        <option value="24h" selected>Last 24h</option>
-        <option value="7d">Last 7d</option>
-      </select>
-    </div>
-    <button id="monitorBtn" class="btn-monitor" onclick="startMonitor()">
-      <span class="btn-icon">⚡</span> REFRESH
-    </button>
-  </div>
+          <!-- Topographic Contour / Radar Rings -->
+          <ellipse cx="18" cy="18" rx="10" ry="8.5" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="2.5 1.5"
+            opacity="0.5" />
+          <ellipse cx="18" cy="18" rx="6.5" ry="6.5" stroke="url(#kosintGrad1)" stroke-width="1.4" opacity="0.85" />
 
-  <div class="header-status">
-    <div class="user-badge" id="userBadge" style="display:none">
-      <span class="user-role-badge" id="userRoleBadge">OPERATOR</span>
-      <span class="user-name" id="userName">Observer</span>
-      <button class="btn-xs btn-logout" id="logoutBtn" title="Sign out of KOSINT">Sign out</button>
-    </div>
-    <div id="liveIndicator" class="status-indicator offline">
-      <span class="status-dot"></span>
-      <span class="status-text">OFFLINE</span>
-    </div>
-    <div class="clock" id="clockDisplay"></div>
-  </div>
-</header>
+          <!-- Network Coordinate Lines (Intelligence Grid) -->
+          <line x1="18" y1="4" x2="18" y2="9" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round"
+            opacity="0.7" />
+          <line x1="18" y1="27" x2="18" y2="32" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round"
+            opacity="0.7" />
+          <line x1="1" y1="18" x2="6" y2="18" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round"
+            opacity="0.7" />
+          <line x1="30" y1="18" x2="35" y2="18" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round"
+            opacity="0.7" />
 
-<!-- ── OSIRIS Sub-Header Operational Ribbon ────────────────────────────────── -->
-<div class="osiris-sub-ribbon" id="osirisSubRibbon">
-  <div class="ribbon-inner">
-    <span>REAL-TIME BALKAN MONITORING</span>
-    <span class="ribbon-dot">·</span>
-    <span>MILITARY FLIGHTS & TRAILS</span>
-    <span class="ribbon-dot">·</span>
-    <span>QKMK BORDER TELEMETRY</span>
-    <span class="ribbon-dot">·</span>
-    <span>CCTV SURVEILLANCE</span>
-    <span class="ribbon-dot">·</span>
-    <span>METEOROLOGICAL & AIR QUALITY</span>
-    <span class="ribbon-dot">·</span>
-    <span>NASA THERMAL WILDFIRES</span>
-    <span class="ribbon-dot">·</span>
-    <span>EMSC SEISMIC</span>
-    <span class="ribbon-dot">·</span>
-    <span>MINE HAZARDS & STANDOFF</span>
-    <span class="ribbon-dot">·</span>
-    <span>STAFF WARDEN EVACUATION</span>
-  </div>
-</div>
-
-<!-- ── Main Layout (OSIRIS AI Map-First Canvas) ────────────────────────────── -->
-<main class="main-layout">
-  <!-- ── OSIRIS AI Inspired Vertical Navigation Rail ───────────────────────── -->
-  <nav class="osiris-nav-rail" id="moduleNavRail" aria-label="Intelligence Modules">
-    <div class="nav-rail-group">
-      <button class="nav-rail-btn" data-panel="newsPanel" onclick="toggleModule('newsPanel')" aria-label="News Intelligence">
-        <span class="nav-rail-icon">📰</span>
-        <span class="nav-rail-tooltip">News Intelligence</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="trafficPanel" onclick="toggleModule('trafficPanel')" aria-label="Traffic Intelligence">
-        <span class="nav-rail-icon">🚦</span>
-        <span class="nav-rail-tooltip">Traffic Intelligence</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')" aria-label="Wildfire Detection">
-        <span class="nav-rail-icon">🔥</span>
-        <span class="nav-rail-tooltip">Wildfire Detection</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="aviationPanel" onclick="toggleModule('aviationPanel')" aria-label="Aviation Intelligence">
-        <span class="nav-rail-icon">✈️</span>
-        <span class="nav-rail-tooltip">Aviation Intelligence</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="routePanel" onclick="toggleModule('routePanel')" aria-label="Route Intelligence">
-        <span class="nav-rail-icon">🛣️</span>
-        <span class="nav-rail-tooltip">Route Intelligence</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="telegramPanel" onclick="toggleModule('telegramPanel')" aria-label="Telegram Public Feed">
-        <span class="nav-rail-icon">📱</span>
-        <span class="nav-rail-tooltip">Telegram Public Feed</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="cctvIntelligencePanel" onclick="toggleModule('cctvIntelligencePanel')" aria-label="CCTV Surveillance">
-        <span class="nav-rail-icon">📹</span>
-        <span class="nav-rail-tooltip">CCTV Surveillance</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="liveFeedsPanel" id="btnLiveFeedsNav" onclick="toggleModule('liveFeedsPanel')" aria-label="Live Broadcast Feeds">
-        <span class="nav-rail-icon">📺</span>
-        <span class="nav-rail-tooltip">Live News Feeds</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="staffPanel" id="btnStaffWarden" onclick="toggleModule('staffPanel')" aria-label="Staff Warden & Evacuation">
-        <span class="nav-rail-icon">🛡️</span>
-        <span class="nav-rail-lock-badge" id="staffNavLockBadge">🔒</span>
-        <span class="nav-rail-tooltip">Staff Warden & Evacuation</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
+          <!-- Central Glowing Sensor Core / Focal Point -->
+          <circle cx="18" cy="18" r="3" fill="url(#kosintCoreGrad)" filter="url(#kosintGlow)" />
+          <circle cx="18" cy="18" r="1" fill="#ffffff" />
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">KOSINT</span>
+        <span class="brand-sub">Open-Source Intelligence Platform</span>
+      </div>
     </div>
 
-    <div class="nav-rail-divider"></div>
-
-    <div class="nav-rail-group nav-rail-utility">
-      <button class="nav-rail-btn" data-panel="alertPanel" onclick="toggleModule('alertPanel')" aria-label="Alert Log">
-        <span class="nav-rail-icon">🔔</span>
-        <span class="nav-rail-badge" id="unreadBadge" style="display:none"></span>
-        <span class="nav-rail-tooltip">Alert Log</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-      <button class="nav-rail-btn" data-panel="settingsPanel" onclick="toggleModule('settingsPanel')" aria-label="System Settings">
-        <span class="nav-rail-icon">⚙️</span>
-        <span class="nav-rail-tooltip">System Settings</span>
-        <span class="nav-rail-active-indicator"></span>
-      </button>
-    </div>
-  </nav>
-
-  <!-- ── Full-Viewport Map Stage ────────────────────────────────────────────── -->
-  <section class="map-stage">
-    <div class="map-card">
-      <div class="panel map-panel" id="mapPanel">
-        <div id="leafletMap"></div>
-
-        <!-- Virtual Directional Pan/Zoom Pad (Controlled by Style Studio) -->
-        <div class="osiris-pan-pad" id="osirisPanZoomPad" style="display:none;">
-          <button type="button" class="pan-pad-btn pan-up" onclick="state.map && state.map.panBy([0, -80])" title="Pan North">▲</button>
-          <div class="pan-pad-mid">
-            <button type="button" class="pan-pad-btn pan-left" onclick="state.map && state.map.panBy([-80, 0])" title="Pan West">◀</button>
-            <button type="button" class="pan-pad-btn pan-center" onclick="resetMapNorth()" title="Reset North">●</button>
-            <button type="button" class="pan-pad-btn pan-right" onclick="state.map && state.map.panBy([80, 0])" title="Pan East">▶</button>
-          </div>
-          <button type="button" class="pan-pad-btn pan-down" onclick="state.map && state.map.panBy([0, 80])" title="Pan South">▼</button>
+    <div class="header-right">
+      <div class="header-controls">
+        <div class="input-group slim">
+          <div class="input-icon">🕒</div>
+          <select id="timelineSelect" class="input-field select-field" aria-label="Select intelligence timeline">
+            <option value="1h">Last 1h</option>
+            <option value="6h">Last 6h</option>
+            <option value="24h" selected>Last 24h</option>
+            <option value="7d">Last 7d</option>
+          </select>
         </div>
-
-        <!-- ── OSIRIS Bottom-Left Floating Map Controls Pill ─────────────── -->
-        <div class="osiris-bottom-left-widget" id="osirisBottomLeftWidget">
-          <!-- 1. 3D / 2D Pill Group -->
-          <div class="osiris-pill-group">
-            <button class="osiris-pill-btn" id="btnOsiris3D" onclick="toggle3DView(true)" title="Switch to 3D Terrain Elevation & Extruded Buildings (3)">
-              <span class="pill-ico">🌐</span> 3D
-            </button>
-            <button class="osiris-pill-btn active" id="btnOsiris2D" onclick="toggle3DView(false)" title="Switch to 2D Tactical Plan View (2)">
-              <span class="pill-ico">👤</span> 2D
-            </button>
-          </div>
-
-          <!-- 2. Solar Day / Night Cycle Toggle -->
-          <div class="osiris-pill-group">
-            <button class="osiris-pill-btn" id="btnToggleDayNightCycle" onclick="toggleDayNightCycle()" title="Toggle Solar Day/Night Shading">
-              <span class="pill-ico" id="osirisDayNightIcon">☀️</span> <span id="osirisDayNightLabel">DAY</span>
-            </button>
-          </div>
-
-          <!-- 3. Reset Compass to North (Between 2D/3D & MAP/SAT) -->
-          <div class="osiris-pill-group">
-            <button class="osiris-pill-btn" id="btnOsirisResetNorth" onclick="resetMapNorth()" title="Reset Compass / Bearing to North (R)">
-              <span class="pill-ico">🧭</span> NORTH
-            </button>
-          </div>
-
-          <!-- 4. MAP / SAT Basemap Pill Group -->
-          <div class="osiris-pill-group">
-            <button class="osiris-pill-btn active" id="btnOsirisMap" onclick="switchOsirisBasemap('map')" title="Dark Tactical Vector Basemap">
-              <span class="pill-ico">🌙</span> MAP
-            </button>
-            <button class="osiris-pill-btn" id="btnOsirisSat" onclick="switchOsirisBasemap('satellite')" title="High-Resolution Satellite Imagery">
-              <span class="pill-ico">🛰️</span> SAT
-            </button>
-          </div>
-
-          <!-- 5. Scale Indicator -->
-          <div class="osiris-scale-pill" id="osirisScalePill">
-            <span class="scale-bar-line"></span>
-            <span class="scale-text" id="osirisScaleText">20 km</span>
-          </div>
-        </div>
-
-        <!-- ── OSIRIS Right-Side Floating Quick-Actions Rail ─────────────── -->
-        <div class="osiris-right-rail" id="osirisRightRail">
-          <button class="osiris-rail-btn" id="btnToggleDrawingTools" onclick="toggleDrawingToolsWidget()" title="Tactical Drawing Tools & AOI Measurement (D)">
-            <span class="rail-icon">📐</span>
-          </button>
-          <button class="osiris-rail-btn" id="btnDefenseMarkets" onclick="toggleDefenseMarketPanel()" title="Defense Equities, Market Breadth & Space Weather (M)">
-            <span class="rail-icon">📈</span>
-          </button>
-          <button class="osiris-rail-btn" onclick="focusKosovoBounds()" title="Focus Kosovo Theater">
-            <span class="rail-icon">🎯</span>
-          </button>
-          <button class="osiris-rail-btn" onclick="toggleTacticalLayersMenu()" title="Tactical Operational Layers (MSR, Bases, Mines)">
-            <span class="rail-icon">🗺️</span>
-          </button>
-          <button class="osiris-rail-btn" onclick="toggleFullScreenMode()" title="Toggle Fullscreen (F)">
-            <span class="rail-icon">⛶</span>
-          </button>
-        </div>
-
-        <!-- ── Floating Tactical Layers Switcher ────────────────────────── -->
-        <div class="tactical-layers-widget" id="tacticalLayersWidget">
-          <button class="tactical-layers-btn" id="btnTacticalLayersToggle" onclick="toggleTacticalLayersMenu()" title="Tactical Map Layers (KFOR Sectors, Strategic Corridors)">
-            <span class="layers-icon">🗺️</span>
-            <span class="layers-label">TACTICAL LAYERS</span>
-            <span class="layers-badge" id="tacticalLayersActiveBadge">0 Active</span>
-          </button>
-          <div class="tactical-layers-menu" id="tacticalLayersMenu" style="display:none">
-            <div class="layers-menu-header">
-              <span class="layers-menu-title">OPERATIONAL ZONES & CORRIDORS</span>
-              <button class="layers-menu-close" onclick="toggleTacticalLayersMenu(false)">✕</button>
-            </div>
-            <div class="layers-menu-body">
-              <!-- 1. Minefields & UXO Hazards (Top priority) -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerMines" onchange="toggleTacticalLayer('mines', this.checked)">
-                <span class="layer-toggle-indicator indicator-mines"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Minefields & UXO Hazards</span>
-                  <span class="layer-toggle-sub">Suspected / confirmed hazard areas & standoff buffers</span>
-                </div>
-              </label>
-
-              <!-- 2. KFOR Military Bases & Checkpoints -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerKfor" onchange="toggleTacticalLayer('kfor', this.checked)">
-                <span class="layer-toggle-indicator indicator-kfor"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">KFOR Military Bases & Fixed Checkpoints</span>
-                  <span class="layer-toggle-sub">Camp Bondsteel, Film City, Nothing Hill, MSU Ibar Post</span>
-                </div>
-              </label>
-
-              <!-- 3. Ibar Bridges & Special Protective Zones -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerCorridors" onchange="toggleTacticalLayer('corridors', this.checked)">
-                <span class="layer-toggle-indicator indicator-corridors"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Ibar Bridges & Special Protective Zones (SPZ)</span>
-                  <span class="layer-toggle-sub">Transit bridges & UNESCO protected heritage zones (Dečani, Peć, Gračanica)</span>
-                </div>
-              </label>
-
-              <!-- 4. Border Crossings & Transit Points -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerBorder" onchange="toggleTacticalLayer('border', this.checked)">
-                <span class="layer-toggle-indicator indicator-border"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Border Crossings & Transit Points</span>
-                  <span class="layer-toggle-sub">Nakordoni/QKMK live entry/exit queue lengths & border status telemetry</span>
-                </div>
-              </label>
-
-              <!-- 6. KFOR Main Supply Routes (MSR) -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerMsr" onchange="toggleTacticalLayer('msr', this.checked)">
-                <span class="layer-toggle-indicator indicator-msr"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">KFOR Main Supply Routes (MSR)</span>
-                  <span class="layer-toggle-sub">MSR Bull, MSR Hawk, MSR Dog, MSR Lion, Route Fox</span>
-                </div>
-              </label>
-
-              <!-- 7. Seismic Activity (EMSC) -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerSeismic" onchange="toggleTacticalLayer('seismic', this.checked)">
-                <span class="layer-toggle-indicator indicator-seismic"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Seismic Activity (EMSC)</span>
-                  <span class="layer-toggle-sub">Regional earthquake epicenters & telemetry</span>
-                </div>
-              </label>
-
-              <!-- 8. Radiation Monitor (EURDEP) -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerRadiation" onchange="toggleTacticalLayer('radiation', this.checked)">
-                <span class="layer-toggle-indicator indicator-radiation"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Radiation Monitor (EURDEP)</span>
-                  <span class="layer-toggle-sub">Early warning ambient dose sensors</span>
-                </div>
-              </label>
-
-              <!-- 9. Weather Monitor -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerWeather" onchange="toggleTacticalLayer('weather', this.checked)">
-                <span class="layer-toggle-indicator indicator-weather"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Weather Monitor</span>
-                  <span class="layer-toggle-sub">Live municipal temperatures, humidity & meteorological forecast</span>
-                </div>
-              </label>
-
-              <!-- 10. Air Quality Index (AQI) -->
-              <label class="layer-toggle-item">
-                <input type="checkbox" id="toggleLayerAqi" onchange="toggleTacticalLayer('aqi', this.checked)">
-                <span class="layer-toggle-indicator indicator-aqi"></span>
-                <div class="layer-toggle-info">
-                  <span class="layer-toggle-name">Air Quality Index (AQI)</span>
-                  <span class="layer-toggle-sub">PM2.5, PM10, ozone & atmospheric health sensors</span>
-                </div>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Tactical Drawing Tools & AOI Measurement Widget ─────────── -->
-        <div class="drawing-tools-widget" id="drawingToolsWidget" style="display:none">
-          <div class="drawing-widget-header">
-            <div class="drawing-widget-title">
-              <span class="drawing-icon">📐</span>
-              <span>TACTICAL DRAWING &amp; AOI</span>
-            </div>
-            <button class="drawing-widget-close" onclick="toggleDrawingToolsWidget(false)" title="Close drawing tools">✕</button>
-          </div>
-          <div class="drawing-widget-metrics">
-            <div class="drawing-metric-box">
-              <span class="drawing-metric-lbl">Tracked Area</span>
-              <span class="drawing-metric-val" id="aoiTrackedArea">0.0 km²</span>
-            </div>
-            <div class="drawing-metric-box">
-              <span class="drawing-metric-lbl">AOIs / Perim</span>
-              <span class="drawing-metric-val" id="aoiPerim">0 / 0.0 km</span>
-            </div>
-          </div>
-          <div class="drawing-step-title">STEP 1 — CHOOSE A SHAPE</div>
-          <div class="drawing-shapes-grid">
-            <button class="drawing-shape-btn active" id="btnShapeArea" onclick="setDrawingShape('area')">
-              <span class="shape-ico">⬡</span>
-              <div class="shape-text-wrap">
-                <span class="shape-name">AREA</span>
-                <span class="shape-desc">Any shape, corner by corner</span>
-              </div>
-            </button>
-            <button class="drawing-shape-btn" id="btnShapeBox" onclick="setDrawingShape('box')">
-              <span class="shape-ico">▭</span>
-              <div class="shape-text-wrap">
-                <span class="shape-name">BOX</span>
-                <span class="shape-desc">Two clicks, opposite corners</span>
-              </div>
-            </button>
-            <button class="drawing-shape-btn" id="btnShapeRadius" onclick="setDrawingShape('radius')">
-              <span class="shape-ico">◯</span>
-              <div class="shape-text-wrap">
-                <span class="shape-name">RADIUS</span>
-                <span class="shape-desc">Centre and radius circle</span>
-              </div>
-            </button>
-            <button class="drawing-shape-btn" id="btnShapePath" onclick="setDrawingShape('path')">
-              <span class="shape-ico">〰</span>
-              <div class="shape-text-wrap">
-                <span class="shape-name">PATH</span>
-                <span class="shape-desc">Distance along route</span>
-              </div>
-            </button>
-          </div>
-          <div class="drawing-status-hint" id="drawingStatusHint">
-            Click on map to place polygon vertices. Click first point or "Complete" to finish.
-          </div>
-          <div class="drawing-inside-container" id="drawingInsideBox" style="display:none">
-            <div class="drawing-inside-header">
-              <span class="drawing-inside-title">🎯 DETECTED IN AOI</span>
-              <span class="drawing-inside-badge" id="drawingInsideCount">0 items</span>
-            </div>
-            <div class="drawing-inside-list" id="drawingInsideList"></div>
-          </div>
-          <div class="drawing-actions-row">
-            <button class="btn-xs btn-drawing-action" onclick="clearDrawnAoi()">🗑️ Clear</button>
-            <button class="btn-xs btn-drawing-action primary" id="btnDrawingComplete" onclick="finishCurrentShape()" style="display:none">✓ Complete Shape</button>
-            <button class="btn-xs btn-drawing-action" onclick="exportAoiGeoJson()">💾 Export</button>
-          </div>
-        </div>
-
-        <!-- ── Defense Equities, Market Breadth & Space Weather Drawer ────── -->
-        <div class="osiris-market-drawer" id="defenseMarketPanel" style="display:none">
-          <div class="market-drawer-header">
-            <div class="market-header-title">
-              <span class="market-icon">📈</span>
-              <span>DEFENSE EQUITIES &amp; SPACE WEATHER</span>
-            </div>
-            <button class="market-drawer-close" onclick="toggleDefenseMarketPanel(false)" title="Close panel">✕</button>
-          </div>
-          <div class="market-drawer-body">
-            <!-- BREADTH CARD -->
-            <div class="market-section-card breadth-card">
-              <div class="market-section-label">BREADTH</div>
-              <div class="breadth-ratio-row">
-                <span class="breadth-ratio-highlight" id="marketBreadthRatio">17▲ / 11▼</span>
-                <span class="breadth-ratio-total" id="marketBreadthTotal">of 28</span>
-              </div>
-              <div class="breadth-movers-row">
-                <span class="mover-up" id="marketMoverUp">▲ Corn +4.17%</span>
-                <span class="mover-down" id="marketMoverDown">▼ PLTR -4.49%</span>
-              </div>
-            </div>
-
-            <!-- SPACE WEATHER CARD -->
-            <div class="market-section-card space-weather-card">
-              <div class="market-section-label">SPACE WEATHER</div>
-              <div class="space-weather-main">
-                <span class="kp-badge" id="spaceWeatherKpBadge">Kp 0 — Quiet</span>
-              </div>
-              <div class="space-flare-sub">
-                Latest flare: <span class="flare-val" id="spaceWeatherFlareVal">M1.0</span> · HF Propagation Nominal
-              </div>
-            </div>
-
-            <!-- SECTOR / OVERVIEW TABS -->
-            <div class="market-section-card sector-card">
-              <div class="market-tabs-row" id="marketTabsRow">
-                <div class="market-tab-item" data-sector="overview" onclick="switchDefenseSector('overview', this)"><span class="tab-name">AI OVERVIEW</span></div>
-                <div class="market-tab-item" data-sector="indices" onclick="switchDefenseSector('indices', this)"><span class="tab-name">INDICES</span> <span class="tab-cnt">5</span></div>
-                <div class="market-tab-item active-sector active" data-sector="defense" onclick="switchDefenseSector('defense', this)"><span class="tab-name">DEFENSE</span> <span class="tab-cnt">7</span></div>
-                <div class="market-tab-item" data-sector="energy" onclick="switchDefenseSector('energy', this)"><span class="tab-name">ENERGY</span> <span class="tab-cnt">3</span></div>
-                <div class="market-tab-item" data-sector="commodities" onclick="switchDefenseSector('commodities', this)"><span class="tab-name">COMMODITIES</span> <span class="tab-cnt">5</span></div>
-                <div class="market-tab-item" data-sector="crypto" onclick="switchDefenseSector('crypto', this)"><span class="tab-name">CRYPTO</span> <span class="tab-cnt">4</span></div>
-                <div class="market-tab-item" data-sector="fx" onclick="switchDefenseSector('fx', this)"><span class="tab-name">FX</span> <span class="tab-cnt">4</span></div>
-              </div>
-              <div class="market-session-status">
-                <span class="session-badge" id="marketSessionBadge">SESSION CLOSED</span>
-                <span class="session-preset" id="marketSessionPreset">DEFAULT</span>
-              </div>
-            </div>
-
-            <!-- DEFENSE QUOTES LIST -->
-            <div class="market-quotes-container">
-              <div class="market-quotes-header">
-                <span id="marketBasketTitle">DEFENSE &amp; AEROSPACE BASKET</span>
-                <span class="quotes-update-time" id="marketUpdateTime">REAL-TIME FEED</span>
-              </div>
-              <div class="market-quotes-list" id="defenseQuotesList">
-                <div class="quote-row">
-                  <div class="quote-ticker-wrap">
-                    <span class="quote-ticker">RTX</span>
-                    <span class="quote-corp">RTX Corporation / Raytheon</span>
-                  </div>
-                  <div class="quote-price-wrap">
-                    <span class="quote-price">200.79</span>
-                    <span class="quote-change down">-0.66%</span>
-                  </div>
-                </div>
-                <div class="quote-row">
-                  <div class="quote-ticker-wrap">
-                    <span class="quote-ticker">LMT</span>
-                    <span class="quote-corp">Lockheed Martin Corp</span>
-                  </div>
-                  <div class="quote-price-wrap">
-                    <span class="quote-price">525.28</span>
-                    <span class="quote-change down">-1.44%</span>
-                  </div>
-                </div>
-                <div class="quote-row">
-                  <div class="quote-ticker-wrap">
-                    <span class="quote-ticker">NOC</span>
-                    <span class="quote-corp">Northrop Grumman Corp</span>
-                  </div>
-                  <div class="quote-price-wrap">
-                    <span class="quote-price">514.98</span>
-                    <span class="quote-change down">-2.51%</span>
-                  </div>
-                </div>
-                <div class="quote-row">
-                  <div class="quote-ticker-wrap">
-                    <span class="quote-ticker">GD</span>
-                    <span class="quote-corp">General Dynamics Corp</span>
-                  </div>
-                  <div class="quote-price-wrap">
-                    <span class="quote-price">359.39</span>
-                    <span class="quote-change down">-1.77%</span>
-                  </div>
-                </div>
-                <div class="quote-row">
-                  <div class="quote-ticker-wrap">
-                    <span class="quote-ticker">BA</span>
-                    <span class="quote-corp">The Boeing Company</span>
-                  </div>
-                  <div class="quote-price-wrap">
-                    <span class="quote-price">212.25</span>
-                    <span class="quote-change up">+0.83%</span>
-                  </div>
-                </div>
-                <div class="quote-row">
-                  <div class="quote-ticker-wrap">
-                    <span class="quote-ticker">LHX</span>
-                    <span class="quote-corp">L3Harris Technologies</span>
-                  </div>
-                  <div class="quote-price-wrap">
-                    <span class="quote-price">256.45</span>
-                    <span class="quote-change down">-2.17%</span>
-                  </div>
-                </div>
-                <div class="quote-row">
-                  <div class="quote-ticker-wrap">
-                    <span class="quote-ticker">PLTR</span>
-                    <span class="quote-corp">Palantir Technologies</span>
-                  </div>
-                  <div class="quote-price-wrap">
-                    <span class="quote-price">174.33</span>
-                    <span class="quote-change down">-4.49%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <button id="monitorBtn" class="btn-monitor" onclick="startMonitor()">
+          <span class="btn-icon">⚡</span> REFRESH
+        </button>
       </div>
 
-      <!-- ── Focused Module Overlay Panel ───────────────────────────────────── -->
-      <div class="module-overlay" id="moduleOverlay" aria-hidden="true">
-        <div class="overlay-shell">
-          <div class="overlay-header">
-            <div>
-              <div class="overlay-title" id="overlayTitle">Module Panel</div>
-              <div class="overlay-sub">Focused intelligence feed over live map view.</div>
+      <div class="header-status">
+        <div class="user-badge" id="userBadge" style="display:none">
+          <span class="user-role-badge" id="userRoleBadge">OPERATOR</span>
+          <span class="user-name" id="userName">Observer</span>
+          <button class="btn-xs btn-logout" id="logoutBtn" title="Sign out of KOSINT">Sign out</button>
+        </div>
+        <div class="clock" id="clockDisplay"></div>
+        <div id="liveIndicator" class="status-indicator offline">
+          <span class="status-dot"></span>
+          <span class="status-text">LIVE</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main Layout (OSIRIS AI Map-First Canvas) ────────────────────────────── -->
+  <main class="main-layout">
+    <!-- ── OSIRIS AI Inspired Vertical Navigation Rail ───────────────────────── -->
+    <nav class="osiris-nav-rail" id="moduleNavRail" aria-label="Intelligence Modules">
+      <div class="nav-rail-group">
+        <button class="nav-rail-btn" data-panel="newsPanel" onclick="toggleModule('newsPanel')"
+          aria-label="News Intelligence">
+          <span class="nav-rail-icon">📰</span>
+          <span class="nav-rail-tooltip">News Intelligence</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="trafficPanel" onclick="toggleModule('trafficPanel')"
+          aria-label="Traffic Intelligence">
+          <span class="nav-rail-icon">🚦</span>
+          <span class="nav-rail-tooltip">Traffic Intelligence</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="wildfirePanel" onclick="toggleModule('wildfirePanel')"
+          aria-label="Wildfire Detection">
+          <span class="nav-rail-icon">🔥</span>
+          <span class="nav-rail-tooltip">Wildfire Detection</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="aviationPanel" onclick="toggleModule('aviationPanel')"
+          aria-label="Aviation Intelligence">
+          <span class="nav-rail-icon">✈️</span>
+          <span class="nav-rail-tooltip">Aviation Intelligence</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="routePanel" onclick="toggleModule('routePanel')"
+          aria-label="Route Intelligence">
+          <span class="nav-rail-icon">🛣️</span>
+          <span class="nav-rail-tooltip">Route Intelligence</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="telegramPanel" onclick="toggleModule('telegramPanel')"
+          aria-label="Telegram Public Feed">
+          <span class="nav-rail-icon">📱</span>
+          <span class="nav-rail-tooltip">Telegram Public Feed</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="cctvIntelligencePanel" onclick="toggleModule('cctvIntelligencePanel')"
+          aria-label="CCTV Surveillance">
+          <span class="nav-rail-icon">📹</span>
+          <span class="nav-rail-tooltip">CCTV Surveillance</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="liveFeedsPanel" id="btnLiveFeedsNav"
+          onclick="toggleModule('liveFeedsPanel')" aria-label="Live Broadcast Feeds">
+          <span class="nav-rail-icon">📺</span>
+          <span class="nav-rail-tooltip">Live News Feeds</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="staffPanel" id="btnStaffWarden" onclick="toggleModule('staffPanel')"
+          aria-label="Staff Warden & Evacuation">
+          <span class="nav-rail-icon">🛡️</span>
+          <span class="nav-rail-lock-badge" id="staffNavLockBadge">🔒</span>
+          <span class="nav-rail-tooltip">Staff Warden & Evacuation</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+      </div>
+
+      <div class="nav-rail-divider"></div>
+
+      <div class="nav-rail-group nav-rail-utility">
+        <button class="nav-rail-btn" data-panel="alertPanel" onclick="toggleModule('alertPanel')"
+          aria-label="Alert Log">
+          <span class="nav-rail-icon">🔔</span>
+          <span class="nav-rail-badge" id="unreadBadge" style="display:none"></span>
+          <span class="nav-rail-tooltip">Alert Log</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+        <button class="nav-rail-btn" data-panel="settingsPanel" onclick="toggleModule('settingsPanel')"
+          aria-label="System Settings">
+          <span class="nav-rail-icon">⚙️</span>
+          <span class="nav-rail-tooltip">System Settings</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ── Full-Viewport Map Stage ────────────────────────────────────────────── -->
+    <section class="map-stage">
+      <div class="map-card">
+        <div class="panel map-panel" id="mapPanel">
+          <div id="leafletMap"></div>
+
+          <!-- Virtual Directional Pan/Zoom Pad (Controlled by Style Studio) -->
+          <div class="osiris-pan-pad" id="osirisPanZoomPad" style="display:none;">
+            <button type="button" class="pan-pad-btn pan-up" onclick="state.map && state.map.panBy([0, -80])"
+              title="Pan North">▲</button>
+            <div class="pan-pad-mid">
+              <button type="button" class="pan-pad-btn pan-left" onclick="state.map && state.map.panBy([-80, 0])"
+                title="Pan West">◀</button>
+              <button type="button" class="pan-pad-btn pan-center" onclick="resetMapNorth()"
+                title="Reset North">●</button>
+              <button type="button" class="pan-pad-btn pan-right" onclick="state.map && state.map.panBy([80, 0])"
+                title="Pan East">▶</button>
             </div>
-            <button class="overlay-close" onclick="closeModulePanel()" aria-label="Close module panel">✕</button>
+            <button type="button" class="pan-pad-btn pan-down" onclick="state.map && state.map.panBy([0, 80])"
+              title="Pan South">▼</button>
           </div>
-          <div class="overlay-content">
 
-            <!-- Live Feeds Broadcast Panel -->
-            <div class="panel overlay-panel" id="liveFeedsPanel" data-panel-title="Live Broadcast Feeds" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">📺</span>
-                  <span>FEEDS · LIVE SATELLITE &amp; BROADCAST</span>
-                  <span class="panel-badge" id="feedsLiveBadge">11 LIVE</span>
-                </div>
-                <div class="panel-meta">FREE BALKAN &amp; GLOBAL CHANNELS</div>
+          <!-- ── OSIRIS Bottom-Left Floating Map Controls Pill ─────────────── -->
+          <div class="osiris-bottom-left-widget" id="osirisBottomLeftWidget">
+            <!-- 1. 3D / 2D Pill Group -->
+            <div class="osiris-pill-group">
+              <button class="osiris-pill-btn" id="btnOsiris3D" onclick="toggle3DView(true)"
+                title="Switch to 3D Terrain Elevation & Extruded Buildings (3)">
+                <span class="pill-ico">🌐</span> 3D
+              </button>
+              <button class="osiris-pill-btn active" id="btnOsiris2D" onclick="toggle3DView(false)"
+                title="Switch to 2D Tactical Plan View (2)">
+                <span class="pill-ico">👤</span> 2D
+              </button>
+            </div>
+
+            <!-- 2. Solar Day / Night Cycle Toggle -->
+            <div class="osiris-pill-group">
+              <button class="osiris-pill-btn" id="btnToggleDayNightCycle" onclick="toggleDayNightCycle()"
+                title="Toggle Solar Day/Night Shading">
+                <span class="pill-ico" id="osirisDayNightIcon">☀️</span> <span id="osirisDayNightLabel">DAY</span>
+              </button>
+            </div>
+
+            <!-- 3. Reset Compass to North (Between 2D/3D & MAP/SAT) -->
+            <div class="osiris-pill-group">
+              <button class="osiris-pill-btn" id="btnOsirisResetNorth" onclick="resetMapNorth()"
+                title="Reset Compass / Bearing to North (R)">
+                <span class="pill-ico">🧭</span> NORTH
+              </button>
+            </div>
+
+            <!-- 4. MAP / SAT Basemap Pill Group -->
+            <div class="osiris-pill-group">
+              <button class="osiris-pill-btn active" id="btnOsirisMap" onclick="switchOsirisBasemap('map')"
+                title="Dark Tactical Vector Basemap">
+                <span class="pill-ico">🌙</span> MAP
+              </button>
+              <button class="osiris-pill-btn" id="btnOsirisSat" onclick="switchOsirisBasemap('satellite')"
+                title="High-Resolution Satellite Imagery">
+                <span class="pill-ico">🛰️</span> SAT
+              </button>
+            </div>
+
+            <!-- 5. Scale Indicator -->
+            <div class="osiris-scale-pill" id="osirisScalePill">
+              <span class="scale-bar-line"></span>
+              <span class="scale-text" id="osirisScaleText">20 km</span>
+            </div>
+          </div>
+
+          <!-- ── OSIRIS Right-Side Floating Quick-Actions Rail ─────────────── -->
+          <div class="osiris-right-rail" id="osirisRightRail">
+            <button class="osiris-rail-btn" id="btnToggleDrawingTools" onclick="toggleDrawingToolsWidget()"
+              title="Tactical Drawing Tools & AOI Measurement (D)">
+              <span class="rail-icon">📐</span>
+            </button>
+            <button class="osiris-rail-btn" id="btnDefenseMarkets" onclick="toggleDefenseMarketPanel()"
+              title="Defense Equities, Market Breadth & Space Weather (M)">
+              <span class="rail-icon">📈</span>
+            </button>
+            <button class="osiris-rail-btn" onclick="focusKosovoBounds()" title="Focus Kosovo Theater">
+              <span class="rail-icon">🎯</span>
+            </button>
+            <button class="osiris-rail-btn" onclick="toggleTacticalLayersMenu()"
+              title="Tactical Operational Layers (MSR, Bases, Mines)">
+              <span class="rail-icon">🗺️</span>
+            </button>
+            <button class="osiris-rail-btn" onclick="toggleFullScreenMode()" title="Toggle Fullscreen (F)">
+              <span class="rail-icon">⛶</span>
+            </button>
+          </div>
+
+          <!-- ── Floating Tactical Layers Switcher ────────────────────────── -->
+          <div class="tactical-layers-widget" id="tacticalLayersWidget">
+            <button class="tactical-layers-btn" id="btnTacticalLayersToggle" onclick="toggleTacticalLayersMenu()"
+              title="Tactical Map Layers (KFOR Sectors, Strategic Corridors)">
+              <span class="layers-icon">🗺️</span>
+              <span class="layers-label">TACTICAL LAYERS</span>
+              <span class="layers-badge" id="tacticalLayersActiveBadge">0 Active</span>
+            </button>
+            <div class="tactical-layers-menu" id="tacticalLayersMenu" style="display:none">
+              <div class="layers-menu-header">
+                <span class="layers-menu-title">OPERATIONAL ZONES & CORRIDORS</span>
+                <button class="layers-menu-close" onclick="toggleTacticalLayersMenu(false)">✕</button>
               </div>
-
-              <!-- Active Video Player Frame -->
-              <div class="live-feed-player-card">
-                <div class="feed-player-header">
-                  <div class="feed-player-title">
-                    <span class="feed-pulse-dot">●</span>
-                    <span id="activeFeedName">Bloomberg TV</span>
-                    <span class="feed-player-loc" id="activeFeedLoc">New York, US</span>
+              <div class="layers-menu-body">
+                <!-- 1. Minefields & UXO Hazards (Top priority) -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerMines" onchange="toggleTacticalLayer('mines', this.checked)">
+                  <span class="layer-toggle-indicator indicator-mines"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Minefields & UXO Hazards</span>
+                    <span class="layer-toggle-sub">Suspected / confirmed hazard areas & standoff buffers</span>
                   </div>
-                  <div class="feed-player-badges">
-                    <span class="badge-live-stream">LIVE STREAM</span>
-                    <a id="feedExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="feed-ext-btn" title="Open feed in browser tab">↗</a>
+                </label>
+
+                <!-- 2. KFOR Military Bases & Checkpoints -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerKfor" onchange="toggleTacticalLayer('kfor', this.checked)">
+                  <span class="layer-toggle-indicator indicator-kfor"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">KFOR Military Bases & Fixed Checkpoints</span>
+                    <span class="layer-toggle-sub">Camp Bondsteel, Film City, Nothing Hill, MSU Ibar Post</span>
                   </div>
-                </div>
-                <div class="feed-video-wrap">
-                  <iframe id="liveFeedVideoFrame" class="live-feed-iframe" src="" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
-                  <div class="feed-video-fallback" id="feedVideoFallback" style="display:none; position:absolute; inset:0; background:rgba(2,6,23,0.95); z-index:10; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px; text-align:center;">
-                    <span style="font-size:24px;">📡</span>
-                    <span style="font-weight:700; color:#f8fafc; font-size:12px;" id="fallbackChannelTitle">Live Broadcast Feed</span>
-                    <p style="font-size:11px; color:#94a3b8; max-width:280px; margin:0;">Direct player embedding restricted by broadcaster security policies. Launch official high-definition live stream directly:</p>
-                    <a id="fallbackExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-xs btn-primary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none; padding:6px 12px; font-weight:700; margin-top:4px;">
-                      ↗ Watch Official Live Stream
-                    </a>
+                </label>
+
+                <!-- 3. Ibar Bridges & Special Protective Zones -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerCorridors"
+                    onchange="toggleTacticalLayer('corridors', this.checked)">
+                  <span class="layer-toggle-indicator indicator-corridors"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Ibar Bridges & Special Protective Zones (SPZ)</span>
+                    <span class="layer-toggle-sub">Transit bridges & UNESCO protected heritage zones (Dečani, Peć,
+                      Gračanica)</span>
                   </div>
-                </div>
-              </div>
+                </label>
 
-              <!-- Custom Video / Stream URL Connect Row -->
-              <div class="feed-custom-connect-row" style="display:flex; gap:6px; margin: 0 14px 10px; align-items:center;">
-                <input type="text" id="feedCustomStreamInput" class="input-field" placeholder="Enter custom YouTube / HLS / MP4 live stream URL..." style="flex:1; font-size:11px; padding:6px 8px;">
-                <button type="button" class="btn-xs btn-primary" onclick="connectCustomFeedStream()" style="white-space:nowrap; padding:6px 10px; font-weight:700;">CONNECT</button>
-              </div>
+                <!-- 4. Border Crossings & Transit Points -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerBorder" onchange="toggleTacticalLayer('border', this.checked)">
+                  <span class="layer-toggle-indicator indicator-border"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Border Crossings & Transit Points</span>
+                    <span class="layer-toggle-sub">Nakordoni/QKMK live entry/exit queue lengths & border status
+                      telemetry</span>
+                  </div>
+                </label>
 
-              <!-- Region & Channel Selector -->
-              <div class="feed-region-tabs">
-                <button class="filter-btn active" id="tabFeedsAll" onclick="switchFeedRegion('all', this)">🌐 ALL FEEDS</button>
-                <button class="filter-btn" id="tabFeedsBalkans" onclick="switchFeedRegion('balkans', this)">🇽🇰 BALKANS (FREE)</button>
-                <button class="filter-btn" id="tabFeedsGlobal" onclick="switchFeedRegion('global', this)">🇺🇸 US / GLOBAL</button>
-              </div>
+                <!-- 6. KFOR Main Supply Routes (MSR) -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerMsr" onchange="toggleTacticalLayer('msr', this.checked)">
+                  <span class="layer-toggle-indicator indicator-msr"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">KFOR Main Supply Routes (MSR)</span>
+                    <span class="layer-toggle-sub">MSR Bull, MSR Hawk, MSR Dog, MSR Lion, Route Fox</span>
+                  </div>
+                </label>
 
-              <!-- Channels List -->
-              <div class="feed-channels-grid" id="feedChannelsGrid"></div>
-            </div>
+                <!-- 7. Seismic Activity (EMSC) -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerSeismic"
+                    onchange="toggleTacticalLayer('seismic', this.checked)">
+                  <span class="layer-toggle-indicator indicator-seismic"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Seismic Activity (EMSC)</span>
+                    <span class="layer-toggle-sub">Regional earthquake epicenters & telemetry</span>
+                  </div>
+                </label>
 
-            <!-- News Panel -->
-            <div class="panel overlay-panel" id="newsPanel" data-panel-title="News Intelligence" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">📰</span>
-                  <span>News Intelligence</span>
-                  <span class="panel-badge" id="newsBadge" style="display:none"></span>
-                </div>
-                <div class="panel-meta" id="newsMeta"></div>
-              </div>
-              <div class="news-triage-controls">
-                <div class="panel-filter-row news-triage-tabs">
-                  <button class="filter-btn active" id="tabNewsAll" onclick="switchNewsTab('all', this)">🌐 All</button>
-                  <button class="filter-btn" id="tabNewsSerbian" onclick="switchNewsTab('serbian', this)">🇷🇸 Serbian</button>
-                  <button class="filter-btn" id="tabNewsAlbanian" onclick="switchNewsTab('albanian', this)">🇦🇱 Albanian</button>
-                  <button class="filter-btn" id="tabNewsOperational" onclick="switchNewsTab('operational', this)">🛡️ Operational</button>
-                </div>
-                <button class="news-urgent-toggle-btn" id="btnNewsUrgentToggle" onclick="toggleNewsUrgent(this)" title="Filter Critical & High alerts only">
-                  <span class="urgent-pulse-dot">●</span> Urgent Only
-                </button>
-              </div>
-              <div class="news-list" id="newsList"></div>
-            </div>
+                <!-- 8. Radiation Monitor (EURDEP) -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerRadiation"
+                    onchange="toggleTacticalLayer('radiation', this.checked)">
+                  <span class="layer-toggle-indicator indicator-radiation"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Radiation Monitor (EURDEP)</span>
+                    <span class="layer-toggle-sub">Early warning ambient dose sensors</span>
+                  </div>
+                </label>
 
-            <!-- Traffic Panel -->
-            <div class="panel overlay-panel" id="trafficPanel" data-panel-title="Traffic Intelligence" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">🚦</span>
-                  <span>Traffic Intelligence</span>
-                  <span class="anomaly-indicator" id="trafficAnomaly" style="display:none">⚠ ANOMALY</span>
-                </div>
-                <div class="panel-meta" id="trafficMeta"></div>
-              </div>
-              <div class="traffic-anomaly-banner" id="trafficAnomalyBanner" style="display:none"></div>
-              <div class="incident-list" id="incidentList"></div>
-            </div>
+                <!-- 9. Weather Monitor -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerWeather"
+                    onchange="toggleTacticalLayer('weather', this.checked)">
+                  <span class="layer-toggle-indicator indicator-weather"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Weather Monitor</span>
+                    <span class="layer-toggle-sub">Live municipal temperatures, humidity & meteorological
+                      forecast</span>
+                  </div>
+                </label>
 
-
-
-
-
-
-
-            <!-- Wildfire Panel -->
-            <div class="panel overlay-panel" id="wildfirePanel" data-panel-title="Wildfire Detection" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">🔥</span>
-                  <span>Wildfire Detection</span>
-                  <span class="panel-badge" id="wildfireBadge" style="display:none"></span>
-                </div>
-                <div class="panel-meta" id="wildfireMeta"></div>
-              </div>
-              <div class="panel-filter-row" id="wildfireFilterRow">
-                <button class="filter-btn active" onclick="filterWildfire('24h', this)">24h</button>
-                <button class="filter-btn" onclick="filterWildfire('48h', this)">48h</button>
-                <button class="filter-btn" onclick="filterWildfire('7d', this)">7d</button>
-              </div>
-              <div class="wildfire-list" id="wildfireList"></div>
-            </div>
-
-            <!-- Aviation Panel -->
-            <div class="panel overlay-panel" id="aviationPanel" data-panel-title="Aviation Intelligence" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">✈️</span>
-                  <span>Aviation Intelligence</span>
-                  <span class="panel-badge" id="aviationBadge" style="display:none"></span>
-                </div>
-                <div class="panel-meta" id="aviationMeta">OPEN SKY · LIVE</div>
-              </div>
-              <div class="aviation-summary-bar" id="aviationSummaryBar">
-                <div class="aviation-count-total" id="aviationTotalCount">0 AIRCRAFT</div>
-              </div>
-              <div class="panel-filter-row aviation-filter-row" id="aviationFilterRow">
-                <button class="filter-btn active" data-category="all" onclick="filterAviation('all', this)">ALL <span class="aviation-pill-count" id="countAll">0</span></button>
-                <button class="filter-btn military-kfor-btn" data-category="kfor" onclick="filterAviation('kfor', this)">🛡️ KFOR / NATO <span class="aviation-pill-count" id="countKfor">0</span></button>
-                <button class="filter-btn military-rotary-btn" data-category="rotary" onclick="filterAviation('rotary', this)">🚁 HELICOPTERS <span class="aviation-pill-count" id="countRotary">0</span></button>
-                <button class="filter-btn military-uav-btn" data-category="uav" onclick="filterAviation('uav', this)">🛩️ UAV / RECON <span class="aviation-pill-count" id="countUav">0</span></button>
-                <button class="filter-btn" data-category="military" onclick="filterAviation('military', this)">MILITARY <span class="aviation-pill-count" id="countMilitary">0</span></button>
-                <button class="filter-btn" data-category="commercial" onclick="filterAviation('commercial', this)">COMMERCIAL <span class="aviation-pill-count" id="countCommercial">0</span></button>
-                <button class="filter-btn" data-category="private" onclick="filterAviation('private', this)">PRIVATE <span class="aviation-pill-count" id="countPrivate">0</span></button>
-                <button class="filter-btn" data-category="private_jet" onclick="filterAviation('private_jet', this)">PRIVATE JETS <span class="aviation-pill-count" id="countPrivateJets">0</span></button>
-                <button class="filter-btn" data-category="unknown" onclick="filterAviation('unknown', this)">UNKNOWN <span class="aviation-pill-count" id="countUnknown">0</span></button>
-              </div>
-              <div class="aviation-list" id="aviationList"></div>
-            </div>
-
-            <!-- Telegram Feed Panel -->
-            <div class="panel overlay-panel" id="telegramPanel" data-panel-title="Telegram Public Feed" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">📱</span>
-                  <span>Telegram Public Feed</span>
-                  <span class="panel-badge" id="telegramBadge" style="display:none"></span>
-                </div>
-                <div class="panel-meta" id="telegramMeta">OFFICIAL API · READ-ONLY</div>
-              </div>
-              <div class="telegram-header-info">
-                <div class="telegram-summary-text" id="telegramSummaryText">MONITORING PUBLIC CHANNELS</div>
-              </div>
-              <div class="panel-filter-row telegram-filter-row" id="telegramFilterRow">
-                <button class="filter-btn active" data-channel="all" onclick="filterTelegram('all', this)">ALL CHANNELS</button>
-                <button class="filter-btn" data-channel="koridorsrb" onclick="filterTelegram('koridorsrb', this)">@koridorsrb</button>
-                <button class="filter-btn" data-channel="srpskinat" onclick="filterTelegram('srpskinat', this)">@srpskinat</button>
-                <button class="filter-btn" data-channel="istokinfo" onclick="filterTelegram('istokinfo', this)">@istokinfo</button>
-              </div>
-              <div class="telegram-list" id="telegramList">
-                <div class="empty-state">Loading Telegram feed...</div>
+                <!-- 10. Air Quality Index (AQI) -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerAqi" onchange="toggleTacticalLayer('aqi', this.checked)">
+                  <span class="layer-toggle-indicator indicator-aqi"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Air Quality Index (AQI)</span>
+                    <span class="layer-toggle-sub">PM2.5, PM10, ozone & atmospheric health sensors</span>
+                  </div>
+                </label>
               </div>
             </div>
+          </div>
 
-            <!-- Border Monitor Panel -->
-            <div class="panel overlay-panel" id="borderPanel" data-panel-title="Border Crossing Monitor" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">🛂</span>
-                  <span>Border Crossing Monitor</span>
-                  <span class="panel-badge" id="borderBadge" style="display:none"></span>
-                </div>
-                <div class="panel-meta" id="borderMeta">QKMK / MPB KOSOVO · LIVE QUEUES</div>
+          <!-- ── Tactical Drawing Tools & AOI Measurement Widget ─────────── -->
+          <div class="drawing-tools-widget" id="drawingToolsWidget" style="display:none">
+            <div class="drawing-widget-header">
+              <div class="drawing-widget-title">
+                <span class="drawing-icon">📐</span>
+                <span>TACTICAL DRAWING &amp; AOI</span>
               </div>
-              <div class="border-header-info">
-                <div class="border-summary-text" id="borderSummaryText">NATIONAL CENTER FOR BORDER MANAGEMENT</div>
-                <button class="border-refresh-btn" id="borderRefreshBtn" onclick="fetchBorder(true)" title="Force Refresh">↻ Refresh</button>
+              <button class="drawing-widget-close" onclick="toggleDrawingToolsWidget(false)"
+                title="Close drawing tools">✕</button>
+            </div>
+            <div class="drawing-widget-metrics">
+              <div class="drawing-metric-box">
+                <span class="drawing-metric-lbl">Tracked Area</span>
+                <span class="drawing-metric-val" id="aoiTrackedArea">0.0 km²</span>
               </div>
-              <div class="border-list" id="borderList">
-                <div class="empty-state">Loading border crossings...</div>
+              <div class="drawing-metric-box">
+                <span class="drawing-metric-lbl">AOIs / Perim</span>
+                <span class="drawing-metric-val" id="aoiPerim">0 / 0.0 km</span>
               </div>
             </div>
-
-            <!-- Route Intelligence Panel -->
-            <div class="panel overlay-panel" id="routePanel" data-panel-title="Route Intelligence" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">🛣️</span>
-                  <span>Route Intelligence</span>
+            <div class="drawing-step-title">STEP 1 — CHOOSE A SHAPE</div>
+            <div class="drawing-shapes-grid">
+              <button class="drawing-shape-btn active" id="btnShapeArea" onclick="setDrawingShape('area')">
+                <span class="shape-ico">⬡</span>
+                <div class="shape-text-wrap">
+                  <span class="shape-name">AREA</span>
+                  <span class="shape-desc">Any shape, corner by corner</span>
                 </div>
-                <div class="panel-meta">TACTICAL ROUTING & THREAT CORRIDOR</div>
+              </button>
+              <button class="drawing-shape-btn" id="btnShapeBox" onclick="setDrawingShape('box')">
+                <span class="shape-ico">▭</span>
+                <div class="shape-text-wrap">
+                  <span class="shape-name">BOX</span>
+                  <span class="shape-desc">Two clicks, opposite corners</span>
+                </div>
+              </button>
+              <button class="drawing-shape-btn" id="btnShapeRadius" onclick="setDrawingShape('radius')">
+                <span class="shape-ico">◯</span>
+                <div class="shape-text-wrap">
+                  <span class="shape-name">RADIUS</span>
+                  <span class="shape-desc">Centre and radius circle</span>
+                </div>
+              </button>
+              <button class="drawing-shape-btn" id="btnShapePath" onclick="setDrawingShape('path')">
+                <span class="shape-ico">〰</span>
+                <div class="shape-text-wrap">
+                  <span class="shape-name">PATH</span>
+                  <span class="shape-desc">Distance along route</span>
+                </div>
+              </button>
+            </div>
+            <div class="drawing-status-hint" id="drawingStatusHint">
+              Click on map to place polygon vertices. Click first point or "Complete" to finish.
+            </div>
+            <div class="drawing-inside-container" id="drawingInsideBox" style="display:none">
+              <div class="drawing-inside-header">
+                <span class="drawing-inside-title">🎯 DETECTED IN AOI</span>
+                <span class="drawing-inside-badge" id="drawingInsideCount">0 items</span>
               </div>
-              <div class="route-content-wrap">
-                <div class="route-inputs-group">
-                  <div class="route-input-row">
-                    <label class="route-input-label">START</label>
-                    <div class="route-input-field-wrap">
-                      <span class="route-input-icon">🟢</span>
-                      <input type="text" id="routeStartInput" class="input-field route-input" placeholder="Start location or lat,lon (e.g. Prishtinë)" list="routeLocationsList" value="Prishtinë" />
+              <div class="drawing-inside-list" id="drawingInsideList"></div>
+            </div>
+            <div class="drawing-actions-row">
+              <button class="btn-xs btn-drawing-action" onclick="clearDrawnAoi()">🗑️ Clear</button>
+              <button class="btn-xs btn-drawing-action primary" id="btnDrawingComplete" onclick="finishCurrentShape()"
+                style="display:none">✓ Complete Shape</button>
+              <button class="btn-xs btn-drawing-action" onclick="exportAoiGeoJson()">💾 Export</button>
+            </div>
+          </div>
+
+          <!-- ── Defense Equities, Market Breadth & Space Weather Drawer ────── -->
+          <div class="osiris-market-drawer" id="defenseMarketPanel" style="display:none">
+            <div class="market-drawer-header">
+              <div class="market-header-title">
+                <span class="market-icon">📈</span>
+                <span>DEFENSE EQUITIES &amp; SPACE WEATHER</span>
+              </div>
+              <button class="market-drawer-close" onclick="toggleDefenseMarketPanel(false)"
+                title="Close panel">✕</button>
+            </div>
+            <div class="market-drawer-body">
+              <!-- BREADTH CARD -->
+              <div class="market-section-card breadth-card">
+                <div class="market-section-label">BREADTH</div>
+                <div class="breadth-ratio-row">
+                  <span class="breadth-ratio-highlight" id="marketBreadthRatio">17▲ / 11▼</span>
+                  <span class="breadth-ratio-total" id="marketBreadthTotal">of 28</span>
+                </div>
+                <div class="breadth-movers-row">
+                  <span class="mover-up" id="marketMoverUp">▲ Corn +4.17%</span>
+                  <span class="mover-down" id="marketMoverDown">▼ PLTR -4.49%</span>
+                </div>
+              </div>
+
+              <!-- SPACE WEATHER CARD -->
+              <div class="market-section-card space-weather-card">
+                <div class="market-section-label">SPACE WEATHER</div>
+                <div class="space-weather-main">
+                  <span class="kp-badge" id="spaceWeatherKpBadge">Kp 0 — Quiet</span>
+                </div>
+                <div class="space-flare-sub">
+                  Latest flare: <span class="flare-val" id="spaceWeatherFlareVal">M1.0</span> · HF Propagation Nominal
+                </div>
+              </div>
+
+              <!-- SECTOR / OVERVIEW TABS -->
+              <div class="market-section-card sector-card">
+                <div class="market-tabs-row" id="marketTabsRow">
+                  <div class="market-tab-item" data-sector="overview" onclick="switchDefenseSector('overview', this)">
+                    <span class="tab-name">AI OVERVIEW</span></div>
+                  <div class="market-tab-item" data-sector="indices" onclick="switchDefenseSector('indices', this)">
+                    <span class="tab-name">INDICES</span> <span class="tab-cnt">5</span></div>
+                  <div class="market-tab-item active-sector active" data-sector="defense"
+                    onclick="switchDefenseSector('defense', this)"><span class="tab-name">DEFENSE</span> <span
+                      class="tab-cnt">7</span></div>
+                  <div class="market-tab-item" data-sector="energy" onclick="switchDefenseSector('energy', this)"><span
+                      class="tab-name">ENERGY</span> <span class="tab-cnt">3</span></div>
+                  <div class="market-tab-item" data-sector="commodities"
+                    onclick="switchDefenseSector('commodities', this)"><span class="tab-name">COMMODITIES</span> <span
+                      class="tab-cnt">5</span></div>
+                  <div class="market-tab-item" data-sector="crypto" onclick="switchDefenseSector('crypto', this)"><span
+                      class="tab-name">CRYPTO</span> <span class="tab-cnt">4</span></div>
+                  <div class="market-tab-item" data-sector="fx" onclick="switchDefenseSector('fx', this)"><span
+                      class="tab-name">FX</span> <span class="tab-cnt">4</span></div>
+                </div>
+                <div class="market-session-status">
+                  <span class="session-badge" id="marketSessionBadge">SESSION CLOSED</span>
+                  <span class="session-preset" id="marketSessionPreset">DEFAULT</span>
+                </div>
+              </div>
+
+              <!-- DEFENSE QUOTES LIST -->
+              <div class="market-quotes-container">
+                <div class="market-quotes-header">
+                  <span id="marketBasketTitle">DEFENSE &amp; AEROSPACE BASKET</span>
+                  <span class="quotes-update-time" id="marketUpdateTime">REAL-TIME FEED</span>
+                </div>
+                <div class="market-quotes-list" id="defenseQuotesList">
+                  <div class="quote-row">
+                    <div class="quote-ticker-wrap">
+                      <span class="quote-ticker">RTX</span>
+                      <span class="quote-corp">RTX Corporation / Raytheon</span>
+                    </div>
+                    <div class="quote-price-wrap">
+                      <span class="quote-price">200.79</span>
+                      <span class="quote-change down">-0.66%</span>
                     </div>
                   </div>
-                  <div id="routeViaInputsContainer"></div>
-                  <div class="route-input-row">
-                    <div class="route-dest-header" style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:2px;">
-                      <label class="route-input-label">DESTINATION</label>
-                      <button type="button" class="route-add-via-btn" onclick="addRouteDestinationInput()" style="background:transparent; border:none; color:var(--cyan); font-size:10px; font-weight:700; cursor:pointer; padding:0; letter-spacing:0.4px;">
-                        + ADD DESTINATION
+                  <div class="quote-row">
+                    <div class="quote-ticker-wrap">
+                      <span class="quote-ticker">LMT</span>
+                      <span class="quote-corp">Lockheed Martin Corp</span>
+                    </div>
+                    <div class="quote-price-wrap">
+                      <span class="quote-price">525.28</span>
+                      <span class="quote-change down">-1.44%</span>
+                    </div>
+                  </div>
+                  <div class="quote-row">
+                    <div class="quote-ticker-wrap">
+                      <span class="quote-ticker">NOC</span>
+                      <span class="quote-corp">Northrop Grumman Corp</span>
+                    </div>
+                    <div class="quote-price-wrap">
+                      <span class="quote-price">514.98</span>
+                      <span class="quote-change down">-2.51%</span>
+                    </div>
+                  </div>
+                  <div class="quote-row">
+                    <div class="quote-ticker-wrap">
+                      <span class="quote-ticker">GD</span>
+                      <span class="quote-corp">General Dynamics Corp</span>
+                    </div>
+                    <div class="quote-price-wrap">
+                      <span class="quote-price">359.39</span>
+                      <span class="quote-change down">-1.77%</span>
+                    </div>
+                  </div>
+                  <div class="quote-row">
+                    <div class="quote-ticker-wrap">
+                      <span class="quote-ticker">BA</span>
+                      <span class="quote-corp">The Boeing Company</span>
+                    </div>
+                    <div class="quote-price-wrap">
+                      <span class="quote-price">212.25</span>
+                      <span class="quote-change up">+0.83%</span>
+                    </div>
+                  </div>
+                  <div class="quote-row">
+                    <div class="quote-ticker-wrap">
+                      <span class="quote-ticker">LHX</span>
+                      <span class="quote-corp">L3Harris Technologies</span>
+                    </div>
+                    <div class="quote-price-wrap">
+                      <span class="quote-price">256.45</span>
+                      <span class="quote-change down">-2.17%</span>
+                    </div>
+                  </div>
+                  <div class="quote-row">
+                    <div class="quote-ticker-wrap">
+                      <span class="quote-ticker">PLTR</span>
+                      <span class="quote-corp">Palantir Technologies</span>
+                    </div>
+                    <div class="quote-price-wrap">
+                      <span class="quote-price">174.33</span>
+                      <span class="quote-change down">-4.49%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Focused Module Overlay Panel ───────────────────────────────────── -->
+        <div class="module-overlay" id="moduleOverlay" aria-hidden="true">
+          <div class="overlay-shell">
+            <div class="overlay-header">
+              <div>
+                <div class="overlay-title" id="overlayTitle">Module Panel</div>
+                <div class="overlay-sub">Focused intelligence feed over live map view.</div>
+              </div>
+              <button class="overlay-close" onclick="closeModulePanel()" aria-label="Close module panel">✕</button>
+            </div>
+            <div class="overlay-content">
+
+              <!-- Live Feeds Broadcast Panel -->
+              <div class="panel overlay-panel" id="liveFeedsPanel" data-panel-title="Live Broadcast Feeds"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">📺</span>
+                    <span>FEEDS · LIVE SATELLITE &amp; BROADCAST</span>
+                    <span class="panel-badge" id="feedsLiveBadge">11 LIVE</span>
+                  </div>
+                  <div class="panel-meta">FREE BALKAN &amp; GLOBAL CHANNELS</div>
+                </div>
+
+                <!-- Active Video Player Frame -->
+                <div class="live-feed-player-card">
+                  <div class="feed-player-header">
+                    <div class="feed-player-title">
+                      <span class="feed-pulse-dot">●</span>
+                      <span id="activeFeedName">Bloomberg TV</span>
+                      <span class="feed-player-loc" id="activeFeedLoc">New York, US</span>
+                    </div>
+                    <div class="feed-player-badges">
+                      <span class="badge-live-stream">LIVE STREAM</span>
+                      <a id="feedExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="feed-ext-btn"
+                        title="Open feed in browser tab">↗</a>
+                    </div>
+                  </div>
+                  <div class="feed-video-wrap">
+                    <iframe id="liveFeedVideoFrame" class="live-feed-iframe" src="" loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+                    <div class="feed-video-fallback" id="feedVideoFallback"
+                      style="display:none; position:absolute; inset:0; background:rgba(2,6,23,0.95); z-index:10; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px; text-align:center;">
+                      <span style="font-size:24px;">📡</span>
+                      <span style="font-weight:700; color:#f8fafc; font-size:12px;" id="fallbackChannelTitle">Live
+                        Broadcast Feed</span>
+                      <p style="font-size:11px; color:#94a3b8; max-width:280px; margin:0;">Direct player embedding
+                        restricted by broadcaster security policies. Launch official high-definition live stream
+                        directly:</p>
+                      <a id="fallbackExternalLink" href="#" target="_blank" rel="noopener noreferrer"
+                        class="btn-xs btn-primary"
+                        style="display:inline-flex; align-items:center; gap:6px; text-decoration:none; padding:6px 12px; font-weight:700; margin-top:4px;">
+                        ↗ Watch Official Live Stream
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Custom Video / Stream URL Connect Row -->
+                <div class="feed-custom-connect-row"
+                  style="display:flex; gap:6px; margin: 0 14px 10px; align-items:center;">
+                  <input type="text" id="feedCustomStreamInput" class="input-field"
+                    placeholder="Enter custom YouTube / HLS / MP4 live stream URL..."
+                    style="flex:1; font-size:11px; padding:6px 8px;">
+                  <button type="button" class="btn-xs btn-primary" onclick="connectCustomFeedStream()"
+                    style="white-space:nowrap; padding:6px 10px; font-weight:700;">CONNECT</button>
+                </div>
+
+                <!-- Region & Channel Selector -->
+                <div class="feed-region-tabs">
+                  <button class="filter-btn active" id="tabFeedsAll" onclick="switchFeedRegion('all', this)">🌐 ALL
+                    FEEDS</button>
+                  <button class="filter-btn" id="tabFeedsBalkans" onclick="switchFeedRegion('balkans', this)">🇽🇰
+                    BALKANS (FREE)</button>
+                  <button class="filter-btn" id="tabFeedsGlobal" onclick="switchFeedRegion('global', this)">🇺🇸 US /
+                    GLOBAL</button>
+                </div>
+
+                <!-- Channels List -->
+                <div class="feed-channels-grid" id="feedChannelsGrid"></div>
+              </div>
+
+              <!-- News Panel -->
+              <div class="panel overlay-panel" id="newsPanel" data-panel-title="News Intelligence" style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">📰</span>
+                    <span>News Intelligence</span>
+                    <span class="panel-badge" id="newsBadge" style="display:none"></span>
+                  </div>
+                  <div class="panel-meta" id="newsMeta"></div>
+                </div>
+                <div class="news-triage-controls">
+                  <div class="panel-filter-row news-triage-tabs">
+                    <button class="filter-btn active" id="tabNewsAll" onclick="switchNewsTab('all', this)">🌐
+                      All</button>
+                    <button class="filter-btn" id="tabNewsOperational" onclick="switchNewsTab('operational', this)">🛡️
+                      Operational</button>
+                    <button class="filter-btn" id="tabNewsPolitical" onclick="switchNewsTab('political', this)">🏛️
+                      Political</button>
+                    <button class="filter-btn" id="tabNewsOpinion" onclick="switchNewsTab('opinion', this)">🎙️
+                      Opinion</button>
+                    <button class="filter-btn" id="tabNewsSerbian" onclick="switchNewsTab('serbian', this)">🇷🇸
+                      Serbian</button>
+                    <button class="filter-btn" id="tabNewsAlbanian" onclick="switchNewsTab('albanian', this)">🇦🇱
+                      Albanian</button>
+                  </div>
+                  <button class="news-urgent-toggle-btn" id="btnNewsUrgentToggle" onclick="toggleNewsUrgent(this)"
+                    title="Filter Critical & High alerts only">
+                    <span class="urgent-pulse-dot">●</span> Urgent Only
+                  </button>
+                </div>
+                <div class="news-list" id="newsList"></div>
+              </div>
+
+              <!-- Traffic Panel -->
+              <div class="panel overlay-panel" id="trafficPanel" data-panel-title="Traffic Intelligence"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">🚦</span>
+                    <span>Traffic Intelligence</span>
+                    <span class="anomaly-indicator" id="trafficAnomaly" style="display:none">⚠ ANOMALY</span>
+                  </div>
+                  <div class="panel-meta" id="trafficMeta"></div>
+                </div>
+                <div class="traffic-anomaly-banner" id="trafficAnomalyBanner" style="display:none"></div>
+                <div class="incident-list" id="incidentList"></div>
+              </div>
+
+
+
+
+
+
+
+              <!-- Wildfire Panel -->
+              <div class="panel overlay-panel" id="wildfirePanel" data-panel-title="Wildfire Detection"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">🔥</span>
+                    <span>Wildfire Detection</span>
+                    <span class="panel-badge" id="wildfireBadge" style="display:none"></span>
+                  </div>
+                  <div class="panel-meta" id="wildfireMeta"></div>
+                </div>
+                <div class="panel-filter-row" id="wildfireFilterRow">
+                  <button class="filter-btn active" onclick="filterWildfire('24h', this)">24h</button>
+                  <button class="filter-btn" onclick="filterWildfire('48h', this)">48h</button>
+                  <button class="filter-btn" onclick="filterWildfire('7d', this)">7d</button>
+                </div>
+                <div class="wildfire-list" id="wildfireList"></div>
+              </div>
+
+              <!-- Aviation Panel -->
+              <div class="panel overlay-panel" id="aviationPanel" data-panel-title="Aviation Intelligence"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">✈️</span>
+                    <span>Aviation Intelligence</span>
+                    <span class="panel-badge" id="aviationBadge" style="display:none"></span>
+                  </div>
+                  <div class="panel-meta" id="aviationMeta">OPEN SKY · LIVE</div>
+                </div>
+                <div class="aviation-summary-bar" id="aviationSummaryBar">
+                  <div class="aviation-count-total" id="aviationTotalCount">0 AIRCRAFT</div>
+                </div>
+                <div class="panel-filter-row aviation-filter-row" id="aviationFilterRow">
+                  <button class="filter-btn active" data-category="all" onclick="filterAviation('all', this)">ALL <span
+                      class="aviation-pill-count" id="countAll">0</span></button>
+                  <button class="filter-btn military-kfor-btn" data-category="kfor"
+                    onclick="filterAviation('kfor', this)">🛡️ KFOR / NATO <span class="aviation-pill-count"
+                      id="countKfor">0</span></button>
+                  <button class="filter-btn military-rotary-btn" data-category="rotary"
+                    onclick="filterAviation('rotary', this)">🚁 HELICOPTERS <span class="aviation-pill-count"
+                      id="countRotary">0</span></button>
+                  <button class="filter-btn military-uav-btn" data-category="uav"
+                    onclick="filterAviation('uav', this)">🛩️ UAV / RECON <span class="aviation-pill-count"
+                      id="countUav">0</span></button>
+                  <button class="filter-btn" data-category="military"
+                    onclick="filterAviation('military', this)">MILITARY <span class="aviation-pill-count"
+                      id="countMilitary">0</span></button>
+                  <button class="filter-btn" data-category="commercial"
+                    onclick="filterAviation('commercial', this)">COMMERCIAL <span class="aviation-pill-count"
+                      id="countCommercial">0</span></button>
+                  <button class="filter-btn" data-category="private" onclick="filterAviation('private', this)">PRIVATE
+                    <span class="aviation-pill-count" id="countPrivate">0</span></button>
+                  <button class="filter-btn" data-category="private_jet"
+                    onclick="filterAviation('private_jet', this)">PRIVATE JETS <span class="aviation-pill-count"
+                      id="countPrivateJets">0</span></button>
+                  <button class="filter-btn" data-category="unknown" onclick="filterAviation('unknown', this)">UNKNOWN
+                    <span class="aviation-pill-count" id="countUnknown">0</span></button>
+                </div>
+                <div class="aviation-list" id="aviationList"></div>
+              </div>
+
+              <!-- Telegram Feed Panel -->
+              <div class="panel overlay-panel" id="telegramPanel" data-panel-title="Telegram Public Feed"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">📱</span>
+                    <span>Telegram Public Feed</span>
+                    <span class="panel-badge" id="telegramBadge" style="display:none"></span>
+                  </div>
+                  <div class="panel-meta" id="telegramMeta">OFFICIAL API · READ-ONLY</div>
+                </div>
+                <div class="telegram-header-info">
+                  <div class="telegram-summary-text" id="telegramSummaryText">MONITORING PUBLIC CHANNELS</div>
+                </div>
+                <div class="panel-filter-row telegram-filter-row" id="telegramFilterRow">
+                  <button class="filter-btn active" data-channel="all" onclick="filterTelegram('all', this)">ALL
+                    CHANNELS</button>
+                  <button class="filter-btn" data-channel="koridorsrb"
+                    onclick="filterTelegram('koridorsrb', this)">@koridorsrb</button>
+                  <button class="filter-btn" data-channel="srpskinat"
+                    onclick="filterTelegram('srpskinat', this)">@srpskinat</button>
+                  <button class="filter-btn" data-channel="istokinfo"
+                    onclick="filterTelegram('istokinfo', this)">@istokinfo</button>
+                </div>
+                <div class="telegram-list" id="telegramList">
+                  <div class="empty-state">Loading Telegram feed...</div>
+                </div>
+              </div>
+
+              <!-- Border Monitor Panel -->
+              <div class="panel overlay-panel" id="borderPanel" data-panel-title="Border Crossing Monitor"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">🛂</span>
+                    <span>Border Crossing Monitor</span>
+                    <span class="panel-badge" id="borderBadge" style="display:none"></span>
+                  </div>
+                  <div class="panel-meta" id="borderMeta">QKMK / MPB KOSOVO · LIVE QUEUES</div>
+                </div>
+                <div class="border-header-info">
+                  <div class="border-summary-text" id="borderSummaryText">NATIONAL CENTER FOR BORDER MANAGEMENT</div>
+                  <button class="border-refresh-btn" id="borderRefreshBtn" onclick="fetchBorder(true)"
+                    title="Force Refresh">↻ Refresh</button>
+                </div>
+                <div class="border-list" id="borderList">
+                  <div class="empty-state">Loading border crossings...</div>
+                </div>
+              </div>
+
+              <!-- Route Intelligence Panel -->
+              <div class="panel overlay-panel" id="routePanel" data-panel-title="Route Intelligence"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">🛣️</span>
+                    <span>Route Intelligence</span>
+                  </div>
+                  <div class="panel-meta">TACTICAL ROUTING & THREAT CORRIDOR</div>
+                </div>
+                <div class="route-content-wrap">
+                  <div class="route-inputs-group">
+                    <div class="route-input-row">
+                      <label class="route-input-label">START</label>
+                      <div class="route-input-field-wrap">
+                        <span class="route-input-icon">🟢</span>
+                        <input type="text" id="routeStartInput" class="input-field route-input"
+                          placeholder="Start location or lat,lon (e.g. Prishtinë)" list="routeLocationsList"
+                          value="Prishtinë" />
+                      </div>
+                    </div>
+                    <div id="routeViaInputsContainer"></div>
+                    <div class="route-input-row">
+                      <div class="route-dest-header"
+                        style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:2px;">
+                        <label class="route-input-label">DESTINATION</label>
+                        <button type="button" class="route-add-via-btn" onclick="addRouteDestinationInput()"
+                          style="background:transparent; border:none; color:var(--cyan); font-size:10px; font-weight:700; cursor:pointer; padding:0; letter-spacing:0.4px;">
+                          + ADD DESTINATION
+                        </button>
+                      </div>
+                      <div class="route-input-field-wrap">
+                        <span class="route-input-icon">🔴</span>
+                        <input type="text" id="routeEndInput" class="input-field route-input"
+                          placeholder="Destination or lat,lon (e.g. Mitrovicë)" list="routeLocationsList"
+                          value="Mitrovicë" />
+                      </div>
+                    </div>
+                    <datalist id="routeLocationsList">
+                      <option value="Regional Centre Mitrovica">
+                      <option value="Safe Haven North">
+                      <option value="Prishtinë">
+                      <option value="Mitrovicë">
+                      <option value="Prizren">
+                      <option value="Pejë">
+                      <option value="Gjilan">
+                      <option value="Ferizaj">
+                      <option value="Gjakovë">
+                      <option value="Podujevë">
+                      <option value="Vushtrri">
+                      <option value="Shtime">
+                      <option value="Kaçanik">
+                      <option value="Obiliq">
+                      <option value="Suharekë">
+                      <option value="Skenderaj">
+                      <option value="Istog">
+                      <option value="Klinë">
+                      <option value="Rahovec">
+                      <option value="Malishevë">
+                      <option value="Kamenicë">
+                      <option value="Dragash">
+                      <option value="Štrpce">
+                      <option value="Novo Brdo">
+                      <option value="Gračanica">
+                      <option value="Deçan">
+                      <option value="Fushë Kosovë">
+                      <option value="Lipjan">
+                      <option value="Brezovica">
+                      <option value="Leposavić">
+                      <option value="Zvečan">
+                      <option value="Zubin Potok">
+                      <option value="Jarinje (Border)">
+                      <option value="Brnjak (Border)">
+                      <option value="Merdarë (Border)">
+                      <option value="Dheu i Bardhë (Border)">
+                      <option value="Hani i Elezit (Border)">
+                      <option value="Vërmicë (Border)">
+                      <option value="Kullë (Border)">
+                      <option value="Morinë (Border)">
+                    </datalist>
+                    <div class="route-mode-row">
+                      <label class="route-input-label">MODE</label>
+                      <div class="route-mode-badge">
+                        <span>🚗</span> DRIVE
+                      </div>
+                    </div>
+                    <div class="route-action-buttons">
+                      <button class="btn-monitor route-calc-btn" id="routeCalcBtn" onclick="calculateRoute()">
+                        <span class="btn-icon">📍</span> CALCULATE ROUTE
+                      </button>
+                      <button class="btn-secondary route-clear-btn" onclick="clearRoute()">
+                        CLEAR
                       </button>
                     </div>
-                    <div class="route-input-field-wrap">
-                      <span class="route-input-icon">🔴</span>
-                      <input type="text" id="routeEndInput" class="input-field route-input" placeholder="Destination or lat,lon (e.g. Mitrovicë)" list="routeLocationsList" value="Mitrovicë" />
-                    </div>
-                  </div>
-                  <datalist id="routeLocationsList">
-                    <option value="Regional Centre Mitrovica">
-                    <option value="Safe Haven North">
-                    <option value="Prishtinë">
-                    <option value="Mitrovicë">
-                    <option value="Prizren">
-                    <option value="Pejë">
-                    <option value="Gjilan">
-                    <option value="Ferizaj">
-                    <option value="Gjakovë">
-                    <option value="Podujevë">
-                    <option value="Vushtrri">
-                    <option value="Shtime">
-                    <option value="Kaçanik">
-                    <option value="Obiliq">
-                    <option value="Suharekë">
-                    <option value="Skenderaj">
-                    <option value="Istog">
-                    <option value="Klinë">
-                    <option value="Rahovec">
-                    <option value="Malishevë">
-                    <option value="Kamenicë">
-                    <option value="Dragash">
-                    <option value="Štrpce">
-                    <option value="Novo Brdo">
-                    <option value="Gračanica">
-                    <option value="Deçan">
-                    <option value="Fushë Kosovë">
-                    <option value="Lipjan">
-                    <option value="Brezovica">
-                    <option value="Leposavić">
-                    <option value="Zvečan">
-                    <option value="Zubin Potok">
-                    <option value="Jarinje (Border)">
-                    <option value="Brnjak (Border)">
-                    <option value="Merdarë (Border)">
-                    <option value="Dheu i Bardhë (Border)">
-                    <option value="Hani i Elezit (Border)">
-                    <option value="Vërmicë (Border)">
-                    <option value="Kullë (Border)">
-                    <option value="Morinë (Border)">
-                  </datalist>
-                  <div class="route-mode-row">
-                    <label class="route-input-label">MODE</label>
-                    <div class="route-mode-badge">
-                      <span>🚗</span> DRIVE
-                    </div>
-                  </div>
-                  <div class="route-action-buttons">
-                    <button class="btn-monitor route-calc-btn" id="routeCalcBtn" onclick="calculateRoute()">
-                      <span class="btn-icon">📍</span> CALCULATE ROUTE
-                    </button>
-                    <button class="btn-secondary route-clear-btn" onclick="clearRoute()">
-                      CLEAR
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Route Telemetry Card -->
-                <div id="routeResultsCard" class="route-results-card" style="display:none;">
-                  <div class="route-metrics-grid">
-                    <div class="route-metric-box">
-                      <span class="metric-label">DISTANCE</span>
-                      <span class="metric-val" id="routeDistanceVal">--</span>
-                    </div>
-                    <div class="route-metric-box">
-                      <span class="metric-label">ESTIMATED TIME</span>
-                      <span class="metric-val" id="routeDurationVal">--</span>
-                    </div>
-                    <div class="route-metric-box full-width">
-                      <span class="metric-label">ROUTE STATUS</span>
-                      <span class="metric-status-badge status-normal" id="routeStatusBadge">ROUTE CALCULATED</span>
-                    </div>
                   </div>
 
-                  <div class="route-waypoints-summary" id="routeWaypointsSummary"></div>
-                </div>
-              </div>
-            </div>
+                  <!-- Route Telemetry Card -->
+                  <div id="routeResultsCard" class="route-results-card" style="display:none;">
+                    <div class="route-metrics-grid">
+                      <div class="route-metric-box">
+                        <span class="metric-label">DISTANCE</span>
+                        <span class="metric-val" id="routeDistanceVal">--</span>
+                      </div>
+                      <div class="route-metric-box">
+                        <span class="metric-label">ESTIMATED TIME</span>
+                        <span class="metric-val" id="routeDurationVal">--</span>
+                      </div>
+                      <div class="route-metric-box full-width">
+                        <span class="metric-label">ROUTE STATUS</span>
+                        <span class="metric-status-badge status-normal" id="routeStatusBadge">ROUTE CALCULATED</span>
+                      </div>
+                    </div>
 
-            <!-- Alert Log Panel -->
-            <div class="panel overlay-panel" id="alertPanel" data-panel-title="Alert Log & Notifications" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">🔔</span>
-                  <span>Alert Log</span>
-                  <span class="panel-badge" id="alertLogBadge" style="display:none"></span>
+                    <div class="route-waypoints-summary" id="routeWaypointsSummary"></div>
+                  </div>
                 </div>
-                <div class="panel-meta" id="alertLogMeta">REAL-TIME INTELLIGENCE ALERTS</div>
               </div>
-              <div class="alert-log-actions">
-                <button class="btn-sm alert-mark-read-btn" onclick="markAllRead()">Mark all read</button>
-              </div>
-              <div class="alert-log" id="alertLog">
-                <div class="empty-state">No alerts yet</div>
-              </div>
-            </div>
 
-            <!-- Settings Panel -->
-            <div class="panel overlay-panel" id="settingsPanel" data-panel-title="System Settings" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">⚙️</span>
-                  <span>System Settings</span>
+              <!-- Alert Log Panel -->
+              <div class="panel overlay-panel" id="alertPanel" data-panel-title="Alert Log & Notifications"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">🔔</span>
+                    <span>Alert Log</span>
+                    <span class="panel-badge" id="alertLogBadge" style="display:none"></span>
+                  </div>
+                  <div class="panel-meta" id="alertLogMeta">REAL-TIME INTELLIGENCE ALERTS</div>
                 </div>
-                <div class="panel-meta">POLLING & DISPLAY PREFERENCES</div>
+                <div class="settings-content-wrap">
+                  <div class="alert-log-actions">
+                    <button class="btn-sm alert-mark-read-btn" onclick="markAllRead()">Mark all read</button>
+                  </div>
+                  <div class="alert-log" id="alertLog">
+                    <div class="empty-state">No alerts yet</div>
+                  </div>
+                </div>
               </div>
-              <div class="settings-content-wrap">
-                <div class="settings-row">
-                  <label class="setting-label">Auto-poll interval</label>
-                  <select class="input-field select-field" id="pollInterval" onchange="updatePollInterval()">
-                    <option value="60000">1 min</option>
-                    <option value="300000" selected>5 min</option>
-                    <option value="600000">10 min</option>
-                    <option value="0">Manual</option>
-                  </select>
-                </div>
-                <div class="settings-row">
-                  <label class="setting-label">Map View</label>
-                  <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide Map</button>
-                </div>
 
-                <!-- ══════════════════════════════════════════════════════════
+              <!-- Settings Panel -->
+              <div class="panel overlay-panel" id="settingsPanel" data-panel-title="System Settings"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">⚙️</span>
+                    <span>System Settings</span>
+                  </div>
+                  <div class="panel-meta">POLLING & DISPLAY PREFERENCES</div>
+                </div>
+                <div class="settings-content-wrap">
+                  <div class="settings-row">
+                    <label class="setting-label">Auto-poll interval</label>
+                    <select class="input-field select-field" id="pollInterval" onchange="updatePollInterval()">
+                      <option value="60000">1 min</option>
+                      <option value="300000" selected>5 min</option>
+                      <option value="600000">10 min</option>
+                      <option value="0">Manual</option>
+                    </select>
+                  </div>
+                  <div class="settings-row">
+                    <label class="setting-label">Map View</label>
+                    <button class="btn-toggle active" id="mapToggle" onclick="toggleMap()">Hide Map</button>
+                  </div>
+
+                  <!-- ══════════════════════════════════════════════════════════
                      STYLE STUDIO — LIVE UI TOKENS & PRESETS
                      ══════════════════════════════════════════════════════════ -->
-                <div class="style-studio-box">
-                  <div class="style-studio-heading-wrap">
-                    <div class="style-studio-title">Style Studio</div>
-                    <div class="style-studio-sub">Live UI tokens</div>
-                  </div>
+                  <div class="style-studio-box">
+                    <div class="style-studio-heading-wrap">
+                      <div class="style-studio-title">Style Studio</div>
+                      <div class="style-studio-sub">Live UI tokens</div>
+                    </div>
 
-                  <!-- Presets -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Preset</div>
-                    <div class="studio-presets-row">
-                      <button type="button" class="studio-preset-btn active" data-preset="HORUS" onclick="StyleStudio.applyPreset('HORUS')">HORUS</button>
-                      <button type="button" class="studio-preset-btn" data-preset="PHANTOM" onclick="StyleStudio.applyPreset('PHANTOM')">PHANTOM</button>
-                      <button type="button" class="studio-preset-btn" data-preset="TERMINAL" onclick="StyleStudio.applyPreset('TERMINAL')">TERMINAL</button>
-                      <button type="button" class="studio-preset-btn" data-preset="CRIMSON" onclick="StyleStudio.applyPreset('CRIMSON')">CRIMSON</button>
-                      <button type="button" class="studio-preset-btn" data-preset="ARCTIC" onclick="StyleStudio.applyPreset('ARCTIC')">ARCTIC</button>
-                      <button type="button" class="studio-preset-btn" data-preset="BLACKOUT" onclick="StyleStudio.applyPreset('BLACKOUT')">BLACKOUT</button>
-                    </div>
-                  </div>
-
-                  <!-- Accent -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Accent</div>
-                    <div class="studio-row">
-                      <span class="studio-label">Primary</span>
-                      <div class="studio-color-picker-wrap">
-                        <input type="color" id="studioAccentPrimary" value="#d4af37" onchange="StyleStudio.setToken('accentPrimary', this.value)">
-                        <span class="studio-hex-tag" id="codeAccentPrimary">#d4af37</span>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Secondary</span>
-                      <div class="studio-color-picker-wrap">
-                        <input type="color" id="studioAccentSecondary" value="#00e5ff" onchange="StyleStudio.setToken('accentSecondary', this.value)">
-                        <span class="studio-hex-tag" id="codeAccentSecondary">#00e5ff</span>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Glow</span>
-                      <div class="studio-pills-row" id="glowOptionsGroup">
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('0%')">0%</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('15%')">15%</button>
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setGlow('30%')">30%</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('50%')">50%</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('80%')">80%</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Signal -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Signal</div>
-                    <div class="studio-grid-2">
-                      <div class="studio-row">
-                        <span class="studio-label">Critical</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSignalCritical" value="#ff3d3d" onchange="StyleStudio.setToken('signalCritical', this.value)">
-                          <span class="studio-hex-tag" id="codeSignalCritical">#ff3d3d</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Warning</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSignalWarning" value="#ff9500" onchange="StyleStudio.setToken('signalWarning', this.value)">
-                          <span class="studio-hex-tag" id="codeSignalWarning">#ff9500</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Nominal</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSignalNominal" value="#00e676" onchange="StyleStudio.setToken('signalNominal', this.value)">
-                          <span class="studio-hex-tag" id="codeSignalNominal">#00e676</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Info</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSignalInfo" value="#448aff" onchange="StyleStudio.setToken('signalInfo', this.value)">
-                          <span class="studio-hex-tag" id="codeSignalInfo">#448aff</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Map controls -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Map controls</div>
-                    <div class="studio-row">
-                      <span class="studio-label">Pan/zoom pad</span>
-                      <div class="studio-toggle-pair" id="panZoomPadToggle">
-                        <button type="button" class="studio-toggle-opt" id="btnPanZoomOn" onclick="StyleStudio.setPanZoomPad(true)">ON</button>
-                        <button type="button" class="studio-toggle-opt active" id="btnPanZoomOff" onclick="StyleStudio.setPanZoomPad(false)">OFF</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Map layers -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Map layers</div>
-                    
-                    <div class="studio-subheading">Cameras</div>
-                    <div class="studio-row">
-                      <span class="studio-label">Dots &amp; labels</span>
-                      <div class="studio-color-picker-wrap">
-                        <input type="color" id="studioLayerCameras" value="#00e676" onchange="StyleStudio.setLayerColor('cameras', this.value)">
-                        <span class="studio-hex-tag" id="codeLayerCameras">#00e676</span>
+                    <!-- Presets -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Preset</div>
+                      <div class="studio-presets-row">
+                        <button type="button" class="studio-preset-btn active" data-preset="HORUS"
+                          onclick="StyleStudio.applyPreset('HORUS')">HORUS</button>
+                        <button type="button" class="studio-preset-btn" data-preset="PHANTOM"
+                          onclick="StyleStudio.applyPreset('PHANTOM')">PHANTOM</button>
+                        <button type="button" class="studio-preset-btn" data-preset="TERMINAL"
+                          onclick="StyleStudio.applyPreset('TERMINAL')">TERMINAL</button>
+                        <button type="button" class="studio-preset-btn" data-preset="CRIMSON"
+                          onclick="StyleStudio.applyPreset('CRIMSON')">CRIMSON</button>
+                        <button type="button" class="studio-preset-btn" data-preset="ARCTIC"
+                          onclick="StyleStudio.applyPreset('ARCTIC')">ARCTIC</button>
+                        <button type="button" class="studio-preset-btn" data-preset="BLACKOUT"
+                          onclick="StyleStudio.applyPreset('BLACKOUT')">BLACKOUT</button>
                       </div>
                     </div>
 
-                    <div class="studio-subheading" style="margin-top:8px;">Satellites</div>
-                    <div class="studio-caption-note">Default keeps each satellite's own mission colour. Change one and it takes over that whole category.</div>
-                    <div class="studio-grid-2">
-                      <div class="studio-row">
-                        <span class="studio-label">Comms</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSatComms" value="#00e676" onchange="StyleStudio.setLayerColor('satComms', this.value)">
-                          <span class="studio-hex-tag" id="codeSatComms">#00e676</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Military</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSatMilitary" value="#ff3d3d" onchange="StyleStudio.setLayerColor('satMilitary', this.value)">
-                          <span class="studio-hex-tag" id="codeSatMilitary">#ff3d3d</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Navigation</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSatNav" value="#448aff" onchange="StyleStudio.setLayerColor('satNav', this.value)">
-                          <span class="studio-hex-tag" id="codeSatNav">#448aff</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Earth obs</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSatEarth" value="#90ee90" onchange="StyleStudio.setLayerColor('satEarth', this.value)">
-                          <span class="studio-hex-tag" id="codeSatEarth">#90ee90</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Science</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSatScience" value="#ffd700" onchange="StyleStudio.setLayerColor('satScience', this.value)">
-                          <span class="studio-hex-tag" id="codeSatScience">#ffd700</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Other</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioSatOther" value="#00e5ff" onchange="StyleStudio.setLayerColor('satOther', this.value)">
-                          <span class="studio-hex-tag" id="codeSatOther">#00e5ff</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="studio-subheading" style="margin-top:8px;">Aircraft</div>
-                    <div class="studio-grid-2">
-                      <div class="studio-row">
-                        <span class="studio-label">Civil</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioPlaneCivil" value="#00e5ff" onchange="StyleStudio.setLayerColor('planeCivil', this.value)">
-                          <span class="studio-hex-tag" id="codePlaneCivil">#00e5ff</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Private</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioPlanePrivate" value="#ffd700" onchange="StyleStudio.setLayerColor('planePrivate', this.value)">
-                          <span class="studio-hex-tag" id="codePlanePrivate">#ffd700</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Government</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioPlaneGov" value="#ff9500" onchange="StyleStudio.setLayerColor('planeGov', this.value)">
-                          <span class="studio-hex-tag" id="codePlaneGov">#ff9500</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Military</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioPlaneMil" value="#ff0000" onchange="StyleStudio.setLayerColor('planeMil', this.value)">
-                          <span class="studio-hex-tag" id="codePlaneMil">#ff0000</span>
-                        </div>
-                      </div>
-                      <div class="studio-row">
-                        <span class="studio-label">Unknown</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioPlaneUnknown" value="#546e7a" onchange="StyleStudio.setLayerColor('planeUnknown', this.value)">
-                          <span class="studio-hex-tag" id="codePlaneUnknown">#546e7a</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Surface -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Surface</div>
-                    <div class="studio-row">
-                      <span class="studio-label">Background</span>
-                      <div class="studio-color-picker-wrap">
-                        <input type="color" id="studioSurfaceBg" value="#04040a" onchange="StyleStudio.setToken('surfaceBg', this.value)">
-                        <span class="studio-hex-tag" id="codeSurfaceBg">#04040a</span>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Panel</span>
-                      <div class="studio-pills-row" id="panelOptionsGroup">
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setPanelOpacity('70%')">70%</button>
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setPanelOpacity('88%')">88%</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setPanelOpacity('95%')">95%</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setPanelOpacity('100%')">100%</button>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Border</span>
-                      <div class="studio-pills-row" id="borderOptionsGroup">
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBorderOpacity('8%')">8%</button>
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setBorderOpacity('15%')">15%</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBorderOpacity('25%')">25%</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBorderOpacity('40%')">40%</button>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Blur</span>
-                      <div class="studio-pills-row" id="blurOptionsGroup">
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setBlur('AUTO')">AUTO</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBlur('OFF')">OFF</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setBlur('HIGH')">HIGH</button>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Radius</span>
-                      <div class="studio-pills-row" id="radiusOptionsGroup">
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setRadius('0.50x')">0.50x</button>
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setRadius('1.00x')">1.00x</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setRadius('1.50x')">1.50x</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Text -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Text</div>
-                    <div class="studio-grid-2">
+                    <!-- Accent -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Accent</div>
                       <div class="studio-row">
                         <span class="studio-label">Primary</span>
                         <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioTextPrimary" value="#e8e6e0" onchange="StyleStudio.setToken('textPrimary', this.value)">
-                          <span class="studio-hex-tag" id="codeTextPrimary">#e8e6e0</span>
+                          <input type="color" id="studioAccentPrimary" value="#d4af37"
+                            onchange="StyleStudio.setToken('accentPrimary', this.value)">
+                          <span class="studio-hex-tag" id="codeAccentPrimary">#d4af37</span>
                         </div>
                       </div>
                       <div class="studio-row">
                         <span class="studio-label">Secondary</span>
                         <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioTextSecondary" value="#9b978e" onchange="StyleStudio.setToken('textSecondary', this.value)">
-                          <span class="studio-hex-tag" id="codeTextSecondary">#9b978e</span>
+                          <input type="color" id="studioAccentSecondary" value="#00e5ff"
+                            onchange="StyleStudio.setToken('accentSecondary', this.value)">
+                          <span class="studio-hex-tag" id="codeAccentSecondary">#00e5ff</span>
                         </div>
                       </div>
                       <div class="studio-row">
-                        <span class="studio-label">Muted</span>
+                        <span class="studio-label">Glow</span>
+                        <div class="studio-pills-row" id="glowOptionsGroup">
+                          <button type="button" class="studio-pill-opt" onclick="StyleStudio.setGlow('0%')">0%</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setGlow('15%')">15%</button>
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setGlow('30%')">30%</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setGlow('50%')">50%</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setGlow('80%')">80%</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Signal -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Signal</div>
+                      <div class="studio-grid-2">
+                        <div class="studio-row">
+                          <span class="studio-label">Critical</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSignalCritical" value="#ff3d3d"
+                              onchange="StyleStudio.setToken('signalCritical', this.value)">
+                            <span class="studio-hex-tag" id="codeSignalCritical">#ff3d3d</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Warning</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSignalWarning" value="#ff9500"
+                              onchange="StyleStudio.setToken('signalWarning', this.value)">
+                            <span class="studio-hex-tag" id="codeSignalWarning">#ff9500</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Nominal</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSignalNominal" value="#00e676"
+                              onchange="StyleStudio.setToken('signalNominal', this.value)">
+                            <span class="studio-hex-tag" id="codeSignalNominal">#00e676</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Info</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSignalInfo" value="#448aff"
+                              onchange="StyleStudio.setToken('signalInfo', this.value)">
+                            <span class="studio-hex-tag" id="codeSignalInfo">#448aff</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Map controls -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Map controls</div>
+                      <div class="studio-row">
+                        <span class="studio-label">Pan/zoom pad</span>
+                        <div class="studio-toggle-pair" id="panZoomPadToggle">
+                          <button type="button" class="studio-toggle-opt" id="btnPanZoomOn"
+                            onclick="StyleStudio.setPanZoomPad(true)">ON</button>
+                          <button type="button" class="studio-toggle-opt active" id="btnPanZoomOff"
+                            onclick="StyleStudio.setPanZoomPad(false)">OFF</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Map layers -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Map layers</div>
+
+                      <div class="studio-subheading">Cameras</div>
+                      <div class="studio-row">
+                        <span class="studio-label">Dots &amp; labels</span>
                         <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioTextMuted" value="#5c5a54" onchange="StyleStudio.setToken('textMuted', this.value)">
-                          <span class="studio-hex-tag" id="codeTextMuted">#5c5a54</span>
+                          <input type="color" id="studioLayerCameras" value="#00e676"
+                            onchange="StyleStudio.setLayerColor('cameras', this.value)">
+                          <span class="studio-hex-tag" id="codeLayerCameras">#00e676</span>
+                        </div>
+                      </div>
+
+                      <div class="studio-subheading" style="margin-top:8px;">Satellites</div>
+                      <div class="studio-caption-note">Default keeps each satellite's own mission colour. Change one and
+                        it takes over that whole category.</div>
+                      <div class="studio-grid-2">
+                        <div class="studio-row">
+                          <span class="studio-label">Comms</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSatComms" value="#00e676"
+                              onchange="StyleStudio.setLayerColor('satComms', this.value)">
+                            <span class="studio-hex-tag" id="codeSatComms">#00e676</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Military</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSatMilitary" value="#ff3d3d"
+                              onchange="StyleStudio.setLayerColor('satMilitary', this.value)">
+                            <span class="studio-hex-tag" id="codeSatMilitary">#ff3d3d</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Navigation</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSatNav" value="#448aff"
+                              onchange="StyleStudio.setLayerColor('satNav', this.value)">
+                            <span class="studio-hex-tag" id="codeSatNav">#448aff</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Earth obs</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSatEarth" value="#90ee90"
+                              onchange="StyleStudio.setLayerColor('satEarth', this.value)">
+                            <span class="studio-hex-tag" id="codeSatEarth">#90ee90</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Science</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSatScience" value="#ffd700"
+                              onchange="StyleStudio.setLayerColor('satScience', this.value)">
+                            <span class="studio-hex-tag" id="codeSatScience">#ffd700</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Other</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioSatOther" value="#00e5ff"
+                              onchange="StyleStudio.setLayerColor('satOther', this.value)">
+                            <span class="studio-hex-tag" id="codeSatOther">#00e5ff</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="studio-subheading" style="margin-top:8px;">Aircraft</div>
+                      <div class="studio-grid-2">
+                        <div class="studio-row">
+                          <span class="studio-label">Civil</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioPlaneCivil" value="#00e5ff"
+                              onchange="StyleStudio.setLayerColor('planeCivil', this.value)">
+                            <span class="studio-hex-tag" id="codePlaneCivil">#00e5ff</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Private</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioPlanePrivate" value="#ffd700"
+                              onchange="StyleStudio.setLayerColor('planePrivate', this.value)">
+                            <span class="studio-hex-tag" id="codePlanePrivate">#ffd700</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Government</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioPlaneGov" value="#ff9500"
+                              onchange="StyleStudio.setLayerColor('planeGov', this.value)">
+                            <span class="studio-hex-tag" id="codePlaneGov">#ff9500</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Military</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioPlaneMil" value="#ff0000"
+                              onchange="StyleStudio.setLayerColor('planeMil', this.value)">
+                            <span class="studio-hex-tag" id="codePlaneMil">#ff0000</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Unknown</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioPlaneUnknown" value="#546e7a"
+                              onchange="StyleStudio.setLayerColor('planeUnknown', this.value)">
+                            <span class="studio-hex-tag" id="codePlaneUnknown">#546e7a</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Surface -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Surface</div>
+                      <div class="studio-row">
+                        <span class="studio-label">Background</span>
+                        <div class="studio-color-picker-wrap">
+                          <input type="color" id="studioSurfaceBg" value="#04040a"
+                            onchange="StyleStudio.setToken('surfaceBg', this.value)">
+                          <span class="studio-hex-tag" id="codeSurfaceBg">#04040a</span>
                         </div>
                       </div>
                       <div class="studio-row">
-                        <span class="studio-label">Heading</span>
-                        <div class="studio-color-picker-wrap">
-                          <input type="color" id="studioTextHeading" value="#f5f0e0" onchange="StyleStudio.setToken('textHeading', this.value)">
-                          <span class="studio-hex-tag" id="codeTextHeading">#f5f0e0</span>
+                        <span class="studio-label">Panel</span>
+                        <div class="studio-pills-row" id="panelOptionsGroup">
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setPanelOpacity('70%')">70%</button>
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setPanelOpacity('88%')">88%</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setPanelOpacity('95%')">95%</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setPanelOpacity('100%')">100%</button>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Border</span>
+                        <div class="studio-pills-row" id="borderOptionsGroup">
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setBorderOpacity('8%')">8%</button>
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setBorderOpacity('15%')">15%</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setBorderOpacity('25%')">25%</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setBorderOpacity('40%')">40%</button>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Blur</span>
+                        <div class="studio-pills-row" id="blurOptionsGroup">
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setBlur('AUTO')">AUTO</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setBlur('OFF')">OFF</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setBlur('HIGH')">HIGH</button>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Radius</span>
+                        <div class="studio-pills-row" id="radiusOptionsGroup">
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setRadius('0.50x')">0.50x</button>
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setRadius('1.00x')">1.00x</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setRadius('1.50x')">1.50x</button>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <!-- Typography -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Typography</div>
-                    <div class="studio-row">
-                      <span class="studio-label">UI font</span>
-                      <div class="studio-pills-row" id="uiFontGroup">
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setFont('ui', 'INTER')">INTER</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('ui', 'MONO')">MONO</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('ui', 'SYSTEM')">SYSTEM</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('ui', 'SERIF')">SERIF</button>
+                    <!-- Text -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Text</div>
+                      <div class="studio-grid-2">
+                        <div class="studio-row">
+                          <span class="studio-label">Primary</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioTextPrimary" value="#e8e6e0"
+                              onchange="StyleStudio.setToken('textPrimary', this.value)">
+                            <span class="studio-hex-tag" id="codeTextPrimary">#e8e6e0</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Secondary</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioTextSecondary" value="#9b978e"
+                              onchange="StyleStudio.setToken('textSecondary', this.value)">
+                            <span class="studio-hex-tag" id="codeTextSecondary">#9b978e</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Muted</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioTextMuted" value="#5c5a54"
+                              onchange="StyleStudio.setToken('textMuted', this.value)">
+                            <span class="studio-hex-tag" id="codeTextMuted">#5c5a54</span>
+                          </div>
+                        </div>
+                        <div class="studio-row">
+                          <span class="studio-label">Heading</span>
+                          <div class="studio-color-picker-wrap">
+                            <input type="color" id="studioTextHeading" value="#f5f0e0"
+                              onchange="StyleStudio.setToken('textHeading', this.value)">
+                            <span class="studio-hex-tag" id="codeTextHeading">#f5f0e0</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Mono font</span>
-                      <div class="studio-pills-row" id="monoFontGroup">
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setFont('mono', 'JETBRAINS')">JETBRAINS</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('mono', 'COURIER')">COURIER</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('mono', 'CONSOLAS')">CONSOLAS</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setFont('mono', 'INTER')">INTER</button>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Tracking</span>
-                      <div class="studio-pills-row" id="trackingGroup">
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setTracking('AUTO')">AUTO</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setTracking('TIGHT')">TIGHT</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setTracking('WIDE')">WIDE</button>
-                      </div>
-                    </div>
-                  </div>
 
-                  <!-- Motion & FX -->
-                  <div class="studio-section">
-                    <div class="studio-section-label">Motion &amp; FX</div>
-                    <div class="studio-row">
-                      <span class="studio-label">Speed</span>
-                      <div class="studio-pills-row" id="speedGroup">
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setSpeed('0.50x')">0.50x</button>
-                        <button type="button" class="studio-pill-opt active" onclick="StyleStudio.setSpeed('1.00x')">1.00x</button>
-                        <button type="button" class="studio-pill-opt" onclick="StyleStudio.setSpeed('1.50x')">1.50x</button>
+                    <!-- Typography -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Typography</div>
+                      <div class="studio-row">
+                        <span class="studio-label">UI font</span>
+                        <div class="studio-pills-row" id="uiFontGroup">
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setFont('ui', 'INTER')">INTER</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setFont('ui', 'MONO')">MONO</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setFont('ui', 'SYSTEM')">SYSTEM</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setFont('ui', 'SERIF')">SERIF</button>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Mono font</span>
+                        <div class="studio-pills-row" id="monoFontGroup">
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setFont('mono', 'JETBRAINS')">JETBRAINS</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setFont('mono', 'COURIER')">COURIER</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setFont('mono', 'CONSOLAS')">CONSOLAS</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setFont('mono', 'INTER')">INTER</button>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Tracking</span>
+                        <div class="studio-pills-row" id="trackingGroup">
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setTracking('AUTO')">AUTO</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setTracking('TIGHT')">TIGHT</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setTracking('WIDE')">WIDE</button>
+                        </div>
                       </div>
                     </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Scanlines</span>
-                      <div class="studio-toggle-pair" id="scanlinesToggle">
-                        <button type="button" class="studio-toggle-opt active" id="btnScanlinesOff" onclick="StyleStudio.toggleFx('scanlines', false)">off</button>
-                        <button type="button" class="studio-toggle-opt" id="btnScanlinesOn" onclick="StyleStudio.toggleFx('scanlines', true)">on</button>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Grain</span>
-                      <div class="studio-toggle-pair" id="grainToggle">
-                        <button type="button" class="studio-toggle-opt active" id="btnGrainOff" onclick="StyleStudio.toggleFx('grain', false)">off</button>
-                        <button type="button" class="studio-toggle-opt" id="btnGrainOn" onclick="StyleStudio.toggleFx('grain', true)">on</button>
-                      </div>
-                    </div>
-                    <div class="studio-row">
-                      <span class="studio-label">Vignette</span>
-                      <div class="studio-toggle-pair" id="vignetteToggle">
-                        <button type="button" class="studio-toggle-opt active" id="btnVignetteOff" onclick="StyleStudio.toggleFx('vignette', false)">off</button>
-                        <button type="button" class="studio-toggle-opt" id="btnVignetteOn" onclick="StyleStudio.toggleFx('vignette', true)">on</button>
-                      </div>
-                    </div>
-                  </div>
 
-                  <!-- Studio Footer Notice & Reset -->
-                  <div class="studio-footer-note">
-                    Saved to this browser. AUTO leaves the app's own styling alone, and presets do not touch the map layers — those carry meaning, not just a look. Reset restores the active theme.
-                  </div>
-                  <div class="studio-reset-action">
-                    <button type="button" class="btn-xs btn-secondary" onclick="StyleStudio.resetActiveTheme()">🔄 Reset restores the active theme</button>
+                    <!-- Motion & FX -->
+                    <div class="studio-section">
+                      <div class="studio-section-label">Motion &amp; FX</div>
+                      <div class="studio-row">
+                        <span class="studio-label">Speed</span>
+                        <div class="studio-pills-row" id="speedGroup">
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setSpeed('0.50x')">0.50x</button>
+                          <button type="button" class="studio-pill-opt active"
+                            onclick="StyleStudio.setSpeed('1.00x')">1.00x</button>
+                          <button type="button" class="studio-pill-opt"
+                            onclick="StyleStudio.setSpeed('1.50x')">1.50x</button>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Scanlines</span>
+                        <div class="studio-toggle-pair" id="scanlinesToggle">
+                          <button type="button" class="studio-toggle-opt active" id="btnScanlinesOff"
+                            onclick="StyleStudio.toggleFx('scanlines', false)">off</button>
+                          <button type="button" class="studio-toggle-opt" id="btnScanlinesOn"
+                            onclick="StyleStudio.toggleFx('scanlines', true)">on</button>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Grain</span>
+                        <div class="studio-toggle-pair" id="grainToggle">
+                          <button type="button" class="studio-toggle-opt active" id="btnGrainOff"
+                            onclick="StyleStudio.toggleFx('grain', false)">off</button>
+                          <button type="button" class="studio-toggle-opt" id="btnGrainOn"
+                            onclick="StyleStudio.toggleFx('grain', true)">on</button>
+                        </div>
+                      </div>
+                      <div class="studio-row">
+                        <span class="studio-label">Vignette</span>
+                        <div class="studio-toggle-pair" id="vignetteToggle">
+                          <button type="button" class="studio-toggle-opt active" id="btnVignetteOff"
+                            onclick="StyleStudio.toggleFx('vignette', false)">off</button>
+                          <button type="button" class="studio-toggle-opt" id="btnVignetteOn"
+                            onclick="StyleStudio.toggleFx('vignette', true)">on</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Studio Footer Notice & Reset -->
+                    <div class="studio-footer-note">
+                      Saved to this browser. AUTO leaves the app's own styling alone, and presets do not touch the map
+                      layers — those carry meaning, not just a look. Reset restores the active theme.
+                    </div>
+                    <div class="studio-reset-action">
+                      <button type="button" class="btn-xs btn-secondary" onclick="StyleStudio.resetActiveTheme()">🔄
+                        Reset restores the active theme</button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Staff Warden & Evacuation Protected Panel -->
-            <div class="panel overlay-panel" id="staffPanel" data-panel-title="Staff Warden & Evacuation" style="display:none">
-              <div class="panel-header">
-                <div class="panel-title">
-                  <span class="module-icon">🛡️</span>
-                  <span>Staff Warden</span>
-                  <span class="panel-badge badge-high" id="staffBadge" style="display:none"></span>
-                </div>
-                <div class="panel-meta" id="staffMeta">WARD No. 10 · RC MITROVICA · 12 PERSONNEL &amp; 27 SOULS</div>
-                <button class="staff-lock-btn" id="btnStaffLogout" onclick="logoutStaff()" title="Lock & Secure Staff Data">
-                  🔒 Lock
-                </button>
-              </div>
-              <div class="staff-controls-bar">
-                <div class="staff-search-wrap">
-                  <input type="text" class="input-field staff-search-input" id="staffSearchInput" placeholder="Search callsign, radio, zone..." oninput="filterStaffList()">
-                </div>
-                <div class="staff-filter-row">
-                  <select class="input-field select-field staff-select" id="staffZoneFilter" onchange="filterStaffList()">
-                    <option value="ALL">All Zones</option>
-                    <option value="Mitrovica North">Mitrovica North</option>
-                    <option value="Mitrovica South">Mitrovica South</option>
-                    <option value="Prishtinë">Prishtinë</option>
-                    <option value="Leposavić">Leposavić</option>
-                    <option value="Zvečan">Zvečan</option>
-                    <option value="Brezovica / Štrpce">Brezovica / Štrpce</option>
-                  </select>
-                  <button class="btn-primary-compact" id="btnOpenAddStaff" onclick="openAddStaffModal()">
-                    ➕ Add Entry
+              <!-- Staff Warden & Evacuation Protected Panel -->
+              <div class="panel overlay-panel" id="staffPanel" data-panel-title="Staff Warden & Evacuation"
+                style="display:none">
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <span class="module-icon">🛡️</span>
+                    <span>Staff Warden</span>
+                    <span class="panel-badge badge-high" id="staffBadge" style="display:none"></span>
+                  </div>
+                  <div class="panel-meta" id="staffMeta">WARD No. 10 · RC MITROVICA · 12 PERSONNEL &amp; 27 SOULS</div>
+                  <button class="staff-lock-btn" id="btnStaffLogout" onclick="logoutStaff()"
+                    title="Lock & Secure Staff Data">
+                    🔒 Lock
                   </button>
                 </div>
-                <div class="staff-category-toggles" id="staffCategoryToggles" style="display:flex; align-items:center; gap:12px; margin-top:8px; padding:6px 10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:6px; font-size:12px;">
-                  <label class="staff-tick-label" style="display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-primary); font-weight:600;">
-                    <input type="checkbox" id="staffFilterInternational" checked onchange="filterStaffList()" style="cursor:pointer; accent-color:#38bdf8;">
-                    <span>🌐 International Staff</span>
-                  </label>
-                  <label class="staff-tick-label" style="display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-primary); font-weight:600;">
-                    <input type="checkbox" id="staffFilterNational" checked onchange="filterStaffList()" style="cursor:pointer; accent-color:#fbbf24;">
-                    <span>🇽🇰 National Staff</span>
-                  </label>
-                  <label class="staff-tick-label" style="display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-primary); font-weight:600;">
-                    <input type="checkbox" id="staffFilterSafeHaven" checked onchange="filterStaffList()" style="cursor:pointer; accent-color:#10b981;">
-                    <span>🛡️ Safe Havens</span>
-                  </label>
+                <div class="staff-controls-bar">
+                  <div class="staff-search-wrap">
+                    <input type="text" class="input-field staff-search-input" id="staffSearchInput"
+                      placeholder="Search callsign, radio, zone..." oninput="filterStaffList()">
+                  </div>
+                  <div class="staff-filter-row">
+                    <select class="input-field select-field staff-select" id="staffZoneFilter"
+                      onchange="filterStaffList()">
+                      <option value="ALL">All Zones</option>
+                      <option value="Mitrovica North">Mitrovica North</option>
+                      <option value="Mitrovica South">Mitrovica South</option>
+                      <option value="Prishtinë">Prishtinë</option>
+                      <option value="Leposavić">Leposavić</option>
+                      <option value="Zvečan">Zvečan</option>
+                      <option value="Brezovica / Štrpce">Brezovica / Štrpce</option>
+                    </select>
+                    <button class="btn-primary-compact" id="btnOpenAddStaff" onclick="openAddStaffModal()">
+                      ➕ Add Entry
+                    </button>
+                  </div>
+                  <div class="staff-category-toggles" id="staffCategoryToggles"
+                    style="display:flex; align-items:center; gap:12px; margin-top:8px; padding:6px 10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:6px; font-size:12px;">
+                    <label class="staff-tick-label"
+                      style="display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-primary); font-weight:600;">
+                      <input type="checkbox" id="staffFilterInternational" checked onchange="filterStaffList()"
+                        style="cursor:pointer; accent-color:#38bdf8;">
+                      <span>🌐 International Staff</span>
+                    </label>
+                    <label class="staff-tick-label"
+                      style="display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-primary); font-weight:600;">
+                      <input type="checkbox" id="staffFilterNational" checked onchange="filterStaffList()"
+                        style="cursor:pointer; accent-color:#fbbf24;">
+                      <span>🇽🇰 National Staff</span>
+                    </label>
+                    <label class="staff-tick-label"
+                      style="display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-primary); font-weight:600;">
+                      <input type="checkbox" id="staffFilterSafeHaven" checked onchange="filterStaffList()"
+                        style="cursor:pointer; accent-color:#10b981;">
+                      <span>🛡️ Safe Havens</span>
+                    </label>
+                  </div>
                 </div>
+                <div class="staff-list" id="staffList"></div>
               </div>
-              <div class="staff-list" id="staffList"></div>
+
+
             </div>
-
-
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- CCTV Intelligence Panel - 50% split-screen / Unobstructed Camera Feed -->
+    <div class="cctv-intelligence-panel" id="cctvIntelligencePanel" style="display: none;">
+      <div class="cctv-intelligence-header">
+        <div class="cctv-intelligence-title">
+          <span class="cctv-icon">📹</span>
+          <span id="cctvName">CAMERA</span>
+        </div>
+        <div class="cctv-header-right">
+          <span id="cctvStatus" class="cctv-status-indicator">● LIVE</span>
+          <a id="cctvOpenFeed" class="cctv-header-link-btn" href="#" target="_blank" rel="noopener noreferrer"
+            title="Open live feed in new tab">
+            ↗ Open feed
+          </a>
+          <button id="cctvFullscreenBtn" class="cctv-header-icon-btn" onclick="toggleCCTVFullscreen()"
+            title="Toggle Fullscreen">
+            ⛶
+          </button>
+          <button id="cctvClose" class="cctv-close-btn" title="Close">✕</button>
+        </div>
+      </div>
+      <div class="cctv-intelligence-video" id="cctvVideoContainer">
+        <iframe id="cctvVideoFrame" class="cctv-video-frame" src="" loading="lazy"
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="cctv-video-unavailable" id="cctvVideoUnavailable" style="display: none;">
+          <div class="cctv-unavailable-icon">📹</div>
+          <div class="cctv-unavailable-text">No stream available for this camera</div>
+        </div>
+      </div>
+      <div class="cctv-intelligence-body">
+        <div class="cctv-intelligence-metadata">
+          <div class="cctv-metadata-row">
+            <span class="cctv-metadata-label">FEED TYPE</span>
+            <span id="cctvFeedType" class="cctv-metadata-value">N/A</span>
+          </div>
+          <div class="cctv-metadata-row">
+            <span class="cctv-metadata-label">STATUS</span>
+            <span id="cctvFeedStatus" class="cctv-metadata-value">N/A</span>
+          </div>
+          <div class="cctv-metadata-row">
+            <span class="cctv-metadata-label">RECORDING</span>
+            <span id="cctvRecording" class="cctv-metadata-value">N/A</span>
+          </div>
+        </div>
+        <div class="cctv-intelligence-actions">
+          <button id="cctvRawFeed" class="cctv-action-btn" style="flex: 1;">RAW FEED</button>
+          <button id="cctvMapTargetBtn" class="cctv-action-btn" style="flex: 1;">MAP TARGET</button>
+        </div>
+        <div class="cctv-custom-connect-row" style="display:flex; gap:6px; margin-top:8px; align-items:center;">
+          <input type="text" id="cctvCustomStreamInput" class="input-field"
+            placeholder="Enter custom RTSP / HLS / Video stream URL..."
+            style="flex:1; font-size:11px; padding:6px 8px;">
+          <button type="button" class="btn-xs btn-primary" onclick="connectCustomCCTVStream()"
+            style="white-space:nowrap; padding:6px 10px; font-weight:700;">CONNECT</button>
+        </div>
+      </div>
     </div>
-  </section>
+  </main>
 
-  <!-- CCTV Intelligence Panel - 50% split-screen / Unobstructed Camera Feed -->
-  <div class="cctv-intelligence-panel" id="cctvIntelligencePanel" style="display: none;">
-    <div class="cctv-intelligence-header">
-      <div class="cctv-intelligence-title">
-        <span class="cctv-icon">📹</span>
-        <span id="cctvName">CAMERA</span>
-      </div>
-      <div class="cctv-header-right">
-        <span id="cctvStatus" class="cctv-status-indicator">● LIVE</span>
-        <a id="cctvOpenFeed" class="cctv-header-link-btn" href="#" target="_blank" rel="noopener noreferrer" title="Open live feed in new tab">
-          ↗ Open feed
-        </a>
-        <button id="cctvFullscreenBtn" class="cctv-header-icon-btn" onclick="toggleCCTVFullscreen()" title="Toggle Fullscreen">
-          ⛶
-        </button>
-        <button id="cctvClose" class="cctv-close-btn" title="Close">✕</button>
+  <!-- ── OSIRIS AI Inspired Bottom Telemetry & Live Alert Ticker Bar ─────────── -->
+  <div class="live-alert-ticker-bar" id="liveAlertTickerBar">
+    <div class="telemetry-cursor-cluster" id="telemetryCursorCluster">
+      <span class="telemetry-label">CURSOR</span>
+      <span class="telemetry-data coords" id="telemetryCursor">42.6629, 21.1655</span>
+      <span class="telemetry-sep">·</span>
+      <span class="telemetry-label">LOCATION</span>
+      <span class="telemetry-data loc" id="telemetryLocation">Kosovo</span>
+      <span class="telemetry-sep">·</span>
+      <span class="telemetry-label">ZOOM</span>
+      <span class="telemetry-data zoom" id="telemetryZoom">8.2</span>
+    </div>
+
+    <div class="ticker-prefix">
+      <span class="ticker-pulse">●</span> LIVE ALERTS
+    </div>
+    <div class="ticker-viewport">
+      <div class="ticker-track" id="liveAlertTickerTrack">
+        <span class="ticker-item-placeholder">INITIALIZING KOSINT REAL-TIME INTELLIGENCE ALERTS...</span>
       </div>
     </div>
-    <div class="cctv-intelligence-video" id="cctvVideoContainer">
-      <iframe id="cctvVideoFrame" class="cctv-video-frame" src="" loading="lazy" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-      <div class="cctv-video-unavailable" id="cctvVideoUnavailable" style="display: none;">
-        <div class="cctv-unavailable-icon">📹</div>
-        <div class="cctv-unavailable-text">No stream available for this camera</div>
-      </div>
-    </div>
-    <div class="cctv-intelligence-body">
-      <div class="cctv-intelligence-metadata">
-        <div class="cctv-metadata-row">
-          <span class="cctv-metadata-label">FEED TYPE</span>
-          <span id="cctvFeedType" class="cctv-metadata-value">N/A</span>
-        </div>
-        <div class="cctv-metadata-row">
-          <span class="cctv-metadata-label">STATUS</span>
-          <span id="cctvFeedStatus" class="cctv-metadata-value">N/A</span>
-        </div>
-        <div class="cctv-metadata-row">
-          <span class="cctv-metadata-label">RECORDING</span>
-          <span id="cctvRecording" class="cctv-metadata-value">N/A</span>
-        </div>
-      </div>
-      <div class="cctv-intelligence-actions">
-        <button id="cctvRawFeed" class="cctv-action-btn" style="flex: 1;">RAW FEED</button>
-        <button id="cctvMapTargetBtn" class="cctv-action-btn" style="flex: 1;">MAP TARGET</button>
-      </div>
-      <div class="cctv-custom-connect-row" style="display:flex; gap:6px; margin-top:8px; align-items:center;">
-        <input type="text" id="cctvCustomStreamInput" class="input-field" placeholder="Enter custom RTSP / HLS / Video stream URL..." style="flex:1; font-size:11px; padding:6px 8px;">
-        <button type="button" class="btn-xs btn-primary" onclick="connectCustomCCTVStream()" style="white-space:nowrap; padding:6px 10px; font-weight:700;">CONNECT</button>
-      </div>
-    </div>
-  </div>
-</main>
 
-<!-- ── OSIRIS AI Inspired Bottom Telemetry & Live Alert Ticker Bar ─────────── -->
-<div class="live-alert-ticker-bar" id="liveAlertTickerBar">
-  <div class="telemetry-cursor-cluster" id="telemetryCursorCluster">
-    <span class="telemetry-label">CURSOR</span>
-    <span class="telemetry-data coords" id="telemetryCursor">42.6629, 21.1655</span>
-    <span class="telemetry-sep">·</span>
-    <span class="telemetry-label">LOCATION</span>
-    <span class="telemetry-data loc" id="telemetryLocation">Kosovo</span>
-    <span class="telemetry-sep">·</span>
-    <span class="telemetry-label">ZOOM</span>
-    <span class="telemetry-data zoom" id="telemetryZoom">8.2</span>
-  </div>
-
-  <div class="ticker-prefix">
-    <span class="ticker-pulse">●</span> LIVE ALERTS
-  </div>
-  <div class="ticker-viewport">
-    <div class="ticker-track" id="liveAlertTickerTrack">
-      <span class="ticker-item-placeholder">INITIALIZING KOSINT REAL-TIME INTELLIGENCE ALERTS...</span>
+    <div class="telemetry-footer-right">
+      <span class="telemetry-online-badge">● ONLINE</span>
     </div>
   </div>
 
-  <div class="telemetry-footer-right">
-    <span class="telemetry-online-badge">● ONLINE</span>
-  </div>
-</div>
-
-<!-- ── Loading overlay ──────────────────────────────────────────────────────── -->
-<div class="loading-overlay" id="loadingOverlay" style="display:none">
-  <div class="loading-content">
-    <div class="loading-spinner"></div>
-    <div class="loading-text">ACQUIRING DATA</div>
-    <div class="loading-sub" id="loadingSub">Connecting to intelligence feeds...</div>
-  </div>
-</div>
-
-<!-- ── Staff Warden Authentication Modal (Tactical Glassmorphic Dialog) ────────── -->
-<div class="modal-overlay" id="staffLoginModal" style="display:none">
-  <div class="modal-card staff-auth-card">
-    <div class="modal-header staff-auth-header">
-      <div class="staff-auth-title-row">
-        <span class="staff-auth-icon">🛡️</span>
-        <div>
-          <h3 class="modal-title">STAFF WARDEN PROTOCOL</h3>
-          <div class="modal-subtitle">Restricted Access · Personnel Evacuation & Safe Havens</div>
-        </div>
-      </div>
-      <button class="modal-close-btn" onclick="closeStaffLoginModal()" title="Close">✕</button>
+  <!-- ── Loading overlay ──────────────────────────────────────────────────────── -->
+  <div class="loading-overlay" id="loadingOverlay" style="display:none">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">ACQUIRING DATA</div>
+      <div class="loading-sub" id="loadingSub">Connecting to intelligence feeds...</div>
     </div>
-    <form id="staffLoginForm" onsubmit="submitStaffLogin(event)">
-      <div class="modal-body">
-        <div class="staff-auth-disclaimer">
-          🔒 <strong>RESTRICTED INFORMATION:</strong> Access is restricted to authorized Security Officers. Unauthorized dissemination of residential locations is strictly prohibited.
-        </div>
-        <div class="input-group">
-          <label class="input-label" for="staffAuthUser">SECURITY CALLSIGN / USERNAME</label>
-          <input type="text" class="input-field" id="staffAuthUser" placeholder="Enter username" autocomplete="username" required>
-        </div>
-        <div class="input-group">
-          <label class="input-label" for="staffAuthPass">SECURITY PASSPHRASE</label>
-          <input type="password" class="input-field" id="staffAuthPass" placeholder="Enter security passphrase" autocomplete="current-password" required>
-        </div>
-        <div class="staff-auth-error" id="staffAuthError" style="display:none"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn-cancel" onclick="closeStaffLoginModal()">Cancel</button>
-        <button type="submit" class="btn-submit staff-btn-unlock" id="btnStaffSubmit">
-          🔓 Authenticate & Decrypt
-        </button>
-      </div>
-    </form>
   </div>
-</div>
 
-<!-- ── Staff Add/Edit Modal ────────────────────────────────────────────────── -->
-<div class="modal-backdrop staff-modal-backdrop" id="staffAddModal" style="display:none">
-  <div class="modal-card staff-add-card">
-    <div class="modal-header">
-      <h3 class="modal-title" id="staffAddModalTitle">ADD STAFF LOCATION / SAFE HAVEN</h3>
-      <button class="modal-close-btn" onclick="closeAddStaffModal()" title="Close">✕</button>
+  <!-- ── Staff Warden Authentication Modal (Tactical Glassmorphic Dialog) ────────── -->
+  <div class="modal-overlay" id="staffLoginModal" style="display:none">
+    <div class="modal-card staff-auth-card">
+      <div class="modal-header staff-auth-header">
+        <div class="staff-auth-title-row">
+          <span class="staff-auth-icon">🛡️</span>
+          <div>
+            <h3 class="modal-title">STAFF WARDEN PROTOCOL</h3>
+            <div class="modal-subtitle">Restricted Access · Personnel Evacuation & Safe Havens</div>
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="closeStaffLoginModal()" title="Close">✕</button>
+      </div>
+      <form id="staffLoginForm" onsubmit="submitStaffLogin(event)">
+        <div class="modal-body">
+          <div class="staff-auth-disclaimer">
+            🔒 <strong>RESTRICTED INFORMATION:</strong> Access is restricted to authorized Security Officers.
+            Unauthorized dissemination of residential locations is strictly prohibited.
+          </div>
+          <div class="input-group">
+            <label class="input-label" for="staffAuthUser">SECURITY CALLSIGN / USERNAME</label>
+            <input type="text" class="input-field" id="staffAuthUser" placeholder="Enter username"
+              autocomplete="username" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label" for="staffAuthPass">SECURITY PASSPHRASE</label>
+            <input type="password" class="input-field" id="staffAuthPass" placeholder="Enter security passphrase"
+              autocomplete="current-password" required>
+          </div>
+          <div class="staff-auth-error" id="staffAuthError" style="display:none"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" onclick="closeStaffLoginModal()">Cancel</button>
+          <button type="submit" class="btn-submit staff-btn-unlock" id="btnStaffSubmit">
+            🔓 Authenticate & Decrypt
+          </button>
+        </div>
+      </form>
     </div>
-    <form id="staffAddForm" onsubmit="submitAddStaff(event)">
-      <div class="modal-body staff-add-form-grid">
-        <input type="hidden" id="staffEntryId">
-        <div class="input-group">
-          <label class="input-label">CALLSIGN / CODE *</label>
-          <input type="text" class="input-field" id="staffCallsign" placeholder="e.g. 61 A or SAFE HAVEN" required>
-        </div>
-        <div class="input-group">
-          <label class="input-label">NAME *</label>
-          <input type="text" class="input-field" id="staffName" placeholder="e.g. Nikolaos Kavallaris Ladis">
-        </div>
-        <div class="input-group">
-          <label class="input-label">ROLE / DESIGNATION</label>
-          <input type="text" class="input-field" id="staffRole" placeholder="e.g. Warden, Deputy Warden, Mission Member">
-        </div>
-        <div class="input-group">
-          <label class="input-label">NATIONALITY</label>
-          <input type="text" class="input-field" id="staffNationality" placeholder="e.g. Greece, Albania, Czech Republic">
-        </div>
-        <div class="input-group">
-          <label class="input-label">RADIO CHANNEL</label>
-          <input type="text" class="input-field" id="staffRadioChannel" placeholder="e.g. CH-04, CH-16">
-        </div>
-        <div class="input-group">
-          <label class="input-label">CATEGORY</label>
-          <select class="input-field select-field" id="staffCategory">
-            <option value="residence">Staff Residence</option>
-            <option value="safe_haven">Safe Haven / Assembly Point</option>
-            <option value="office">Mission Field Office</option>
-          </select>
-        </div>
-        <div class="input-group">
-          <label class="input-label">ZONE / SECTOR</label>
-          <input type="text" class="input-field" id="staffZone" placeholder="e.g. Mitrovica North, Mitrovica South, Prishtinë" required>
-        </div>
-        <div class="input-group">
-          <label class="input-label">LATITUDE *</label>
-          <input type="number" step="any" class="input-field" id="staffLat" placeholder="42.8945" required>
-        </div>
-        <div class="input-group">
-          <label class="input-label">LONGITUDE *</label>
-          <input type="number" step="any" class="input-field" id="staffLon" placeholder="20.8672" required>
-        </div>
-        <div class="input-group">
-          <label class="input-label">GRID REFERENCE (GR)</label>
-          <input type="text" class="input-field" id="staffGridRef" placeholder="e.g. 42°53'49.35&quot;N 20°51'58.56&quot;E">
-        </div>
-        <div class="input-group">
-          <label class="input-label">PRIMARY PHONE</label>
-          <input type="text" class="input-field" id="staffPhone" placeholder="+383 49 ...">
-        </div>
-        <div class="input-group">
-          <label class="input-label">EMAIL ADDRESS</label>
-          <input type="email" class="input-field" id="staffEmail" placeholder="first.last@osce.org">
-        </div>
-        <div class="input-group">
-          <label class="input-label">DEPENDANTS / SOULS</label>
-          <input type="text" class="input-field" id="staffDependants" placeholder="e.g. Venera (Wife), Leon (Son) or None">
-        </div>
-        <div class="input-group">
-          <label class="input-label">EVACUATION PRIORITY</label>
-          <select class="input-field select-field" id="staffPriority">
-            <option value="CRITICAL">CRITICAL</option>
-            <option value="HIGH" selected>HIGH</option>
-            <option value="MEDIUM">MEDIUM</option>
-            <option value="LOW">LOW</option>
-          </select>
-        </div>
-        <div class="input-group span-full">
-          <label class="input-label">ADDRESS / ACCESS ROUTE</label>
-          <input type="text" class="input-field" id="staffAddress" placeholder="Street, landmarks, access notes">
-        </div>
-        <div class="input-group span-full">
-          <label class="input-label">TACTICAL NOTES / EVACUATION ROUTE</label>
-          <textarea class="input-field textarea-field" id="staffNotes" rows="2" placeholder="Entry codes, generator status, rally directions..."></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn-cancel" onclick="closeAddStaffModal()">Cancel</button>
-        <button type="submit" class="btn-submit">💾 Save Location</button>
-      </div>
-    </form>
   </div>
-</div>
 
-<!-- ── Authentication Modal (Global Login Gate) ────────────────────────────── -->
-<div id="loginModal" class="modal-backdrop" style="display:none">
-  <div class="modal-card">
-    <div class="modal-header">
-      <div class="brand-badge-modal">🛡️ RESTRICTED ACCESS</div>
-      <h2>KOSINT PLATFORM</h2>
-      <p class="modal-subtitle">OSCE Technical & Situational Operations Platform</p>
+  <!-- ── Staff Add/Edit Modal ────────────────────────────────────────────────── -->
+  <div class="modal-backdrop staff-modal-backdrop" id="staffAddModal" style="display:none">
+    <div class="modal-card staff-add-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="staffAddModalTitle">ADD STAFF LOCATION / SAFE HAVEN</h3>
+        <button class="modal-close-btn" onclick="closeAddStaffModal()" title="Close">✕</button>
+      </div>
+      <form id="staffAddForm" onsubmit="submitAddStaff(event)">
+        <div class="modal-body staff-add-form-grid">
+          <input type="hidden" id="staffEntryId">
+          <div class="input-group">
+            <label class="input-label">CALLSIGN / CODE *</label>
+            <input type="text" class="input-field" id="staffCallsign" placeholder="e.g. 61 A or SAFE HAVEN" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">NAME *</label>
+            <input type="text" class="input-field" id="staffName" placeholder="e.g. Nikolaos Kavallaris Ladis">
+          </div>
+          <div class="input-group">
+            <label class="input-label">ROLE / DESIGNATION</label>
+            <input type="text" class="input-field" id="staffRole"
+              placeholder="e.g. Warden, Deputy Warden, Mission Member">
+          </div>
+          <div class="input-group">
+            <label class="input-label">NATIONALITY</label>
+            <input type="text" class="input-field" id="staffNationality"
+              placeholder="e.g. Greece, Albania, Czech Republic">
+          </div>
+          <div class="input-group">
+            <label class="input-label">RADIO CHANNEL</label>
+            <input type="text" class="input-field" id="staffRadioChannel" placeholder="e.g. CH-04, CH-16">
+          </div>
+          <div class="input-group">
+            <label class="input-label">CATEGORY</label>
+            <select class="input-field select-field" id="staffCategory">
+              <option value="residence">Staff Residence</option>
+              <option value="safe_haven">Safe Haven / Assembly Point</option>
+              <option value="office">Mission Field Office</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label class="input-label">ZONE / SECTOR</label>
+            <input type="text" class="input-field" id="staffZone"
+              placeholder="e.g. Mitrovica North, Mitrovica South, Prishtinë" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">LATITUDE *</label>
+            <input type="number" step="any" class="input-field" id="staffLat" placeholder="42.8945" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">LONGITUDE *</label>
+            <input type="number" step="any" class="input-field" id="staffLon" placeholder="20.8672" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">GRID REFERENCE (GR)</label>
+            <input type="text" class="input-field" id="staffGridRef"
+              placeholder="e.g. 42°53'49.35&quot;N 20°51'58.56&quot;E">
+          </div>
+          <div class="input-group">
+            <label class="input-label">PRIMARY PHONE</label>
+            <input type="text" class="input-field" id="staffPhone" placeholder="+383 49 ...">
+          </div>
+          <div class="input-group">
+            <label class="input-label">EMAIL ADDRESS</label>
+            <input type="email" class="input-field" id="staffEmail" placeholder="first.last@osce.org">
+          </div>
+          <div class="input-group">
+            <label class="input-label">DEPENDANTS / SOULS</label>
+            <input type="text" class="input-field" id="staffDependants"
+              placeholder="e.g. Venera (Wife), Leon (Son) or None">
+          </div>
+          <div class="input-group">
+            <label class="input-label">EVACUATION PRIORITY</label>
+            <select class="input-field select-field" id="staffPriority">
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="HIGH" selected>HIGH</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="LOW">LOW</option>
+            </select>
+          </div>
+          <div class="input-group span-full">
+            <label class="input-label">ADDRESS / ACCESS ROUTE</label>
+            <input type="text" class="input-field" id="staffAddress" placeholder="Street, landmarks, access notes">
+          </div>
+          <div class="input-group span-full">
+            <label class="input-label">TACTICAL NOTES / EVACUATION ROUTE</label>
+            <textarea class="input-field textarea-field" id="staffNotes" rows="2"
+              placeholder="Entry codes, generator status, rally directions..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" onclick="closeAddStaffModal()">Cancel</button>
+          <button type="submit" class="btn-submit">💾 Save Location</button>
+        </div>
+      </form>
     </div>
-    <form id="loginForm" class="modal-form">
-      <div class="form-group">
-        <label for="loginUsername">CALLSIGN / USERNAME</label>
-        <input type="text" id="loginUsername" class="input-field" placeholder="Enter username" autocomplete="username" required />
-      </div>
-      <div class="form-group">
-        <label for="loginPassword">PASSPHRASE</label>
-        <input type="password" id="loginPassword" class="input-field" placeholder="Enter passphrase" autocomplete="current-password" required />
-      </div>
-      <div id="loginError" class="modal-error" style="display:none"></div>
-      <button type="submit" id="loginSubmitBtn" class="btn-primary-modal">AUTHENTICATE & ACCESS</button>
-    </form>
   </div>
-</div>
 
-<!-- Style Studio FX Screen Overlays -->
-<div id="styleStudioScanlines" class="style-studio-scanlines" style="display:none;" aria-hidden="true"></div>
-<div id="styleStudioGrain" class="style-studio-grain" style="display:none;" aria-hidden="true"></div>
-<div id="styleStudioVignette" class="style-studio-vignette" style="display:none;" aria-hidden="true"></div>
+  <!-- ── Authentication Modal (Global Login Gate) ────────────────────────────── -->
+  <div id="loginModal" class="modal-backdrop" style="display:none">
+    <div class="modal-card login-card">
+      <div class="modal-header">
+        <div class="brand-badge-modal">🛡️ RESTRICTED ACCESS</div>
+        <h2>KOSINT PLATFORM</h2>
+        <p class="modal-subtitle">Open-Source Intelligence Platform</p>
+      </div>
+      <form id="loginForm" class="modal-form">
+        <div class="form-group">
+          <label for="loginUsername">Username</label>
+          <input type="text" id="loginUsername" class="input-field" placeholder="Username" autocomplete="username"
+            required />
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" class="input-field" placeholder="Password"
+            autocomplete="current-password" required />
+        </div>
+        <div id="loginError" class="modal-error" style="display:none"></div>
+        <button type="submit" id="loginSubmitBtn" class="btn-primary-modal">Authenticate & Access</button>
+      </form>
+    </div>
+  </div>
 
-<script type="module" src="app.js?v=2.6.2"></script>
+  <!-- Style Studio FX Screen Overlays -->
+  <div id="styleStudioScanlines" class="style-studio-scanlines" style="display:none;" aria-hidden="true"></div>
+  <div id="styleStudioGrain" class="style-studio-grain" style="display:none;" aria-hidden="true"></div>
+  <div id="styleStudioVignette" class="style-studio-vignette" style="display:none;" aria-hidden="true"></div>
+
+  <script type="module" src="app.js?v=2.6.2"></script>
 </body>
+
 </html>

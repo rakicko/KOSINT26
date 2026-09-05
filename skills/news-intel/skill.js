@@ -37,7 +37,8 @@ const {
 
 const {
   hasKosovoContext,
-  calculateSecurityScore
+  calculateSecurityScore,
+  isSportsOrEntertainment
 } = require('./security');
 
 const {
@@ -200,6 +201,11 @@ async function fetchRSS(source) {
         return null;
       }
 
+      // Hard Sports & Entertainment Blacklist: drop immediately during ingestion
+      if (isSportsOrEntertainment(title, description)) {
+        return null;
+      }
+
       let link = '#';
       if (typeof item.link?.[0] === 'string') {
         link = item.link[0];
@@ -269,7 +275,8 @@ async function fetchNews({
     '7d':  7 * 24 * 60 * 60 * 1000
   }[timeline] || (24 * 60 * 60 * 1000);
 
-  const rawFeeds = feeds.flat();
+  // Filter out any lingering sports/entertainment items immediately during ingestion
+  const rawFeeds = feeds.flat().filter(a => a && !isSportsOrEntertainment(a.title, a.description, a._signals));
   let allArticles = rawFeeds.filter(a => {
     const pubTime = new Date(a.publishedAt).getTime();
     if (isNaN(pubTime)) return false;
@@ -364,6 +371,7 @@ module.exports = {
   fetchNews,
   analyzeArticle,
   fetchRSS,
+  isSportsOrEntertainment,
   SOURCES,
   SOURCE_RELIABILITY,
   SOURCE_AUTHORITY,

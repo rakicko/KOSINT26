@@ -15,6 +15,8 @@ const staffService = require('./staff-service');
 const mineService = require('./mine-service');
 const auth = require('./auth');
 const rateLimit = require('express-rate-limit');
+const cache = require('./cache');
+const { CACHE_TTL } = cache;
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -256,6 +258,11 @@ app.get('/api/weather', auth.requireAuth, async (req, res) => {
 // ── API: Wildfire detections ─────────────────────────────────────────────────────
 app.get('/api/wildfire', auth.requireAuth, async (req, res) => {
   const { period = '24h', lat, lon, forceRefresh = 'false', debug = 'false' } = req.query;
+  const cacheKey = `wildfire:${period}:${lat||''}:${lon||''}`;
+  if (forceRefresh !== 'true') {
+    const hit = cache.get(cacheKey);
+    if (hit) return res.json(hit);
+  }
   try {
     const data = await fetchWildfire({
       period,
@@ -264,6 +271,7 @@ app.get('/api/wildfire', auth.requireAuth, async (req, res) => {
       forceRefresh: forceRefresh === 'true',
       debug: debug === 'true'
     });
+    cache.set(cacheKey, data, CACHE_TTL.WILDFIRE);
     res.json(data);
   } catch (err) {
     console.error('[server] wildfire fetch error:', err);
@@ -274,8 +282,14 @@ app.get('/api/wildfire', auth.requireAuth, async (req, res) => {
 // ── API: Aviation Intelligence ────────────────────────────────────────────────
 app.get('/api/aviation', auth.requireAuth, async (req, res) => {
   const { forceRefresh = 'false' } = req.query;
+  const cacheKey = 'aviation';
+  if (forceRefresh !== 'true') {
+    const hit = cache.get(cacheKey);
+    if (hit) return res.json(hit);
+  }
   try {
     const data = await fetchAviation({ forceRefresh: forceRefresh === 'true' });
+    cache.set(cacheKey, data, CACHE_TTL.AVIATION);
     res.json(data);
   } catch (err) {
     console.error('[server] aviation fetch error:', err);
@@ -295,6 +309,11 @@ app.get('/api/aviation', auth.requireAuth, async (req, res) => {
 // ── API: Telegram Public Feed ─────────────────────────────────────────────────
 app.get('/api/telegram', auth.requireAuth, async (req, res) => {
   const { forceRefresh = 'false', channels, limit, demo = 'false' } = req.query;
+  const cacheKey = `telegram:${channels||'default'}:${limit||''}:${demo}`;
+  if (forceRefresh !== 'true') {
+    const hit = cache.get(cacheKey);
+    if (hit) return res.json(hit);
+  }
   try {
     const channelList = channels ? channels.split(',').map(s => s.trim()).filter(Boolean) : null;
     const limitNum = limit ? parseInt(limit, 10) : null;
@@ -304,6 +323,7 @@ app.get('/api/telegram', auth.requireAuth, async (req, res) => {
       forceRefresh: forceRefresh === 'true',
       useDemo: demo === 'true'
     });
+    cache.set(cacheKey, data, CACHE_TTL.TELEGRAM);
     res.json(data);
   } catch (err) {
     console.error('[server] telegram fetch error:', err);
@@ -351,10 +371,16 @@ app.get('/api/telegram/media', auth.requireAuth, async (req, res) => {
 // ── API: Border Crossing Monitor ──────────────────────────────────────────────
 app.get('/api/borders', auth.requireAuth, async (req, res) => {
   const { forceRefresh = 'false' } = req.query;
+  const cacheKey = 'borders';
+  if (forceRefresh !== 'true') {
+    const hit = cache.get(cacheKey);
+    if (hit) return res.json(hit);
+  }
   try {
     const data = await fetchBorders({
       forceRefresh: forceRefresh === 'true'
     });
+    cache.set(cacheKey, data, CACHE_TTL.BORDERS);
     res.json(data);
   } catch (err) {
     console.error('[server] borders fetch error:', err.message);
@@ -369,6 +395,11 @@ app.get('/api/borders', auth.requireAuth, async (req, res) => {
       message: err.message || 'Failed to fetch border crossing intelligence.'
     });
   }
+});
+
+// ── API: Cache stats (internal debug) ────────────────────────────────────────
+app.get('/api/cache/stats', auth.requireAuth, (req, res) => {
+  res.json(cache.stats());
 });
 
 // ── API: Kosovo Minefields & UXO Hazards ──────────────────────────────────────

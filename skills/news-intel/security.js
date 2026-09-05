@@ -2,6 +2,30 @@
 
 const { normalizeMultilingualText } = require('./normalizer');
 
+const SPORTS_ENTERTAINMENT_BLACKLIST = /\b(fudbal|utakmic[ae]|lig[ae]|gol|golov[ai]|trener|arsenal|atletico|napoli|real madrid|košark[ae]|tenis|estrad[ae]|rijaliti|euroleague|uefa|fifa|superliga|futboll|ndeshj[ae]|kampionat|trajner|sporti|basketboll|këngëtar|transferim)\b/i;
+
+const POLITICAL_KEYWORDS_REGEX = /\b(skupština|skupstina|kuvend|kuvendi|kuvendit|sednica|sednice|seancë|seance|seanca|seancës|vlada|vlade|vladi|qeveri|qeveria|qeverisë|qeverise|ministar|ministra|ministri|ministër|minister|ministrit|izbori|izborima|zgjedhje|zgjedhjet|zgjedhjeve|dijalog|dijaloga|dialogu|dialog|ambasada|ambasade|ambasadë|ambasada|ambasadës|sporazum|sporazuma|marrëveshje|marreveshje|marrëveshja|parlament|parlamenti)\b/i;
+
+function isSportsOrEntertainment(title = '', description = '', signals = null) {
+  const text = `${title} ${description}`.trim();
+  if (!SPORTS_ENTERTAINMENT_BLACKLIST.test(text)) return false;
+
+  // Guard against "arsenal" false positive when referring to a weapon/ammunition arsenal seizure
+  if (/\barsenal\b/i.test(text)) {
+    const isWeaponArsenal = /arsenal\s+(?:oružj|oruzj|armë|arme|municij|naoružan)/i.test(text) ||
+      /(?:zaplen|konfisk|sekuestr|otkriv|gjet|zbul|pronađ|pronadj).*arsenal/i.test(text) ||
+      (signals && signals.eventTypes && signals.eventTypes.some(e => e.id && e.id.includes('weapon')));
+    if (isWeaponArsenal) {
+      const otherSports = /\b(fudbal|utakmic[ae]|lig[ae]|gol|golov[ai]|trener|atletico|napoli|real madrid|košark[ae]|tenis|estrad[ae]|rijaliti|euroleague|uefa|fifa|superliga|futboll|ndeshj[ae]|kampionat|trajner|sporti|basketboll|këngëtar|transferim)\b/i;
+      if (!otherSports.test(text)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 /**
  * Checks general Kosovo context in text
  */
@@ -10,7 +34,7 @@ function hasKosovoContext(signals, fullText = '') {
     return true;
   }
   const norm = normalizeMultilingualText(fullText).transliteratedText;
-  return /\b(kosov|kosova|kosovo|prishtin|pristin|mitrovic|beograd|serb|shqiptar|balkan|kfor|eulex)\b/i.test(norm);
+  return /\b(kosov|kosova|kosovo|prishtin|pristin|mitrovic|beograd|serb|shqiptar|balkan|kfor|eulex|qeveri|kuvend|parlament|vlada|skupštin|skupstin|dialog|dijalog)\b/i.test(norm);
 }
 
 /**
@@ -23,6 +47,19 @@ function hasKosovoContext(signals, fullText = '') {
 function calculateSecurityScore(signals, title = '', description = '', publishedAt = null) {
   const fullText = `${title} ${description}`.trim();
   const titleNorm = normalizeMultilingualText(title).transliteratedText;
+
+  // 0. Hard Sports & Entertainment Blacklist
+  if (isSportsOrEntertainment(title, description, signals)) {
+    return {
+      intensityScore: 1,
+      severity: 'low',
+      category: 'other',
+      eventType: 'commentary',
+      confidence: 0.10,
+      tags: ['sports_entertainment_excluded'],
+      isSecurityRelevant: false
+    };
+  }
 
   // 1. Must have Kosovo relevance context
   if (!hasKosovoContext(signals, fullText)) {
@@ -37,33 +74,62 @@ function calculateSecurityScore(signals, title = '', description = '', published
     };
   }
 
-  // 2. Identify Event vs Commentary
-  const isStudioDebate = /aludon|opinionist|analist|në\s*studio|ne\s*studio|pressing|debat\s*plus|rubikon|shtron\s*pyetjen/i.test(fullText);
-  const isSpeech = signals.commentarySignals.length > 0 || isStudioDebate;
-  const hasDirectAction = !isStudioDebate && signals.eventTypes.some(e => ['VIOLENCE', 'ENFORCEMENT', 'SEIZURE', 'DISCOVERY', 'EMERGENCY'].includes(e.actionType) && e.modality !== 'DENIED');
-  const eventType = (isSpeech && !hasDirectAction) ? 'commentary' : 'event';
+  // ── Classification Priority Cascade (Single Category Assignment) ───────────
+  // Step 1 (Operational - Highest Priority): Physical field events (arrests, weapons, raids, shootings, traffic blockades, border incidents). If true, assign category = 'operational' and stop.
+  // Step 2 (Opinion / Commentary): Studio debates, op-eds, analyst columns (analist, opinionist, kolumna, intervistë, komentar). If true, assign category = 'opinion' and stop.
+  // Step 3 (Political): Government, diplomacy, assembly sessions, agreements without active unrest. If true, assign category = 'political' and stop.
 
-  // 3. Base Score & Severity from Canonical Event Types
+  const hasOperationalEvent = signals.eventTypes.some(e =>
+    ['VIOLENCE', 'ENFORCEMENT', 'SEIZURE', 'DISCOVERY', 'EMERGENCY', 'UNREST', 'ACCIDENT'].includes(e.actionType) ||
+    ['event:clash', 'event:shooting', 'event:weapon_use', 'event:explosion', 'event:arrest', 'event:raid', 'event:weapon_seizure', 'event:weapon_discovery', 'event:barricade', 'event:accident', 'event:fire', 'event:espionage'].includes(e.id)
+  );
+
+  const hasOperationalKeywords = /\b(uhapšen|uhapsen|uhapšeni|uhapseni|hapje|arrestim|arrestuar|arrestohen|arrestoi|arrestuan|bastisje|bastisën|bastisur|pretres|pretresi|racija|pucnjava|pucano|të\s*shtëna|te\s*shtena|gjuajtje|eksplod|shpërthim|shperthim|zaplena\s*oružja|armë|oruzje|oružje|municij|municion|barikad|bllokad|bllokim\s*rruge|blokada\s*puta|kufi|granic|vendkalim)\b/i.test(fullText);
+
+  const isOperational = hasOperationalEvent || hasOperationalKeywords;
+
+  const isOpinion = /\b(analist|analisti|analistët|analiste|analitičar|analitičari|opinionist|opinionisti|kolumn[ae]|kolumnist|intervist[aëe]|intervju|komentar|komentator|aludon|aludoi|në\s*studio|ne\s*studio|pressing|debat\s*plus|rubikon|shtron\s*pyetjen|polemik|replikë|replike|debat\s*politik)\b/i.test(fullText);
+
+  const isPolitical = POLITICAL_KEYWORDS_REGEX.test(fullText) ||
+    signals.institutions.some(i => ['inst:government_kosovo', 'inst:parliament_kosovo', 'inst:ministry_interior'].includes(i.id)) ||
+    signals.people.some(p => ['person:albin_kurti', 'person:vjosa_osmani', 'person:aleksandar_vucic', 'person:petar_petkovic', 'person:xhelal_svecla'].includes(p.id));
+
+  let category = 'other';
+  let eventType = 'commentary';
   let baseScore = 3;
   let severity = 'low';
-  let category = 'security';
 
-  if (signals.eventTypes.length > 0) {
-    // Find maximum severity among matched event types
+  if (isOperational) {
+    // Step 1 (Operational - Highest Priority) -> STOP
+    category = 'operational';
+    eventType = 'event';
+
     const maxEvent = signals.eventTypes.reduce((prev, curr) => {
       const pScore = prev ? prev.defaultScore : 0;
       return curr.defaultScore > pScore ? curr : prev;
     }, null);
 
-    if (maxEvent) {
-      baseScore = maxEvent.defaultScore;
-      severity = maxEvent.baseSeverity;
-    }
+    baseScore = maxEvent ? maxEvent.defaultScore : 6;
+    severity = maxEvent ? maxEvent.baseSeverity : 'high';
+  } else if (isOpinion) {
+    // Step 2 (Opinion / Commentary) -> STOP
+    category = 'opinion';
+    eventType = 'commentary';
+    baseScore = 3;
+    severity = 'medium';
+  } else if (isPolitical) {
+    // Step 3 (Political) -> STOP
+    category = 'political';
+    eventType = 'political';
+    baseScore = 4;
+    severity = 'medium';
   } else if (signals.institutions.length > 0 || signals.people.length > 0) {
+    category = 'political';
+    eventType = 'political';
     baseScore = 4;
     severity = 'medium';
   } else {
-    // No specific event, institution, or people matched -> low priority
+    // Fallback unvetted / other
     return {
       intensityScore: 1,
       severity: 'low',
@@ -75,32 +141,15 @@ function calculateSecurityScore(signals, title = '', description = '', published
     };
   }
 
-  // 4. Category refinement
-  const hasUnrest = signals.eventTypes.some(e => ['event:protest', 'event:clash'].includes(e.id));
-  const hasEmergency = signals.eventTypes.some(e => ['event:fire', 'event:accident', 'event:explosion'].includes(e.id));
-
-  if (hasUnrest && severity !== 'critical') {
-    category = 'unrest';
-  } else if (hasEmergency && severity !== 'critical') {
-    category = 'emergency';
-  }
-
-  // Commentary score adjustment
-  if (eventType === 'commentary') {
-    baseScore = Math.max(2, baseScore - 1);
+  // Commentary score adjustment for opinion
+  if (category === 'opinion') {
+    baseScore = Math.min(5, Math.max(2, baseScore - 1));
     if (severity === 'critical') severity = 'high';
     else if (severity === 'high') severity = 'medium';
-    else if (severity === 'medium') severity = 'low';
-    if (isStudioDebate) {
-      severity = 'medium';
-      baseScore = Math.min(5, baseScore);
-      category = 'commentary';
-    }
   }
 
-  // 5. North Kosovo Detection & Boost
+  // 5. North Kosovo Detection & Boost (Geographic attribute, does not mutate primary category)
   let isNorth = signals.locations.some(l => l.isNorth);
-  // Check KEK / Obiliq exclusion override
   const isKek = signals.locations.some(l => l.id === 'loc:kek') || /\b(kek|obiliq|kastriot)\b/i.test(fullText);
   if (isKek) {
     isNorth = false;
@@ -108,7 +157,6 @@ function calculateSecurityScore(signals, title = '', description = '', published
 
   let northBoost = 0;
   if (isNorth && (baseScore >= 4 || severity !== 'low')) {
-    category = 'north_kosovo';
     northBoost = 2;
   }
 
@@ -123,7 +171,7 @@ function calculateSecurityScore(signals, title = '', description = '', published
     }
   }
 
-  // 7. Negation penalty (if primary event is denied, avoid artificial panic)
+  // 7. Negation penalty
   let negationPenalty = 0;
   if (signals.negations.length > 0) {
     negationPenalty = 2;
@@ -131,12 +179,15 @@ function calculateSecurityScore(signals, title = '', description = '', published
 
   const finalScore = Math.min(10, Math.max(1, baseScore + northBoost + timeBoost - negationPenalty));
 
-  // Determine final severity category based on score
-  if (finalScore >= 9 && (severity === 'critical' || isNorth || baseScore >= 8)) {
+  // Determine final severity category based on score and category constraints
+  if (category === 'opinion') {
+    // Opinion pieces never trigger panic/critical
+    severity = finalScore >= 7 ? 'high' : finalScore >= 4 ? 'medium' : 'low';
+  } else if (finalScore >= 9 && (severity === 'critical' || isNorth || baseScore >= 8)) {
     severity = 'critical';
   } else if (finalScore >= 7) {
     severity = 'high';
-  } else if (finalScore >= 4) {
+  } else if (finalScore >= 4 || category === 'political' || category === 'operational') {
     severity = 'medium';
   } else {
     severity = 'low';
@@ -146,8 +197,9 @@ function calculateSecurityScore(signals, title = '', description = '', published
   let confidence = 0.50;
   if (isNorth) confidence += 0.15;
   if (signals.institutions.length > 0) confidence += 0.15;
-  if (hasDirectAction) confidence += 0.10;
+  if (category === 'operational') confidence += 0.10;
   if (signals.people.length > 0) confidence += 0.05;
+  if (category === 'political') confidence += 0.10;
   if (eventType === 'commentary') confidence -= 0.05;
   if (signals.negations.length > 0) confidence -= 0.05;
   confidence = Math.max(0.40, Math.min(0.98, Number(confidence.toFixed(2))));
@@ -173,6 +225,16 @@ function calculateSecurityScore(signals, title = '', description = '', published
     else if (loc.isNorth) tags.add('north_kosovo');
   });
 
+  if (category === 'operational') {
+    tags.add('operational');
+  } else if (category === 'opinion') {
+    tags.add('opinion');
+    tags.add('commentary');
+  } else if (category === 'political') {
+    tags.add('political');
+    tags.add('governance');
+  }
+
   return {
     intensityScore: finalScore,
     severity,
@@ -180,11 +242,14 @@ function calculateSecurityScore(signals, title = '', description = '', published
     eventType,
     confidence,
     tags: Array.from(tags),
-    isSecurityRelevant: severity !== 'low' && category !== 'other'
+    isSecurityRelevant: category === 'operational' || category === 'political'
   };
 }
 
 module.exports = {
   hasKosovoContext,
-  calculateSecurityScore
+  calculateSecurityScore,
+  isSportsOrEntertainment,
+  SPORTS_ENTERTAINMENT_BLACKLIST,
+  POLITICAL_KEYWORDS_REGEX
 };

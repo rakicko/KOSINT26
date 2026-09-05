@@ -53,7 +53,7 @@ const policeIncident = analyzeArticle(
   'Aksion policor në Mitrovicë, arrestohen dy persona të dyshuar',
   'Njësia Speciale e Policisë së Kosovës ka arrestuar dy persona të dyshuar për posedim pa leje të armëve të zjarrit në Lagjen e Boshnjakëve.'
 );
-assert(['security', 'north_kosovo'].includes(policeIncident.category), 'Police incident in Mitrovica should be security or north_kosovo');
+assert(['operational', 'security', 'north_kosovo'].includes(policeIncident.category), 'Police incident in Mitrovica should be operational, security or north_kosovo');
 assert.strictEqual(policeIncident.eventType, 'event');
 
 // Non-operational: Studio talk-show commentary
