@@ -286,11 +286,19 @@
               </button>
             </div>
 
-            <!-- 3. Reset Compass to North (Between 2D/3D & MAP/SAT) -->
+            <!-- 3. Reset Compass to North -->
             <div class="osiris-pill-group">
               <button class="osiris-pill-btn" id="btnOsirisResetNorth" onclick="resetMapNorth()"
                 title="Reset Compass / Bearing to North (R)">
                 <span class="pill-ico">🧭</span> NORTH
+              </button>
+            </div>
+
+            <!-- 3b. Reset Kosovo Theater View -->
+            <div class="osiris-pill-group">
+              <button class="osiris-pill-btn" id="resetViewBtn" onclick="focusKosovoBounds()"
+                title="Reset map to default Kosovo Theater view">
+                <span class="pill-ico">🎯</span> RESET VIEW
               </button>
             </div>
 
@@ -322,9 +330,6 @@
             <button class="osiris-rail-btn" id="btnDefenseMarkets" onclick="toggleDefenseMarketPanel()"
               title="Defense Equities, Market Breadth & Space Weather (M)">
               <span class="rail-icon">📈</span>
-            </button>
-            <button class="osiris-rail-btn" onclick="focusKosovoBounds()" title="Focus Kosovo Theater">
-              <span class="rail-icon">🎯</span>
             </button>
             <button class="osiris-rail-btn" onclick="toggleTacticalLayersMenu()"
               title="Tactical Operational Layers (MSR, Bases, Mines)">

@@ -6034,13 +6034,14 @@ window.toggleDayNightCycle = function (force) {
   }
 };
 
-window.focusKosovoBounds = function () {
+function focusKosovoBounds() {
   if (!state.map) return;
-  state.map.fitBounds([[20.0, 41.85], [21.8, 43.25]], {
+  state.map.fitBounds(DEFAULT_KOSOVO_BOUNDS, {
     padding: { top: 60, bottom: 60, left: 80, right: 60 },
     duration: 1000
   });
-};
+}
+window.focusKosovoBounds = focusKosovoBounds;
 
 window.toggleFullScreenMode = function () {
   if (!document.fullscreenElement) {
