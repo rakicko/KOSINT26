@@ -307,14 +307,14 @@
 
 /* 4. The Card Container */
 .civil-popup-card {
-  position: relative;
+  position: relative !important;
   background: linear-gradient(180deg, rgba(14, 23, 42, 0.98) 0%, rgba(9, 15, 30, 0.99) 100%) !important;
   border: 1px solid rgba(56, 189, 248, 0.45);
   border-radius: 8px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(56, 189, 248, 0.18);
   backdrop-filter: blur(16px);
   color: #f1f5f9;
-  padding: 12px 14px 14px 14px;
+  padding: 14px 14px 14px 14px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   width: 324px;
   max-width: calc(100vw - 32px);
@@ -334,21 +334,23 @@
 }
 
 .civil-popup-header {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 7px;
-  padding-right: 36px !important;
+  width: 100%;
 }
 
 .civil-popup-tags {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 6px;
-  padding-right: 32px !important;
+  max-width: calc(100% - 36px) !important;
+  padding-right: 0 !important;
 }
 
 .civil-badge {
@@ -362,6 +364,12 @@
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+  line-height: 1.35;
 }
 
 .civil-badge-red {
