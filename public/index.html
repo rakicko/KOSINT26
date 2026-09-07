@@ -95,22 +95,30 @@
 
       <div class="header-status">
         <!-- World Monitor-Inspired Regional Tension Index (RTI) Badge & Tactical Rationale Popover -->
-        <div class="regional-tension-badge tension-low" id="regionalTensionBadge" data-widget="tensionIndexWidget" onclick="toggleRegionalTensionTooltip(event)" title="Regional Tension Index (RTI) — Click for operational rationale & breakdown" role="button" tabindex="0">
+        <div class="regional-tension-badge tension-low" id="regionalTensionBadge" data-widget="tensionIndexWidget"
+          onclick="toggleRegionalTensionTooltip(event)"
+          title="Regional Tension Index (RTI) — Click for operational rationale & breakdown" role="button" tabindex="0">
           <span class="tension-label">TENSION:</span>
           <span class="tension-score" id="tensionScore">1.5</span>
           <span class="tension-level" id="tensionLevel">LOW / NORMAL</span>
           <span class="tension-trend" id="tensionTrend">[→]</span>
-          <div class="tension-tooltip tension-rationale-popover" id="tensionTooltip" style="display:none" onclick="event.stopPropagation()">
+          <div class="tension-tooltip tension-rationale-popover" id="tensionTooltip" style="display:none"
+            onclick="event.stopPropagation()">
             <div class="tension-popover-header">
               <div class="tension-tooltip-title" id="tensionPopoverHeader">REGIONAL TENSION INDEX: 1.5/10.0 [LOW]</div>
               <span class="tension-popover-defcon tension-low" id="tooltipDefconBadge">DEFCON 5</span>
             </div>
             <div class="tension-metric-grid">
-              <div class="tension-tooltip-row"><span>Status:</span> <strong id="tooltipTensionLevel">LOW / NORMAL</strong></div>
-              <div class="tension-tooltip-row"><span>Index Score:</span> <strong id="tooltipTensionScore">1.5 / 10.0</strong></div>
-              <div class="tension-tooltip-row"><span>12h Trend:</span> <strong id="tooltipTensionTrend">STABLE (→)</strong></div>
-              <div class="tension-tooltip-row"><span>24h Incidents:</span> <strong id="tooltipTensionIncidents">0</strong></div>
-              <div class="tension-tooltip-row"><span>12h Delta:</span> <strong id="tooltipTensionDelta">0.0 pts</strong></div>
+              <div class="tension-tooltip-row"><span>Status:</span> <strong id="tooltipTensionLevel">LOW /
+                  NORMAL</strong></div>
+              <div class="tension-tooltip-row"><span>Index Score:</span> <strong id="tooltipTensionScore">1.5 /
+                  10.0</strong></div>
+              <div class="tension-tooltip-row"><span>12h Trend:</span> <strong id="tooltipTensionTrend">STABLE
+                  (→)</strong></div>
+              <div class="tension-tooltip-row"><span>24h Incidents:</span> <strong
+                  id="tooltipTensionIncidents">0</strong></div>
+              <div class="tension-tooltip-row"><span>12h Delta:</span> <strong id="tooltipTensionDelta">0.0 pts</strong>
+              </div>
             </div>
             <div class="tension-rationale-section">
               <div class="tension-section-title">CORE OPERATIONAL RATIONALE</div>
@@ -343,7 +351,8 @@
               <div class="layers-menu-body">
                 <!-- 0. Civil Unrest: Hague Verdict Gatherings (16 Sept) -->
                 <label class="layer-toggle-item">
-                  <input type="checkbox" id="toggleLayerCivilUnrest" onchange="toggleTacticalLayer('civilUnrest', this.checked)">
+                  <input type="checkbox" id="toggleLayerCivilUnrest"
+                    onchange="toggleTacticalLayer('civilUnrest', this.checked)">
                   <span class="layer-toggle-indicator" style="background:#ef4444; box-shadow: 0 0 8px #ef4444;"></span>
                   <div class="layer-toggle-info">
                     <span class="layer-toggle-name">Civil Unrest: Hague Verdict Gatherings</span>
@@ -353,11 +362,13 @@
 
                 <!-- 1. Active Incidents & Radar Pulse (24h events) -->
                 <label class="layer-toggle-item">
-                  <input type="checkbox" id="toggleLayerIncidents" onchange="toggleTacticalLayer('incidents', this.checked)">
+                  <input type="checkbox" id="toggleLayerIncidents"
+                    onchange="toggleTacticalLayer('incidents', this.checked)">
                   <span class="layer-toggle-indicator indicator-incidents"></span>
                   <div class="layer-toggle-info">
                     <span class="layer-toggle-name">Active Incidents & Radar Pulse (24h)</span>
-                    <span class="layer-toggle-sub">Kinetic field events, threat range rings & verification telemetry</span>
+                    <span class="layer-toggle-sub">Kinetic field events, threat range rings & verification
+                      telemetry</span>
                   </div>
                 </label>
 
@@ -569,9 +580,11 @@
               <div class="market-section-card sector-card">
                 <div class="market-tabs-row" id="marketTabsRow">
                   <div class="market-tab-item" data-sector="overview" onclick="switchDefenseSector('overview', this)">
-                    <span class="tab-name">AI OVERVIEW</span></div>
+                    <span class="tab-name">AI OVERVIEW</span>
+                  </div>
                   <div class="market-tab-item" data-sector="indices" onclick="switchDefenseSector('indices', this)">
-                    <span class="tab-name">INDICES</span> <span class="tab-cnt">5</span></div>
+                    <span class="tab-name">INDICES</span> <span class="tab-cnt">5</span>
+                  </div>
                   <div class="market-tab-item active-sector active" data-sector="defense"
                     onclick="switchDefenseSector('defense', this)"><span class="tab-name">DEFENSE</span> <span
                       class="tab-cnt">7</span></div>
@@ -687,8 +700,8 @@
             <div class="overlay-content">
 
               <!-- Civil Unrest & Public Gatherings Panel (Hague Verdict 16 Sept 2026) -->
-              <div class="panel overlay-panel" id="civilUnrestPanel" data-panel-title="Civil Unrest &amp; Public Gatherings"
-                style="display:none">
+              <div class="panel overlay-panel" id="civilUnrestPanel"
+                data-panel-title="Civil Unrest &amp; Public Gatherings" style="display:none">
                 <div id="civilUnrestWidgetMount"></div>
               </div>
 
@@ -715,9 +728,12 @@
                       </div>
                     </div>
                     <div class="feed-player-badges">
-                      <div class="feed-mode-toggle" id="feedModeToggle" title="Toggle between HLS Stream and Official Broadcaster Webview">
-                        <button type="button" class="feed-mode-btn active" id="btnFeedModeHls" onclick="setFeedPlayerMode('hls')">HLS STREAM</button>
-                        <button type="button" class="feed-mode-btn" id="btnFeedModeEmbed" onclick="setFeedPlayerMode('embed')">OFFICIAL WEBVIEW</button>
+                      <div class="feed-mode-toggle" id="feedModeToggle"
+                        title="Toggle between HLS Stream and Official Broadcaster Webview">
+                        <button type="button" class="feed-mode-btn active" id="btnFeedModeHls"
+                          onclick="setFeedPlayerMode('hls')">HLS STREAM</button>
+                        <button type="button" class="feed-mode-btn" id="btnFeedModeEmbed"
+                          onclick="setFeedPlayerMode('embed')">OFFICIAL WEBVIEW</button>
                       </div>
                       <span class="badge-live-stream" id="feedLiveStreamBadge">LIVE HLS</span>
                       <a id="feedExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="feed-ext-btn"
@@ -726,8 +742,10 @@
                   </div>
                   <div class="feed-video-wrap" id="liveFeedVideoFrame">
                     <div class="tactical-video-wrapper">
-                      <video id="liveFeedVideoPlayer" class="tactical-video-player" controls autoplay muted playsinline></video>
-                      <iframe id="liveFeedIframePlayer" class="tactical-iframe-player" style="display:none;" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+                      <video id="liveFeedVideoPlayer" class="tactical-video-player" controls autoplay muted
+                        playsinline></video>
+                      <iframe id="liveFeedIframePlayer" class="tactical-iframe-player" style="display:none;"
+                        allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
                       <div id="videoChannelOverlay" class="video-channel-overlay"></div>
                       <div id="videoPlayerSpinner" class="video-player-spinner" style="display:none;"></div>
                     </div>
@@ -744,7 +762,8 @@
 
                 <!-- Region & Language Selector -->
                 <div class="feed-region-tabs">
-                  <button class="filter-btn active" id="tabFeedsAll" onclick="switchFeedRegion('all', this)">🌐 ALL</button>
+                  <button class="filter-btn active" id="tabFeedsAll" onclick="switchFeedRegion('all', this)">🌐
+                    ALL</button>
                   <button class="filter-btn" id="tabFeedsSr" onclick="switchFeedRegion('sr', this)">🇷🇸 SRPSKI</button>
                   <button class="filter-btn" id="tabFeedsSq" onclick="switchFeedRegion('sq', this)">🇦🇱 SHQIP</button>
                   <button class="filter-btn" id="tabFeedsInt" onclick="switchFeedRegion('int', this)">🌐 GLOBAL</button>
@@ -1678,10 +1697,11 @@
       <div class="modal-header staff-auth-header">
         <div class="staff-auth-title-row">
           <span class="staff-auth-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              <path d="M12 8v4"/>
-              <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M12 8v4" />
+              <circle cx="12" cy="16" r="0.5" fill="currentColor" />
             </svg>
           </span>
           <div>
@@ -1695,13 +1715,15 @@
         <div class="modal-body">
           <div class="staff-auth-disclaimer">
             <span class="staff-disclaimer-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </span>
             <div>
-              <strong>RESTRICTED INFORMATION:</strong> Access is restricted to authorized Security Officers. Unauthorized dissemination of residential locations is strictly prohibited.
+              <strong>RESTRICTED INFORMATION:</strong> Access is restricted to authorized Security Officers.
+              Unauthorized dissemination of residential locations is strictly prohibited.
             </div>
           </div>
           <div class="input-group">
@@ -1719,9 +1741,10 @@
         <div class="modal-footer">
           <button type="button" class="btn-cancel" onclick="closeStaffLoginModal()">Cancel</button>
           <button type="submit" class="btn-submit staff-btn-unlock" id="btnStaffSubmit">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 9.9-1" />
             </svg>
             <span>Authenticate & Decrypt</span>
           </button>

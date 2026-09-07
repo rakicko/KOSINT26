@@ -4480,16 +4480,18 @@ body {
 .border-map-popup .maplibregl-popup-content,
 .border-map-popup.mapboxgl-popup .mapboxgl-popup-content,
 .mapbox-popup .maplibregl-popup-content,
-.mapbox-popup.mapboxgl-popup .mapboxgl-popup-content {
+.mapbox-popup.mapboxgl-popup .mapboxgl-popup-content,
+.leaflet-popup-content-wrapper {
   width: min(360px, calc(100vw - 32px)) !important;
   max-width: 360px !important;
   min-width: 280px !important;
   box-sizing: border-box;
   padding: 12px 14px;
-  background: #0b1329 !important;
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  border-radius: 8px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.95), 0 0 1px rgba(56, 189, 248, 0.5);
+  background: rgba(13, 20, 32, 0.95) !important;
+  border: 1px solid rgba(0, 200, 255, 0.3) !important;
+  border-radius: 6px !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.95), 0 0 1px rgba(0, 200, 255, 0.5) !important;
   color: #ffffff;
   font-family: var(--font-sans);
   overflow-wrap: anywhere;
@@ -4506,10 +4508,32 @@ body {
 .news-map-popup .maplibregl-popup-tip,
 .border-map-popup .maplibregl-popup-tip,
 .mapbox-popup .maplibregl-popup-tip {
-  border-top-color: #0b1329 !important;
-  border-bottom-color: #0b1329 !important;
+  border-top-color: rgba(13, 20, 32, 0.95) !important;
+  border-bottom-color: rgba(13, 20, 32, 0.95) !important;
 }
 
+/* ── Universal Header Badge Clearance ───────────────────────────────────── */
+.tactical-popup-header,
+.popup-badge-row,
+.map-popup-header-top,
+.weather-popup-header,
+.border-popup-header,
+.tactical-layer-popup .layer-popup-header,
+.staff-popup-header,
+.leaflet-popup-content .badge-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-right: 32px !important;
+  margin-bottom: 8px !important;
+}
+
+.map-popup-badge {
+  margin-right: 8px !important;
+}
+
+/* ── Universal Popup Close Button Styling ───────────────────────────────── */
+.leaflet-popup-close-button,
 .maplibregl-popup-close-button,
 .mapboxgl-popup-close-button,
 .map-unified-popup .maplibregl-popup-close-button,
@@ -4522,21 +4546,29 @@ body {
 .border-map-popup.mapboxgl-popup .mapboxgl-popup-close-button,
 .mapbox-popup .maplibregl-popup-close-button,
 .mapbox-popup.mapboxgl-popup .mapboxgl-popup-close-button {
-  color: #ffffff !important;
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 22px !important;
+  height: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #e2e8f0 !important;
   font-size: 18px !important;
   font-weight: 700 !important;
-  padding: 4px 8px !important;
-  right: 6px !important;
-  top: 6px !important;
+  padding: 0 !important;
+  margin: 0 !important;
   border: none !important;
   background: rgba(255, 255, 255, 0.14) !important;
+  border-radius: 4px !important;
   cursor: pointer !important;
   line-height: 1 !important;
-  border-radius: 4px !important;
   transition: all 0.15s ease !important;
-  z-index: 10 !important;
+  z-index: 100 !important;
 }
 
+.leaflet-popup-close-button:hover,
 .maplibregl-popup-close-button:hover,
 .mapboxgl-popup-close-button:hover,
 .map-unified-popup .maplibregl-popup-close-button:hover,
@@ -4550,7 +4582,8 @@ body {
 .mapbox-popup .maplibregl-popup-close-button:hover,
 .mapbox-popup.mapboxgl-popup .mapboxgl-popup-close-button:hover {
   color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.32) !important;
+  background: rgba(239, 68, 68, 0.8) !important;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5) !important;
 }
 
 .map-popup,

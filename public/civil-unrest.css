@@ -314,10 +314,11 @@
 .civil-popup-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 7px;
+  padding-right: 36px !important;
 }
 
 .civil-popup-tags {
@@ -325,7 +326,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  max-width: calc(100% - 30px); /* Prevents overlapping with the close button */
+  padding-right: 32px !important;
 }
 
 .civil-badge {

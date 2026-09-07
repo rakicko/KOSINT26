@@ -27,18 +27,18 @@ if (typeof window !== 'undefined') {
   try {
     const legacyKeys = ['kosint_news', 'kosint_alerts', 'cached_news', 'news_cache', 'kosint_feed_cache', 'alertStore', 'kosint_cached_alerts'];
     legacyKeys.forEach(k => {
-      try { localStorage.removeItem(k); } catch (e) {}
-      try { sessionStorage.removeItem(k); } catch (e) {}
+      try { localStorage.removeItem(k); } catch (e) { }
+      try { sessionStorage.removeItem(k); } catch (e) { }
     });
     if (typeof localStorage !== 'undefined') {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
         if (key && (key.toLowerCase().includes('news') || key.toLowerCase().includes('alert'))) {
-          try { localStorage.removeItem(key); } catch (e) {}
+          try { localStorage.removeItem(key); } catch (e) { }
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -691,7 +691,25 @@ window.clearAllModuleLayers = clearAllModuleLayers;
 window.setActiveMapModule = setActiveMapModule;
 window.updateMapBadgeAndMeta = updateMapBadgeAndMeta;
 
-const $ = id => document.getElementById(id);
+const origGetElementById = (typeof document !== 'undefined' && typeof document.getElementById === 'function')
+  ? document.getElementById.bind(document)
+  : () => null;
+
+const $ = id => {
+  let el = origGetElementById(id);
+  if (!el && (id === 'newsItemsContainer' || id === 'newsFeedList')) el = origGetElementById('newsList');
+  if (!el && (id === 'trafficIncidentsList' || id === 'trafficList')) el = origGetElementById('incidentList');
+  return el;
+};
+
+if (typeof document !== 'undefined' && origGetElementById) {
+  document.getElementById = function (id) {
+    let el = origGetElementById(id);
+    if (!el && (id === 'newsItemsContainer' || id === 'newsFeedList')) el = origGetElementById('newsList');
+    if (!el && (id === 'trafficIncidentsList' || id === 'trafficList')) el = origGetElementById('incidentList');
+    return el;
+  };
+}
 
 function setMapViewMode(mode) {
   if (!state.map) return;
@@ -794,7 +812,7 @@ function setupAuthEventListeners() {
             'X-CSRF-Token': state.csrfToken || ''
           }
         });
-      } catch {}
+      } catch { }
       state.user = null;
       state.csrfToken = null;
       updateUserBadgeUI();
@@ -950,14 +968,14 @@ async function fetchAndRender(location, timeline, forceRefresh = false) {
 
   hideWelcome();
   renderThreatLevel(data.threatLevel);
-  renderNews(data.news);
-  renderWeather(data.weather);
-  renderTraffic(data.traffic);
-  renderRadiation(data.radiation);
-  renderAQI(data.aqi);
-  renderEarthquakes(data.earthquakes);
-  renderWildfire(data.wildfire);
-  renderAviation(data.aviation);
+  try { renderNews(data.news); } catch (e) { console.error('[fetchAndRender] renderNews error:', e); }
+  try { renderWeather(data.weather); } catch (e) { console.error('[fetchAndRender] renderWeather error:', e); }
+  try { renderTraffic(data.traffic); } catch (e) { console.error('[fetchAndRender] renderTraffic error:', e); }
+  try { renderRadiation(data.radiation); } catch (e) { console.error('[fetchAndRender] renderRadiation error:', e); }
+  try { renderAQI(data.aqi); } catch (e) { console.error('[fetchAndRender] renderAQI error:', e); }
+  try { renderEarthquakes(data.earthquakes); } catch (e) { console.error('[fetchAndRender] renderEarthquakes error:', e); }
+  try { renderWildfire(data.wildfire); } catch (e) { console.error('[fetchAndRender] renderWildfire error:', e); }
+  try { renderAviation(data.aviation); } catch (e) { console.error('[fetchAndRender] renderAviation error:', e); }
   fetchTelegram(forceRefresh);
   fetchBorder(forceRefresh);
   updateMap(data);
@@ -999,35 +1017,67 @@ function renderThreatLevel(tl) {
   if (header) header.style.borderBottomColor = tl.score >= 80 ? tl.color : '';
 }
 
+/**
+ * Normalized Fingerprint Hash: normalize(title).slice(0, 60) + "_" + source
+ * Resilient against undefined, null, or malformed data objects.
+ */
+function getAlertFingerprint(item) {
+  if (!item || typeof item !== 'object') return '';
+  try {
+    const rawTitle = item.title || item.headline || item.canonicalTitle || item.message || '';
+    const cleanTitle = String(rawTitle).toLowerCase()
+      .replace(/^[\[\(]news[\]\)]\s*/i, '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 60);
+    const rawSource = String(item.source || item.publisher || item.primarySource || (Array.isArray(item.sources) ? item.sources[0] : '') || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+    return `${cleanTitle}_${rawSource}`;
+  } catch {
+    return String(item.id || item.url || item.title || Math.random());
+  }
+}
+
 function renderNews(news) {
   const panel = $('newsPanel');
-  if (!news || news.error) { $('newsList').innerHTML = `<div class="error-state">News unavailable: ${news?.error || ''}</div>`; return; }
-
-  const items = news.items || [];
-  const totalEvents = news.summary?.total || items.length;
-  const criticalCount = items.filter(i => i.severity === 'critical' || i.intensityScore >= 9).length;
-  const highCount = items.filter(i => i.severity === 'high' || (i.intensityScore >= 7 && i.intensityScore <= 8)).length;
-
-  const badge = $('newsBadge');
-  if (criticalCount > 0) {
-    badge.textContent = `${criticalCount} CRITICAL`;
-    badge.className = 'panel-badge badge-critical';
-    badge.style.display = '';
-  } else if (highCount > 0) {
-    badge.textContent = `${highCount} HIGH`;
-    badge.className = 'panel-badge badge-high';
-    badge.style.display = '';
-  } else {
-    badge.style.display = 'none';
+  const list = $('newsList') || $('newsItemsContainer') || $('newsFeedList');
+  if (!news || news.error) {
+    if (list) list.innerHTML = `<div class="error-state">News unavailable: ${news?.error || ''}</div>`;
+    return;
   }
 
-  $('newsMeta').textContent = `${totalEvents} Events`;
+  const items = Array.isArray(news) ? news : (news.items || []);
+  const totalEvents = news.summary?.total || items.length;
+  const criticalCount = items.filter(i => i && (i.severity === 'critical' || i.intensityScore >= 9)).length;
+  const highCount = items.filter(i => i && (i.severity === 'high' || (i.intensityScore >= 7 && i.intensityScore <= 8))).length;
 
-  // Update World Monitor Regional Tension Index (RTI)
+  const badge = $('newsBadge');
+  if (badge) {
+    if (criticalCount > 0) {
+      badge.textContent = `${criticalCount} CRITICAL`;
+      badge.className = 'panel-badge badge-critical';
+      badge.style.display = '';
+    } else if (highCount > 0) {
+      badge.textContent = `${highCount} HIGH`;
+      badge.className = 'panel-badge badge-high';
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if ($('newsMeta')) {
+    $('newsMeta').textContent = `${totalEvents} Events`;
+  }
+
+  // Update World Monitor Regional Tension Index (RTI) safely
   if (Array.isArray(items)) {
-    const tension = calculateRegionalTension(items);
-    state.regionalTension = tension;
-    renderRegionalTension(tension);
+    try {
+      const tension = calculateRegionalTension(items);
+      state.regionalTension = tension;
+      renderRegionalTension(tension);
+    } catch (tErr) {
+      console.warn('[news-tension] Non-blocking tension calculation error:', tErr);
+    }
   }
 
   filterNewsItems(items, state.newsTab || state.newsFilter || 'all');
@@ -1060,9 +1110,9 @@ function isNorthKosovoOrCheckpoint(item) {
 
   // Check signals / entities if present
   const signalsLocs = (item._signals && item._signals.locations) ||
-                      (item.signals && item.signals.locations) ||
-                      (item.multilingualEntities && item.multilingualEntities.locations) ||
-                      (Array.isArray(item.locations) ? item.locations : []);
+    (item.signals && item.signals.locations) ||
+    (item.multilingualEntities && item.multilingualEntities.locations) ||
+    (Array.isArray(item.locations) ? item.locations : []);
 
   if (Array.isArray(signalsLocs) && signalsLocs.length > 0) {
     for (const loc of signalsLocs) {
@@ -1071,7 +1121,7 @@ function isNorthKosovoOrCheckpoint(item) {
       const lid = String(loc.id || '').toLowerCase();
       const lname = String(loc.name || '').toLowerCase();
       if (lid.includes('jarinje') || lid.includes('brnjak') || lid.includes('bridge') || lid.includes('merdare') ||
-          lname.includes('jarinje') || lname.includes('brnjak') || lname.includes('bridge') || lname.includes('merdare')) {
+        lname.includes('jarinje') || lname.includes('brnjak') || lname.includes('bridge') || lname.includes('merdare')) {
         return true;
       }
     }
@@ -1235,10 +1285,14 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
   const dedupedNewsItems = [];
   for (const item of newsItems) {
     if (!item || typeof item !== 'object') continue;
-    const fp = getAlertFingerprint(item);
-    if (fp && seenFingerprints.has(fp)) continue;
-    if (fp) seenFingerprints.add(fp);
-    dedupedNewsItems.push(item);
+    try {
+      const fp = getAlertFingerprint(item);
+      if (fp && seenFingerprints.has(fp)) continue;
+      if (fp) seenFingerprints.add(fp);
+      dedupedNewsItems.push(item);
+    } catch {
+      dedupedNewsItems.push(item);
+    }
   }
 
   let recentScore = 0;
@@ -1579,8 +1633,8 @@ function renderNewsVerificationBadge(item) {
     (Array.isArray(item.languages) && item.languages.includes('sr') && item.languages.includes('sq'))
       ? 'CROSS-VERIFIED'
       : (((item.sourceCount || 1) >= 3 || (Array.isArray(item.participatingSources) && item.participatingSources.length >= 3) || (Array.isArray(item.sources) && item.sources.length >= 3))
-          ? 'MULTI-SOURCE'
-          : 'SINGLE-SOURCE')
+        ? 'MULTI-SOURCE'
+        : 'SINGLE-SOURCE')
   );
 
   const count = item.sourceCount || (Array.isArray(item.participatingSources) && item.participatingSources.length > 0 ? item.participatingSources.length : (Array.isArray(item.sources) ? item.sources.length : 1));
@@ -1635,7 +1689,7 @@ function ensureTriageTabButtons() {
     const btn = document.createElement('button');
     btn.className = 'filter-btn';
     btn.id = 'tabNewsPolitical';
-    btn.onclick = function() { switchNewsTab('political', this); };
+    btn.onclick = function () { switchNewsTab('political', this); };
     btn.innerHTML = '🏛️ Political';
     const opBtn = document.getElementById('tabNewsOperational');
     if (opBtn && opBtn.nextSibling) {
@@ -1649,7 +1703,7 @@ function ensureTriageTabButtons() {
     const btn = document.createElement('button');
     btn.className = 'filter-btn';
     btn.id = 'tabNewsOpinion';
-    btn.onclick = function() { switchNewsTab('opinion', this); };
+    btn.onclick = function () { switchNewsTab('opinion', this); };
     btn.innerHTML = '🎙️ Opinion';
     const polBtn = document.getElementById('tabNewsPolitical');
     if (polBtn && polBtn.nextSibling) {
@@ -1661,65 +1715,95 @@ function ensureTriageTabButtons() {
 }
 
 function renderNewsCard(item) {
-  if (!item) return '';
-  const s = item.intensityScore || 1;
-  const sev = (item.severity || (s >= 9 ? 'critical' : s >= 7 ? 'high' : s >= 4 ? 'medium' : 'low')).toLowerCase();
-  const sevClass = sev === 'critical' ? 'sev-critical' : sev === 'high' ? 'sev-high' : sev === 'medium' ? 'sev-medium' : 'sev-low';
-  const sevLabel = sev.toUpperCase();
+  if (!item || typeof item !== 'object') return '';
+  try {
+    const s = Number(item.intensityScore) || 1;
+    const rawSev = item.severity || (s >= 9 ? 'critical' : s >= 7 ? 'high' : s >= 4 ? 'medium' : 'low');
+    const sev = String(rawSev || 'low').toLowerCase();
+    const sevClass = sev === 'critical' ? 'sev-critical' : sev === 'high' ? 'sev-high' : sev === 'medium' ? 'sev-medium' : 'sev-low';
+    const sevLabel = sev.toUpperCase();
 
-  // Category / news type tag
-  const rawCat = (item.category || 'INTEL').replace(/_/g, ' ');
-  const catLabel = rawCat.toUpperCase();
+    // Defensive property defaults
+    const title = item.title || item.headline || item.canonicalTitle || 'Tactical Dispatch';
+    const source = item.source || item.publisher || item.primarySource || 'INTEL';
+    const category = String(item.category || 'general').toLowerCase();
+    const timestamp = item.publishedAt || item.pubDate || item.date || item.timestamp || new Date().toISOString();
 
-  const title = item.title || item.canonicalTitle || 'Untitled Intelligence Item';
-  const rawUrl = item.url ? String(item.url).trim() : '';
-  const validUrl = (rawUrl && isValidArticleUrl(rawUrl)) ? rawUrl : '';
-  const verifyBadgeHtml = renderNewsVerificationBadge(item);
-  const sourceStr = item.source || item.primarySource || '';
-  const timeStr = timeAgo(item.publishedAt || item.pubDate || item.date || item.timestamp);
+    // Category / news type tag
+    const rawCat = category.replace(/_/g, ' ');
+    const catLabel = rawCat.toUpperCase();
 
-  const cardInner = `
-    <!-- Row 1: Compact Meta Bar -->
-    <div class="news-card-meta-row news-card-meta">
-      <div class="news-card-meta-left">
-        <span class="badge-severity news-badge-sev badge-${sev} ${sevClass}">${sevLabel}</span>
-        <span class="badge-category news-badge-cat">${escHtml(catLabel)}</span>
-        ${verifyBadgeHtml}
+    const rawUrl = item.url ? String(item.url).trim() : '';
+    const validUrl = (rawUrl && isValidArticleUrl(rawUrl)) ? rawUrl : '';
+    let verifyBadgeHtml = '';
+    try {
+      verifyBadgeHtml = renderNewsVerificationBadge(item);
+    } catch {
+      verifyBadgeHtml = '<span class="news-badge-verify verify-single">[INTEL]</span>';
+    }
+    const sourceStr = String(source || '');
+    let timeStr = '';
+    try {
+      timeStr = timeAgo(timestamp);
+    } catch {
+      timeStr = '';
+    }
+
+    const cardInner = `
+      <!-- Row 1: Compact Meta Bar -->
+      <div class="news-card-meta-row news-card-meta">
+        <div class="news-card-meta-left">
+          <span class="badge-severity news-badge-sev badge-${sev} ${sevClass}">${sevLabel}</span>
+          <span class="badge-category news-badge-cat">${escHtml(catLabel)}</span>
+          ${verifyBadgeHtml}
+        </div>
+        <div class="news-card-meta-right">
+          ${timeStr ? `<span class="news-card-time">${escHtml(timeStr)}</span>` : ''}
+          ${sourceStr ? `<span class="news-card-source">${escHtml(sourceStr)}</span>` : ''}
+          ${validUrl ? '<span class="news-card-ext">↗</span>' : ''}
+        </div>
       </div>
-      <div class="news-card-meta-right">
-        ${timeStr ? `<span class="news-card-time">${escHtml(timeStr)}</span>` : ''}
-        ${sourceStr ? `<span class="news-card-source">${escHtml(sourceStr)}</span>` : ''}
-        ${validUrl ? '<span class="news-card-ext">↗</span>' : ''}
+
+      <!-- Row 2: Prominent Full Headline -->
+      <div class="news-card-title-row">
+        <h4 class="news-card-headline news-card-title" title="${escHtml(title)}">${escHtml(title)}</h4>
       </div>
-    </div>
-
-    <!-- Row 2: Prominent Full Headline -->
-    <div class="news-card-title-row">
-      <h4 class="news-card-headline news-card-title" title="${escHtml(title)}">${escHtml(title)}</h4>
-    </div>
-  `;
-
-  if (validUrl) {
-    return `
-      <a class="news-item-card news-simple-card ${sevClass} severity-${sev}" href="${escHtml(validUrl)}" target="_blank" rel="noopener noreferrer" title="${escHtml(title)}">
-        ${cardInner}
-      </a>
     `;
-  }
 
-  return `
-    <div class="news-item-card news-simple-card ${sevClass} severity-${sev}" title="${escHtml(title)}">
-      ${cardInner}
-    </div>
-  `;
+    if (validUrl) {
+      return `
+        <a class="news-item-card news-simple-card ${sevClass} severity-${sev}" href="${escHtml(validUrl)}" target="_blank" rel="noopener noreferrer" title="${escHtml(title)}">
+          ${cardInner}
+        </a>
+      `;
+    }
+
+    return `
+      <div class="news-item-card news-simple-card ${sevClass} severity-${sev}" title="${escHtml(title)}">
+        ${cardInner}
+      </div>
+    `;
+  } catch (err) {
+    console.warn('[news-card] Error rendering individual card:', err, item);
+    return '';
+  }
 }
 
 function renderNewsList(items, filter) {
   return filterNewsItems(items, filter);
 }
 
+function renderNewsCards(items) {
+  const itemList = Array.isArray(items) ? items : (items?.items || []);
+  return renderNewsList(itemList);
+}
+
 function filterNewsItems(items, filter) {
-  ensureTriageTabButtons();
+  try {
+    ensureTriageTabButtons();
+  } catch (e) {
+    console.warn('[news-tabs] Failed ensuring triage tab buttons:', e);
+  }
   state.newsTab = filter || state.newsTab || 'all';
   state.newsFilter = state.newsTab;
 
@@ -1728,91 +1812,130 @@ function filterNewsItems(items, filter) {
   const deduped = [];
 
   for (const item of (items || [])) {
-    if (!item) continue;
-    // TTL Cutoff: Articles older than 48 hours belong exclusively in historical archives/search, NEVER in live feed
-    const pubTime = new Date(item.publishedAt || item.pubDate || 0).getTime();
-    if (pubTime > 0 && (nowMs - pubTime) > 48 * 3600 * 1000) {
-      continue;
+    if (!item || typeof item !== 'object') continue;
+    try {
+      // TTL Cutoff: Articles older than 48 hours belong exclusively in historical archives/search, NEVER in live feed
+      const rawTime = item.publishedAt || item.pubDate || item.date || item.timestamp;
+      const pubTime = rawTime ? new Date(rawTime).getTime() : 0;
+      if (!isNaN(pubTime) && pubTime > 0 && (nowMs - pubTime) > 48 * 3600 * 1000) {
+        continue;
+      }
+      const fp = getAlertFingerprint(item);
+      if (fp && seenFp.has(fp)) continue;
+      if (fp) seenFp.add(fp);
+      deduped.push(item);
+    } catch {
+      deduped.push(item);
     }
-    const fp = getAlertFingerprint(item);
-    if (fp && seenFp.has(fp)) continue;
-    if (fp) seenFp.add(fp);
-    deduped.push(item);
   }
 
-  items = deduped.filter(i => !isWelfareNoiseItem(i));
+  items = deduped.filter(i => {
+    try {
+      return !isWelfareNoiseItem(i);
+    } catch {
+      return true;
+    }
+  });
 
   let filtered = items;
 
   // 1. Strict Mutually Exclusive Category Tabs & Language Views
-  if (state.newsTab === 'all') {
-    // All tab: Shows all valid articles chronologically (deduplicated)
-    filtered = items.filter(i => i && i.category !== 'other');
-  } else if (state.newsTab === 'operational') {
-    // Operational tab: Shows ONLY items where item.category === 'operational'
-    filtered = items.filter(i => isOperationalNewsItem(i));
-  } else if (state.newsTab === 'political') {
-    // Political tab: Shows ONLY items where item.category === 'political'
-    filtered = items.filter(i => isPoliticalNewsItem(i));
-  } else if (state.newsTab === 'opinion') {
-    // Opinion tab: Shows ONLY items where item.category === 'opinion'
-    filtered = items.filter(i => isOpinionNewsItem(i));
-  } else if (state.newsTab === 'serbian') {
-    filtered = items.filter(i => isSerbianNewsItem(i) && i.category !== 'other');
-  } else if (state.newsTab === 'albanian') {
-    filtered = items.filter(i => isAlbanianNewsItem(i) && i.category !== 'other');
-  } else if (state.newsTab === 'critical') {
-    filtered = items.filter(i => i.severity === 'critical' || i.intensityScore >= 9);
-  } else if (state.newsTab === 'high') {
-    filtered = items.filter(i => i.severity === 'high' || (i.intensityScore >= 7 && i.intensityScore <= 8));
-  } else if (state.newsTab === 'medium') {
-    filtered = items.filter(i => i.severity === 'medium' || (i.intensityScore >= 4 && i.intensityScore <= 6));
-  } else {
-    filtered = items.filter(i => i && i.category !== 'other');
+  try {
+    if (state.newsTab === 'all') {
+      // All tab: Shows all valid articles chronologically (deduplicated)
+      filtered = items.filter(i => i && i.category !== 'other');
+    } else if (state.newsTab === 'operational') {
+      // Operational tab: Shows ONLY items where item.category === 'operational'
+      filtered = items.filter(i => isOperationalNewsItem(i));
+    } else if (state.newsTab === 'political') {
+      // Political tab: Shows ONLY items where item.category === 'political'
+      filtered = items.filter(i => isPoliticalNewsItem(i));
+    } else if (state.newsTab === 'opinion') {
+      // Opinion tab: Shows ONLY items where item.category === 'opinion'
+      filtered = items.filter(i => isOpinionNewsItem(i));
+    } else if (state.newsTab === 'serbian') {
+      filtered = items.filter(i => isSerbianNewsItem(i) && i.category !== 'other');
+    } else if (state.newsTab === 'albanian') {
+      filtered = items.filter(i => isAlbanianNewsItem(i) && i.category !== 'other');
+    } else if (state.newsTab === 'critical') {
+      filtered = items.filter(i => i && (i.severity === 'critical' || i.intensityScore >= 9));
+    } else if (state.newsTab === 'high') {
+      filtered = items.filter(i => i && (i.severity === 'high' || (i.intensityScore >= 7 && i.intensityScore <= 8)));
+    } else if (state.newsTab === 'medium') {
+      filtered = items.filter(i => i && (i.severity === 'medium' || (i.intensityScore >= 4 && i.intensityScore <= 6)));
+    } else {
+      filtered = items.filter(i => i && i.category !== 'other');
+    }
+  } catch (fErr) {
+    console.warn('[news-filter] Error filtering items by tab:', fErr);
+    filtered = items;
   }
 
   // 2. Urgent Only Toggle (Filter Critical & High)
   if (state.newsUrgentOnly) {
     filtered = filtered.filter(i => {
-      const s = i.intensityScore || 1;
-      const sev = (i.severity || '').toLowerCase();
+      if (!i) return false;
+      const s = Number(i.intensityScore) || 1;
+      const sev = String(i.severity || '').toLowerCase();
       return sev === 'critical' || sev === 'high' || s >= 7;
     });
   }
 
   // Pre-calculate / refresh effective ranks for dynamic time-decay
   items.forEach(item => {
-    if (item) {
+    if (item && typeof item === 'object') {
       if (!item.pubDate && item.publishedAt) {
         item.pubDate = item.publishedAt;
       }
-      item._rank = getArticleRank(item);
+      try {
+        item._rank = getArticleRank(item);
+      } catch {
+        item._rank = Number(item.intensityScore) || 1;
+      }
     }
   });
 
   // World Monitor dynamic threat & time-decay news ranking (_rank descending)
-  const sorted = sortNewsByRank(filtered);
+  let sorted = filtered;
+  try {
+    sorted = sortNewsByRank(filtered);
+  } catch (sErr) {
+    console.warn('[news-sort] Fallback sorting used:', sErr);
+  }
 
   // Preserve cached tactical SitRep banner across tab transitions
   if (state.cachedSitrep) {
-    renderFlashSitRep(state.cachedSitrep);
+    try {
+      renderFlashSitRep(state.cachedSitrep);
+    } catch { }
   }
 
-  const list = $('newsList');
+  const list = $('newsList') || $('newsItemsContainer') || $('newsFeedList');
   if (!list) return;
 
-  if (!sorted.length) {
+  if (!sorted || !sorted.length) {
     const tabName = state.newsTab === 'serbian' ? 'Serbian'
       : state.newsTab === 'albanian' ? 'Albanian'
-      : state.newsTab === 'operational' ? 'Operational'
-      : state.newsTab === 'political' ? 'Political'
-      : state.newsTab === 'opinion' ? 'Opinion'
-      : 'All';
+        : state.newsTab === 'operational' ? 'Operational'
+          : state.newsTab === 'political' ? 'Political'
+            : state.newsTab === 'opinion' ? 'Opinion'
+              : 'All';
     list.innerHTML = `<div class="empty-state">No ${state.newsUrgentOnly ? 'urgent ' : ''}events in ${tabName} news feed</div>`;
     return;
   }
 
-  list.innerHTML = sorted.map(renderNewsCard).join('');
+  // Wrap individual card rendering inside try/catch so one malformed item cannot suppress the rest
+  const renderedCards = [];
+  for (const item of sorted) {
+    try {
+      const cardHtml = renderNewsCard(item);
+      if (cardHtml) renderedCards.push(cardHtml);
+    } catch (cardErr) {
+      console.warn('[news-render] Suppressed card render error for item:', cardErr, item);
+    }
+  }
+
+  list.innerHTML = renderedCards.join('');
 }
 
 function switchNewsTab(tab, btn) {
@@ -2784,41 +2907,72 @@ function ensureTrafficIncidentLocations(traffic) {
 }
 
 function renderTraffic(traffic) {
-  ensureTrafficIncidentLocations(traffic);
-  if (!traffic || traffic.error) {
-    $('incidentList').innerHTML = `<div class="error-state">Traffic data unavailable</div>`;
-    return;
-  }
+  try {
+    ensureTrafficIncidentLocations(traffic);
+    const incidentContainer = $('incidentList') || $('trafficIncidentsList') || $('trafficList');
+    if (!incidentContainer) return;
 
-  $('trafficMeta').textContent = `via intelligence RSS feeds`;
-  $('trafficAnomaly').style.display = traffic.anomalyDetected ? '' : 'none';
-  $('trafficAnomalyBanner').style.display = traffic.anomalyDetected ? '' : 'none';
-  if (traffic.anomalyDetected) $('trafficAnomalyBanner').textContent = `🚨 ${traffic.anomalySummary}`;
+    if (!traffic || traffic.error) {
+      incidentContainer.innerHTML = `<div class="error-state">Traffic data unavailable</div>`;
+      return;
+    }
 
-  const incidents = traffic.incidents || [];
-  if (incidents.length === 0) {
-    $('incidentList').innerHTML = '<div class="empty-state">No active traffic incidents reported</div>';
-    return;
-  }
+    if ($('trafficMeta')) $('trafficMeta').textContent = `via intelligence RSS feeds`;
+    if ($('trafficAnomaly')) $('trafficAnomaly').style.display = traffic.anomalyDetected ? '' : 'none';
+    if ($('trafficAnomalyBanner')) {
+      $('trafficAnomalyBanner').style.display = traffic.anomalyDetected ? '' : 'none';
+      if (traffic.anomalyDetected) $('trafficAnomalyBanner').textContent = `🚨 ${traffic.anomalySummary || 'Traffic Anomaly'}`;
+    }
 
-  $('incidentList').innerHTML = incidents.map(inc => {
-    const typeLabel = inc.typeLabel || (inc.type ? inc.type.replace(/_/g, ' ').toUpperCase() : 'TRAFFIC INCIDENT');
-    return `
-      <div class="incident-item ${inc.anomaly ? 'anomaly' : ''}">
-        <div class="incident-body">
-          <div class="incident-type">
-            <span class="incident-badge">${escHtml(typeLabel)}</span>
-            ${inc.location?.city ? ` <span class="incident-road">📍 ${escHtml(inc.location.city)}</span>` : ''}
-            ${inc.anomaly ? `<span class="incident-anomaly-tag">⚠ ${escHtml(inc.anomalyType || 'ANOMALY')}</span>` : ''}
+    const incidents = Array.isArray(traffic) ? traffic : (traffic.incidents || []);
+    if (incidents.length === 0) {
+      incidentContainer.innerHTML = '<div class="empty-state">No active traffic incidents reported</div>';
+      return;
+    }
+
+    const renderedIncidents = [];
+    for (const inc of incidents) {
+      try {
+        if (!inc || typeof inc !== 'object') continue;
+        const typeLabel = inc.typeLabel || (inc.type ? String(inc.type).replace(/_/g, ' ').toUpperCase() : 'TRAFFIC INCIDENT');
+        const title = inc.title || inc.headline || 'Traffic Event';
+        const description = inc.description || title;
+        const source = inc.source || inc.publisher || 'Traffic Intelligence';
+        const timestamp = inc.publishedAt || inc.pubDate || inc.timestamp || new Date().toISOString();
+        const city = inc.location?.city ? String(inc.location.city) : '';
+        const isAnomaly = !!inc.anomaly;
+        const anomalyType = inc.anomalyType || 'ANOMALY';
+        const url = inc.url && inc.url !== '#' ? String(inc.url) : '';
+
+        renderedIncidents.push(`
+          <div class="incident-item ${isAnomaly ? 'anomaly' : ''}">
+            <div class="incident-body">
+              <div class="incident-type">
+                <span class="incident-badge">${escHtml(typeLabel)}</span>
+                ${city ? ` <span class="incident-road">📍 ${escHtml(city)}</span>` : ''}
+                ${isAnomaly ? `<span class="incident-anomaly-tag">⚠ ${escHtml(anomalyType)}</span>` : ''}
+              </div>
+              <div class="incident-title" style="font-weight:600;font-size:12px;margin:4px 0 2px;color:#f1f5f9;">${escHtml(title)}</div>
+              <div class="incident-desc">${escHtml(description)}</div>
+              <div class="incident-source">📰 ${escHtml(source)} · ${formatTimeAgo(timestamp)}</div>
+              ${url ? `<div class="incident-link"><a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">Read source article ↗</a></div>` : ''}
+            </div>
           </div>
-          <div class="incident-title" style="font-weight:600;font-size:12px;margin:4px 0 2px;color:#f1f5f9;">${escHtml(inc.title)}</div>
-          <div class="incident-desc">${escHtml(inc.description)}</div>
-          <div class="incident-source">📰 ${escHtml(inc.source)} · ${formatTimeAgo(inc.publishedAt)}</div>
-          ${inc.url && inc.url !== '#' ? `<div class="incident-link"><a href="${escHtml(inc.url)}" target="_blank" rel="noopener noreferrer">Read source article ↗</a></div>` : ''}
-        </div>
-      </div>
-    `;
-  }).join('');
+        `);
+      } catch (incErr) {
+        console.warn('[traffic-render] Suppressed incident card error:', incErr, inc);
+      }
+    }
+
+    incidentContainer.innerHTML = renderedIncidents.join('');
+  } catch (err) {
+    console.error('[traffic-render] Error in renderTraffic:', err);
+  }
+}
+
+function renderTrafficIncidents(incidents) {
+  const list = Array.isArray(incidents) ? incidents : (incidents?.incidents || []);
+  return renderTraffic({ incidents: list });
 }
 
 function renderTrafficMarkers(trafficData) {
@@ -2826,10 +2980,20 @@ function renderTrafficMarkers(trafficData) {
 }
 
 function renderTrafficMapMarkers(trafficData) {
+  const data = trafficData || state.data?.traffic;
+
+  // Ensure Traffic panel UI list container is populated with verified incident data
+  if (data) {
+    try {
+      renderTraffic(data);
+    } catch (e) {
+      console.warn('[traffic] Failed to update traffic panel list:', e);
+    }
+  }
+
   if (!state.map || state.activeMapModule !== 'traffic') return;
   clearMarkerList(moduleLayers.traffic.markers);
 
-  const data = trafficData || state.data?.traffic;
   if (!data || data.error || !Array.isArray(data.incidents)) {
     updateMapBadgeAndMeta();
     return;
@@ -3136,7 +3300,7 @@ function renderEarthquakeMapMarkers(eqData) {
     return;
   }
 
-  const isDebug = window._DEBUG_SEISMIC || 
+  const isDebug = window._DEBUG_SEISMIC ||
     (typeof window.location !== 'undefined' && (window.location.search.includes('debug=seismic') || window.location.search.includes('debug=true')));
 
   data.earthquakes.filter(eq => eq.magnitude >= 2.5).forEach(eq => {
@@ -3249,7 +3413,7 @@ function buildNewsPopupHtml(item) {
     <div class="news-event">
       <div class="news-event-header">
         <span class="news-event-status-badge ${statusClass}">STATUS: ${escHtml(status)}</span>
-        ${renderNewsVerificationBadge(item)}
+        ${typeof renderNewsVerificationBadge === 'function' ? renderNewsVerificationBadge(item) : ''}
       </div>
       <div class="news-event-metrics-bar">
         <span>${sourceCount} SOURCES</span>
@@ -3620,8 +3784,12 @@ function deduplicateNewsItems(items, similarityThreshold = 0.82) {
 function updateTacticalThreatRangeRingsLayer(itemsWithCoords) {
   if (!state.map) return;
 
-  if (!isTacticalLayerVisible('incidents')) {
+  if (typeof isTacticalLayerVisible === 'function' && !isTacticalLayerVisible('incidents')) {
     clearTacticalThreatRangeRingsLayer();
+    return;
+  }
+
+  if (typeof isPointInKosovoOperationalZone !== 'function' || typeof calculateThreatRangeRings !== 'function') {
     return;
   }
 
@@ -3678,7 +3846,7 @@ function updateTacticalThreatRangeRingsLayer(itemsWithCoords) {
           'line-dasharray': [4, 2]
         }
       });
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -3688,7 +3856,7 @@ function clearTacticalThreatRangeRingsLayer() {
   if (source) {
     try {
       source.setData({ type: 'FeatureCollection', features: [] });
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -3696,7 +3864,7 @@ function renderNewsMapMarkers(newsData) {
   if (!state.map || state.activeMapModule !== 'news') return;
   clearMarkerList(moduleLayers.news.markers);
 
-  if (!isTacticalLayerVisible('incidents')) {
+  if (typeof isTacticalLayerVisible === 'function' && !isTacticalLayerVisible('incidents')) {
     clearTacticalThreatRangeRingsLayer();
     updateMapBadgeAndMeta();
     return;
@@ -3756,7 +3924,7 @@ function renderNewsMapMarkers(newsData) {
     } else {
       const { item, color, itemId, coords, sev } = c.item;
       let el;
-      if (sev === 'CRITICAL' || sev === 'HIGH') {
+      if ((sev === 'CRITICAL' || sev === 'HIGH') && typeof createTacticalThreatMarkerElement === 'function') {
         el = createTacticalThreatMarkerElement(item, { severity: sev });
       } else {
         el = createMapMarkerElement(color, 12, 2, sev);
@@ -3881,10 +4049,10 @@ function renderAqiMapMarkers(aqiData) {
   const stationsToRender = Array.isArray(data.stations) && data.stations.length > 0
     ? data.stations
     : (data.coordinates && data.current ? [{
-        name: data.location || 'Kosovo AQI Station',
-        coordinates: data.coordinates,
-        current: data.current
-      }] : []);
+      name: data.location || 'Kosovo AQI Station',
+      coordinates: data.coordinates,
+      current: data.current
+    }] : []);
 
   stationsToRender.forEach(st => {
     const coords = st.coordinates || { lat: st.lat, lon: st.lon };
@@ -3977,22 +4145,22 @@ function renderWildfire(wildfireData) {
     badge.textContent = wildfireData.isCached ? `${detections.length} ACTIVE (CACHED)` : `${detections.length} ACTIVE`;
   }
 
-    const maxDisplay = 60;
-    const displayItems = detections.slice(0, maxDisplay);
+  const maxDisplay = 60;
+  const displayItems = detections.slice(0, maxDisplay);
 
-    list.innerHTML = displayItems.map(d => {
-      const conf = d.confidence || 0;
-      const confClass = conf >= 80 ? 'high' : conf >= 50 ? 'medium' : 'low';
-      const sat = d.satellite || 'NASA Satellite';
-      const time = d.acq_time ? formatHour(d.acq_time) : '';
-      const date = d.acq_date ? formatDate(d.acq_date) : '';
-      const bright = typeof d.brightness === 'number' && d.brightness > 0 ? `${d.brightness.toFixed(1)} K` : 'N/A';
-      const frp = typeof d.frp === 'number' && d.frp > 0 ? `${d.frp.toFixed(1)} MW` : 'N/A';
-      const distText = d.distanceKm ? ` · ${d.distanceKm} km away` : '';
-      const place = d.place || (typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(d.lat, d.lon).place : 'Balkan Area');
-      const country = d.country || (typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(d.lat, d.lon).country : 'Regional');
+  list.innerHTML = displayItems.map(d => {
+    const conf = d.confidence || 0;
+    const confClass = conf >= 80 ? 'high' : conf >= 50 ? 'medium' : 'low';
+    const sat = d.satellite || 'NASA Satellite';
+    const time = d.acq_time ? formatHour(d.acq_time) : '';
+    const date = d.acq_date ? formatDate(d.acq_date) : '';
+    const bright = typeof d.brightness === 'number' && d.brightness > 0 ? `${d.brightness.toFixed(1)} K` : 'N/A';
+    const frp = typeof d.frp === 'number' && d.frp > 0 ? `${d.frp.toFixed(1)} MW` : 'N/A';
+    const distText = d.distanceKm ? ` · ${d.distanceKm} km away` : '';
+    const place = d.place || (typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(d.lat, d.lon).place : 'Balkan Area');
+    const country = d.country || (typeof resolveWildfireLocation === 'function' ? resolveWildfireLocation(d.lat, d.lon).country : 'Regional');
 
-      return `<div class="wildfire-item severity-${confClass}">
+    return `<div class="wildfire-item severity-${confClass}">
       <div class="wildfire-header">
         <span class="wildfire-confidence">${conf}% Conf${distText}</span>
         <span class="wildfire-sat">${escHtml(sat)}</span>
@@ -4013,14 +4181,14 @@ function renderWildfire(wildfireData) {
         <span class="wildfire-frp">FRP: ${frp}</span>
       </div>
     </div>`;
-    }).join('');
+  }).join('');
 
-    if (detections.length > maxDisplay) {
-      list.innerHTML += `
+  if (detections.length > maxDisplay) {
+    list.innerHTML += `
       <div class="wildfire-pagination-note" style="text-align:center; padding:10px 12px; font-size:11px; color:var(--text-secondary); background:rgba(15,23,42,0.5); border-radius:8px; margin-top:8px; border:1px solid rgba(56,189,248,0.15);">
         Showing <strong>${maxDisplay}</strong> most critical detections · All <strong>${detections.length}</strong> plotted on live map
       </div>`;
-    }
+  }
 }
 
 function formatDate(dateStr) {
@@ -4300,6 +4468,80 @@ function createAircraftMarkerElement(aircraft) {
   return el;
 }
 
+window.activeFlightPathLayer = window.activeFlightPathLayer || null;
+
+function clearActiveFlightPath() {
+  if (state.map && typeof state.map.getSource === 'function' && state.map.getSource('aviation-flight-trails-source')) {
+    state.map.getSource('aviation-flight-trails-source').setData({
+      type: 'FeatureCollection',
+      features: []
+    });
+  }
+  window.activeFlightPathLayer = null;
+  state.selectedAircraftIcao = null;
+}
+
+function renderSelectedAircraftTrail(ac) {
+  clearActiveFlightPath();
+  if (!ac || !state.map) return;
+  const key = (ac.icao24 || '').toLowerCase();
+  if (!key) return;
+
+  state.selectedAircraftIcao = key;
+  let trail = state.aviationTrails ? state.aviationTrails.get(key) : null;
+  if (!trail || trail.length < 2) {
+    if (typeof ac.longitude === 'number' && typeof ac.latitude === 'number') {
+      trail = [[ac.longitude, ac.latitude, ac.altitude || 0, Date.now()]];
+      if (typeof ac.heading === 'number' && typeof ac.speedKts === 'number' && ac.speedKts > 20) {
+        const rad = (ac.heading + 180) * (Math.PI / 180);
+        const distDeg = (ac.speedKts * 0.0005) * 0.12;
+        const prevLon = ac.longitude + distDeg * Math.sin(rad);
+        const prevLat = ac.latitude + distDeg * Math.cos(rad);
+        trail.unshift([prevLon, prevLat, ac.altitude || 0, Date.now() - 30000]);
+      }
+    }
+  }
+
+  if (trail && trail.length >= 2) {
+    const feature = {
+      type: 'Feature',
+      properties: {
+        icao24: ac.icao24,
+        isMilitary: ac.category === 'military',
+        isSpecialMilitary: !!ac.isSpecialMilitary,
+        isKfor: !!ac.isKfor
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: trail.map(pt => [pt[0], pt[1]])
+      }
+    };
+
+    if (state.map.getSource && state.map.getSource('aviation-flight-trails-source')) {
+      state.map.getSource('aviation-flight-trails-source').setData({
+        type: 'FeatureCollection',
+        features: [feature]
+      });
+      window.activeFlightPathLayer = 'aviation-flight-trails-layer';
+    }
+  }
+}
+
+function dismissMapPopupsAndTrails() {
+  if (state.map && typeof state.map.closePopup === 'function') {
+    try { state.map.closePopup(); } catch (e) {}
+  }
+  closeMapPopup();
+  if (window.CivilUnrestMap && typeof window.CivilUnrestMap.toggleCivilUnrestLayer === 'function') {
+    try {
+      if (typeof window.CivilUnrestMap.closeActivePopup === 'function') {
+        window.CivilUnrestMap.closeActivePopup();
+      }
+    } catch (e) {}
+  }
+  clearActiveFlightPath();
+}
+
 function renderAviationMarkers(aviationData) {
   renderAviationMapMarkers(aviationData);
 }
@@ -4310,27 +4552,14 @@ function renderAviationMapMarkers(aviationData) {
 
   const data = aviationData || state.data?.aviation;
   if (!data || data.status !== 'LIVE_DATA' || !Array.isArray(data.aircraft)) {
-    if (state.map && state.map.getSource('aviation-flight-trails-source')) {
-      state.map.getSource('aviation-flight-trails-source').setData({ type: 'FeatureCollection', features: [] });
-    }
+    clearActiveFlightPath();
     updateMapBadgeAndMeta();
     return;
   }
 
   state.aviationTrails = state.aviationTrails || new Map();
 
-  const currentFilter = state.aviationFilter || 'all';
-  const filtered = data.aircraft.filter(ac => {
-    if (typeof ac.latitude !== 'number' || typeof ac.longitude !== 'number') return false;
-    if (currentFilter === 'all') return true;
-    if (currentFilter === 'kfor') return !!ac.isKfor || (ac.callsign && (ac.callsign.includes('KFOR') || ac.callsign.includes('NATO')));
-    if (currentFilter === 'rotary') return ac.militaryRole === 'rotary' || ac.subType === 'helicopter';
-    if (currentFilter === 'uav') return ac.militaryRole === 'uav' || ac.subType === 'uav' || ac.militaryRole === 'recon';
-    return ac.category === currentFilter;
-  });
-
-  // Maintain Flight Trails Buffer
-  const trailFeatures = [];
+  // Maintain Flight Trails Buffer in memory without drawing global polylines
   data.aircraft.forEach(ac => {
     if (typeof ac.latitude !== 'number' || typeof ac.longitude !== 'number') return;
     const key = (ac.icao24 || '').toLowerCase();
@@ -4347,7 +4576,7 @@ function renderAviationMapMarkers(aviationData) {
     // Synthesize historical flight vector if trail has only 1 point but heading and speed are present
     if (trail.length === 1 && typeof ac.heading === 'number' && typeof ac.speedKts === 'number' && ac.speedKts > 20) {
       const rad = (ac.heading + 180) * (Math.PI / 180);
-      const distDeg = (ac.speedKts * 0.0005) * 0.12; // ~5-10nm back
+      const distDeg = (ac.speedKts * 0.0005) * 0.12;
       const prevLon = ac.longitude + distDeg * Math.sin(rad);
       const prevLat = ac.latitude + distDeg * Math.cos(rad);
       trail.unshift([prevLon, prevLat, ac.altitude || 0, Date.now() - 30000]);
@@ -4355,33 +4584,27 @@ function renderAviationMapMarkers(aviationData) {
     }
   });
 
-  // Build GeoJSON features for filtered trails
-  filtered.forEach(ac => {
-    const key = (ac.icao24 || '').toLowerCase();
-    const trail = state.aviationTrails.get(key);
-    if (trail && trail.length >= 2) {
-      trailFeatures.push({
-        type: 'Feature',
-        properties: {
-          icao24: ac.icao24,
-          isMilitary: ac.category === 'military',
-          isSpecialMilitary: !!ac.isSpecialMilitary,
-          isKfor: !!ac.isKfor
-        },
-        geometry: {
-          type: 'LineString',
-          coordinates: trail.map(pt => [pt[0], pt[1]])
-        }
-      });
+  // Flight paths render ON-DEMAND ONLY for selected plane (0 global lines by default)
+  if (state.selectedAircraftIcao) {
+    const selAc = data.aircraft.find(a => (a.icao24 || '').toLowerCase() === state.selectedAircraftIcao);
+    if (selAc) {
+      renderSelectedAircraftTrail(selAc);
+    } else {
+      clearActiveFlightPath();
     }
-  });
-
-  if (state.map.getSource('aviation-flight-trails-source')) {
-    state.map.getSource('aviation-flight-trails-source').setData({
-      type: 'FeatureCollection',
-      features: trailFeatures
-    });
+  } else {
+    clearActiveFlightPath();
   }
+
+  const currentFilter = state.aviationFilter || 'all';
+  const filtered = data.aircraft.filter(ac => {
+    if (typeof ac.latitude !== 'number' || typeof ac.longitude !== 'number') return false;
+    if (currentFilter === 'all') return true;
+    if (currentFilter === 'kfor') return !!ac.isKfor || (ac.callsign && (ac.callsign.includes('KFOR') || ac.callsign.includes('NATO')));
+    if (currentFilter === 'rotary') return ac.militaryRole === 'rotary' || ac.subType === 'helicopter';
+    if (currentFilter === 'uav') return ac.militaryRole === 'uav' || ac.subType === 'uav' || ac.militaryRole === 'recon';
+    return ac.category === currentFilter;
+  });
 
   filtered.forEach(ac => {
     const el = createAircraftMarkerElement(ac);
@@ -4421,10 +4644,22 @@ function renderAviationMapMarkers(aviationData) {
       footer: `ICAO: ${ac.icao24.toUpperCase()} · OPEN SKY BALKAN AIRSPACE`
     });
 
+    const popup = createMapPopup(popupHtml, { offset: 15 });
+    popup.on('open', () => {
+      renderSelectedAircraftTrail(ac);
+    });
+    popup.on('close', () => {
+      clearActiveFlightPath();
+    });
+
     const marker = new maplibregl.Marker({ element: el })
       .setLngLat([ac.longitude, ac.latitude])
-      .setPopup(createMapPopup(popupHtml, { offset: 15 }))
+      .setPopup(popup)
       .addTo(state.map);
+
+    el.addEventListener('click', () => {
+      renderSelectedAircraftTrail(ac);
+    });
 
     marker._module = 'aviation';
     moduleLayers.aviation.markers.push(marker);
@@ -4490,27 +4725,21 @@ function renderAviation(aviationData) {
   if (meta) meta.textContent = `OPEN SKY · LIVE · ${formatTimeAgo(aviationData.updatedAt)}`;
 
   if (badge) {
-    if (summary.military > 0) {
-      badge.style.display = '';
-      badge.className = 'panel-badge badge-critical';
-      badge.textContent = `${summary.military} MILITARY`;
-    } else {
-      badge.style.display = 'none';
-    }
+    badge.textContent = `${summary.military || 0} MIL / ${summary.commercial || 0} CIV`;
+    badge.style.display = '';
   }
 
-  if (totalCount) totalCount.textContent = `${aviationData.count} AIRCRAFT (BALKAN AIRSPACE)`;
-  if (countAll) countAll.textContent = aviationData.count;
-  if (countCommercial) countCommercial.textContent = summary.commercial;
-  if (countPrivate) countPrivate.textContent = summary.private;
-  if (countPrivateJets) countPrivateJets.textContent = summary.privateJets;
-  if (countMilitary) countMilitary.textContent = summary.military;
-  if (countUnknown) countUnknown.textContent = summary.unknown;
-  if (countKfor) countKfor.textContent = summary.kforCount || 0;
-  if (countRotary) countRotary.textContent = summary.militaryHeloCount || 0;
-  if (countUav) countUav.textContent = summary.uavCount || 0;
+  if (totalCount) totalCount.textContent = `${aircraftList.length} AIRCRAFT`;
+  if (countAll) countAll.textContent = aircraftList.length;
+  if (countCommercial) countCommercial.textContent = summary.commercial || 0;
+  if (countPrivate) countPrivate.textContent = summary.private || 0;
+  if (countPrivateJets) countPrivateJets.textContent = summary.privateJets || 0;
+  if (countMilitary) countMilitary.textContent = summary.military || 0;
+  if (countUnknown) countUnknown.textContent = summary.unknown || 0;
+  if (countKfor) countKfor.textContent = summary.kfor || 0;
+  if (countRotary) countRotary.textContent = summary.rotary || 0;
+  if (countUav) countUav.textContent = summary.uav || 0;
 
-  // Filter aircraft for display
   const currentFilter = state.aviationFilter || 'all';
   const filtered = aircraftList.filter(ac => {
     if (currentFilter === 'all') return true;
@@ -4521,65 +4750,60 @@ function renderAviation(aviationData) {
   });
 
   if (filtered.length === 0) {
-    list.innerHTML = `
-      <div class="empty-state aviation-empty-state">
-        <div class="wildfire-state-icon">✈️</div>
-        <div class="wildfire-state-title">NO AIRCRAFT IN VIEW</div>
-        <div class="wildfire-state-desc">No aircraft found matching category filter: <strong>${escHtml(currentFilter.replace('_', ' '))}</strong></div>
-      </div>`;
-  } else {
-    list.innerHTML = filtered.map(ac => {
-      const callsign = ac.callsign || 'N/A';
-      const icao = ac.icao24.toUpperCase();
-      const cat = ac.category || 'unknown';
-      const catLabel = ac.isKfor ? 'KFOR NATO' : (ac.militaryRole ? `MIL ${ac.militaryRole.toUpperCase()}` : cat.toUpperCase().replace('_', ' '));
-      const alt = ac.altitudeFt ? `${ac.altitudeFt.toLocaleString()} ft` : (ac.altitude ? `${ac.altitude} m` : 'N/A');
-      const spd = ac.speedKts ? `${ac.speedKts} kts` : (ac.speed ? `${ac.speed} km/h` : 'N/A');
-      const hdg = ac.heading !== null ? `${ac.heading}°` : 'N/A';
-      const type = ac.aircraftDesc || ac.aircraftType || 'N/A';
-      const reg = ac.registration || 'N/A';
-      const op = ac.operator || ac.originCountry || 'N/A';
-      const time = formatTimeAgo(ac.timestamp);
+    list.innerHTML = '<div class="empty-state">No aircraft matching active category filter</div>';
+    return;
+  }
 
-      return `
-        <div class="aviation-item cat-${cat} ${ac.isKfor ? 'kfor-highlight' : ''}" onclick="centerMapOnAircraft(${ac.latitude}, ${ac.longitude}, '${ac.icao24}')">
-          <div class="aviation-item-header">
-            <div>
-              <span class="aviation-callsign">${escHtml(callsign)}</span>
-              <span class="aviation-icao">${icao}</span>
-            </div>
-            <span class="aviation-cat-badge cat-${cat}">${escHtml(catLabel)}</span>
+  list.innerHTML = filtered.map(ac => {
+    const cat = ac.category || 'unknown';
+    const catLabel = ac.isKfor ? 'KFOR / NATO' : (ac.militaryRole ? `MIL (${ac.militaryRole.toUpperCase()})` : cat.replace(/_/g, ' ').toUpperCase());
+    const callsign = ac.callsign || 'N/A';
+    const icao = ac.icao24 ? ac.icao24.toUpperCase() : 'UNKNOWN';
+    const alt = ac.altitudeFt ? `${ac.altitudeFt.toLocaleString()} ft` : (ac.altitude ? `${ac.altitude} m` : 'N/A');
+    const spd = ac.speedKts ? `${ac.speedKts} kts` : (ac.speed ? `${ac.speed} km/h` : 'N/A');
+    const hdg = ac.heading !== null && ac.heading !== undefined ? `${ac.heading}°` : 'N/A';
+    const reg = ac.registration || 'N/A';
+    const type = ac.aircraftDesc || ac.aircraftType || (ac.subType ? ac.subType.toUpperCase() : 'N/A');
+    const time = formatTimeAgo(ac.lastContact || Date.now());
+
+    return `
+      <div class="aviation-item cat-${cat} ${ac.isKfor ? 'kfor-highlight' : ''}" onclick="centerMapOnAircraft(${ac.latitude}, ${ac.longitude}, '${ac.icao24}')">
+        <div class="aviation-item-header">
+          <div>
+            <span class="aviation-callsign">${escHtml(callsign)}</span>
+            <span class="aviation-icao">${icao}</span>
           </div>
-          <div class="aviation-grid">
-            <div class="aviation-cell">
-              <span class="aviation-label">Altitude</span>
-              <span class="aviation-value">${alt}</span>
-            </div>
-            <div class="aviation-cell">
-              <span class="aviation-label">Speed</span>
-              <span class="aviation-value">${spd}</span>
-            </div>
-            <div class="aviation-cell">
-              <span class="aviation-label">Heading</span>
-              <span class="aviation-value">${hdg}</span>
-            </div>
-            <div class="aviation-cell">
-              <span class="aviation-label">Type</span>
-              <span class="aviation-value" title="${escHtml(type)}">${escHtml(type)}</span>
-            </div>
-            <div class="aviation-cell">
-              <span class="aviation-label">Registration</span>
-              <span class="aviation-value">${escHtml(reg)}</span>
-            </div>
-            <div class="aviation-cell">
-              <span class="aviation-label">Updated</span>
-              <span class="aviation-value">${time}</span>
-            </div>
+          <span class="aviation-cat-badge cat-${cat}">${escHtml(catLabel)}</span>
+        </div>
+        <div class="aviation-grid">
+          <div class="aviation-cell">
+            <span class="aviation-label">Altitude</span>
+            <span class="aviation-value">${alt}</span>
+          </div>
+          <div class="aviation-cell">
+            <span class="aviation-label">Speed</span>
+            <span class="aviation-value">${spd}</span>
+          </div>
+          <div class="aviation-cell">
+            <span class="aviation-label">Heading</span>
+            <span class="aviation-value">${hdg}</span>
+          </div>
+          <div class="aviation-cell">
+            <span class="aviation-label">Type</span>
+            <span class="aviation-value" title="${escHtml(type)}">${escHtml(type)}</span>
+          </div>
+          <div class="aviation-cell">
+            <span class="aviation-label">Registration</span>
+            <span class="aviation-value">${escHtml(reg)}</span>
+          </div>
+          <div class="aviation-cell">
+            <span class="aviation-label">Updated</span>
+            <span class="aviation-value">${time}</span>
           </div>
         </div>
-      `;
-    }).join('');
-  }
+      </div>
+    `;
+  }).join('');
 
   // Update map markers ONLY if aviation is currently active!
   if (state.activeMapModule === 'aviation') {
@@ -4606,6 +4830,12 @@ function centerMapOnAircraft(lat, lon, icao24) {
     zoom: Math.max(10, state.map.getZoom() || 8),
     duration: 800
   });
+
+  const data = state.data?.aviation;
+  const ac = data?.aircraft?.find(a => (a.icao24 || '').toLowerCase() === (icao24 || '').toLowerCase());
+  if (ac) {
+    renderSelectedAircraftTrail(ac);
+  }
 
   const marker = moduleLayers.aviation.markers.find(m => {
     const lngLat = m.getLngLat();
@@ -4828,6 +5058,8 @@ function toggleModule(panelId) {
       }
     } else if (targetModule === 'news') {
       if (state.data?.news) renderNews(state.data.news);
+    } else if (targetModule === 'traffic') {
+      if (state.data?.traffic) renderTraffic(state.data.traffic);
     } else if (targetModule === 'wildfire') {
       window.updateWildfireLayer(state.wildfireFilter);
     } else if (targetModule === 'aviation') {
@@ -5300,7 +5532,7 @@ function initMap() {
   state.map.once('error', (err) => {
     if (err && (err.dataType === 'style' || err.sourceId === 'openmaptiles')) {
       console.warn('[map] Falling back to pitch-black tactical raster style:', err);
-      try { state.map.setStyle(OSM_STYLE); } catch (e) {}
+      try { state.map.setStyle(OSM_STYLE); } catch (e) { }
     }
   });
 
@@ -5716,7 +5948,7 @@ function initOSIRISLayersAndControls(map) {
   updateOsirisScaleBar();
 }
 
-window.toggle3DView = function(enable3D) {
+window.toggle3DView = function (enable3D) {
   state.is3D = enable3D;
   const btn3D = $('btnOsiris3D');
   const btn2D = $('btnOsiris2D');
@@ -5751,7 +5983,7 @@ window.toggle3DView = function(enable3D) {
   }
 };
 
-window.switchOsirisBasemap = function(type) {
+window.switchOsirisBasemap = function (type) {
   state.basemapType = type;
   const btnMap = $('btnOsirisMap');
   const btnSat = $('btnOsirisSat');
@@ -5766,19 +5998,19 @@ window.switchOsirisBasemap = function(type) {
   }
 };
 
-window.resetMapNorth = function() {
+window.resetMapNorth = function () {
   if (!state.map) return;
   state.map.easeTo({ bearing: 0, pitch: state.is3D ? 58 : 0, duration: 600 });
 };
 
-window.toggleTerrainElevation = function() {
+window.toggleTerrainElevation = function () {
   if (!state.map) return;
   const hasTerrain = !!state.map.getTerrain();
   toggle3DView(!hasTerrain);
 };
 
 state.dayNightActive = false;
-window.toggleDayNightCycle = function(force) {
+window.toggleDayNightCycle = function (force) {
   if (!state.map) return;
   const btn = $('btnToggleDayNightCycle');
   state.dayNightActive = force !== undefined ? Boolean(force) : !state.dayNightActive;
@@ -5802,7 +6034,7 @@ window.toggleDayNightCycle = function(force) {
   }
 };
 
-window.focusKosovoBounds = function() {
+window.focusKosovoBounds = function () {
   if (!state.map) return;
   state.map.fitBounds([[20.0, 41.85], [21.8, 43.25]], {
     padding: { top: 60, bottom: 60, left: 80, right: 60 },
@@ -5810,7 +6042,7 @@ window.focusKosovoBounds = function() {
   });
 };
 
-window.toggleFullScreenMode = function() {
+window.toggleFullScreenMode = function () {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(err => console.warn(err));
   } else {
@@ -5818,7 +6050,7 @@ window.toggleFullScreenMode = function() {
   }
 };
 
-window.connectCustomCCTVStream = function() {
+window.connectCustomCCTVStream = function () {
   const input = $('cctvCustomStreamInput');
   if (!input || !input.value.trim()) return;
   const url = input.value.trim();
@@ -6297,6 +6529,7 @@ function syncTacticalLayersOnMap() {
 
 function toggleTacticalLayer(layerGroup, isVisible) {
   if (!state.map) return;
+  dismissMapPopupsAndTrails();
   const visibility = isVisible ? 'visible' : 'none';
 
   if (layerGroup === 'incidents') {
@@ -6422,7 +6655,7 @@ function toggleWeatherTacticalLayer(visible) {
   } else {
     clearMarkerList(moduleLayers.weather.markers);
     if (state.weatherPopup) {
-      try { state.weatherPopup.remove(); } catch (_) {}
+      try { state.weatherPopup.remove(); } catch (_) { }
       state.weatherPopup = null;
     }
   }
@@ -6678,10 +6911,10 @@ function buildAlerts(statusData = state.data, borderData = state.borderData, tel
       // CRITICAL: intensityScore >= 9, OR threatLevel=critical, OR severity string is 'critical'
       if (intScore >= ALERT_THRESHOLDS.news.criticalScore || item.threatLevel === 'critical' || itemSevStr === 'critical') {
         severity = 'CRITICAL';
-      // HIGH: intensityScore >= 7, OR isSecurityIncident, OR severity string is 'high'
+        // HIGH: intensityScore >= 7, OR isSecurityIncident, OR severity string is 'high'
       } else if (intScore >= ALERT_THRESHOLDS.news.highScore || item.isSecurityIncident || itemSevStr === 'high') {
         severity = 'HIGH';
-      // MEDIUM: intensityScore >= 5 AND (security/military/unrest/border/political category, OR severity string is 'medium')
+        // MEDIUM: intensityScore >= 5 AND (security/military/unrest/border/political category, OR severity string is 'medium')
       } else if (intScore >= ALERT_THRESHOLDS.news.mediumScore && (
         itemCat === 'security' || itemCat === 'civil_unrest' || itemCat === 'military' ||
         itemCat === 'border' || itemCat === 'political' || itemSevStr === 'medium'
@@ -8653,7 +8886,12 @@ window.buildMapPopupHtml = buildMapPopupHtml;
 window.createMapPopup = createMapPopup;
 window.openMapPopup = openMapPopup;
 window.closeMapPopup = closeMapPopup;
+window.getAlertFingerprint = getAlertFingerprint;
+window.renderNewsCard = renderNewsCard;
+window.renderNewsCards = renderNewsCards;
+window.renderNewsList = renderNewsList;
 window.renderTraffic = renderTraffic;
+window.renderTrafficIncidents = renderTrafficIncidents;
 window.renderTrafficMarkers = renderTrafficMarkers;
 window.renderTrafficMapMarkers = renderTrafficMapMarkers;
 window.classifyTrafficIncident = classifyTrafficIncident;
@@ -8931,12 +9169,12 @@ function filterStaffList() {
     if (zone !== 'ALL' && item.zone !== zone) return false;
     if (query) {
       const match = (item.callsign || '').toLowerCase().includes(query) ||
-                    (item.name || '').toLowerCase().includes(query) ||
-                    (item.role || '').toLowerCase().includes(query) ||
-                    (item.nationality || '').toLowerCase().includes(query) ||
-                    (item.zone || '').toLowerCase().includes(query) ||
-                    (item.address || '').toLowerCase().includes(query) ||
-                    (item.phone || '').toLowerCase().includes(query);
+        (item.name || '').toLowerCase().includes(query) ||
+        (item.role || '').toLowerCase().includes(query) ||
+        (item.nationality || '').toLowerCase().includes(query) ||
+        (item.zone || '').toLowerCase().includes(query) ||
+        (item.address || '').toLowerCase().includes(query) ||
+        (item.phone || '').toLowerCase().includes(query);
       if (!match) return false;
     }
     return true;
@@ -10255,7 +10493,7 @@ function stopLiveFeedPlayback() {
       videoEl.src = '';
       videoEl.removeAttribute('src');
       videoEl.load();
-    } catch (e) {}
+    } catch (e) { }
     videoEl.style.display = 'none';
   }
 
@@ -10264,7 +10502,7 @@ function stopLiveFeedPlayback() {
     try {
       iframeEl.src = 'about:blank';
       iframeEl.removeAttribute('src');
-    } catch (e) {}
+    } catch (e) { }
     iframeEl.style.display = 'none';
   }
 
@@ -10292,15 +10530,15 @@ function switchPlayerToEmbed(channel, failureReason = 'Direct stream unavailable
   const fallback = $('feedVideoFallback');
 
   if (currentHlsInstance) {
-    try { currentHlsInstance.destroy(); } catch (_) {}
+    try { currentHlsInstance.destroy(); } catch (_) { }
     currentHlsInstance = null;
   }
   if (typeof window !== 'undefined' && window.currentHlsInstance) {
-    try { window.currentHlsInstance.destroy(); } catch (_) {}
+    try { window.currentHlsInstance.destroy(); } catch (_) { }
     window.currentHlsInstance = null;
   }
   if (videoEl) {
-    try { videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); } catch (_) {}
+    try { videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); } catch (_) { }
     videoEl.style.display = 'none';
   }
 
@@ -10468,7 +10706,7 @@ function playHlsStream(streamUrl, arg2, arg3) {
     videoEl.pause();
     videoEl.removeAttribute('src');
     videoEl.load();
-  } catch (e) {}
+  } catch (e) { }
 
   if (!streamUrl) {
     switchPlayerToEmbed(channelObj, 'No direct stream URL configured');
@@ -10540,14 +10778,14 @@ function playHlsStream(streamUrl, arg2, arg3) {
           case HlsClass.ErrorTypes.NETWORK_ERROR:
             if (!isProxyAttempt && !isBackupAttempt) {
               console.log(`[Hls] Direct CDN network error for ${channelName}. Retrying via manifest rewrite proxy...`);
-              try { hls.destroy(); } catch (_) {}
+              try { hls.destroy(); } catch (_) { }
               playHlsStream(rawUrl, channelName, { ...options, channel: channelObj, forceProxy: true, attempt: 2 });
             } else if (options.backupUrl && !isBackupAttempt) {
               console.log(`[Hls] Proxy failed for ${channelName}. Retrying with backup URL...`);
-              try { hls.destroy(); } catch (_) {}
+              try { hls.destroy(); } catch (_) { }
               playHlsStream(options.backupUrl, channelName + ' (Backup)', { ...options, channel: channelObj, isBackup: true, attempt: 3 });
             } else {
-              try { hls.destroy(); } catch (_) {}
+              try { hls.destroy(); } catch (_) { }
               switchPlayerToEmbed(channelObj, `Network/CORS error (${data.details || 'Load failed'})`);
             }
             break;
@@ -10560,7 +10798,7 @@ function playHlsStream(streamUrl, arg2, arg3) {
             }
             break;
           default:
-            try { hls.destroy(); } catch (_) {}
+            try { hls.destroy(); } catch (_) { }
             switchPlayerToEmbed(channelObj, `Playback failure (${data.details || 'Fatal'})`);
             break;
         }
@@ -10695,8 +10933,8 @@ function renderLiveFeeds(region = 'all') {
     const badge = c.badge || 'HLS';
     const badgeLower = badge.toLowerCase();
     const badgeClass = badgeLower === 'hd' ? 'badge-hd' :
-                       badgeLower === 'local' ? 'badge-local' :
-                       badgeLower === 'wire' ? 'badge-wire' : 'badge-live';
+      badgeLower === 'local' ? 'badge-local' :
+        badgeLower === 'wire' ? 'badge-wire' : 'badge-live';
     const lang = (c.lang || 'en').toLowerCase();
 
     return `
@@ -11178,8 +11416,8 @@ function haversineDistanceKm(coord1, coord2) {
   const dLat = (coord2[1] - coord1[1]) * rad;
   const dLon = (coord2[0] - coord1[0]) * rad;
   const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1) * Math.cos(lat2) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.cos(lat1) * Math.cos(lat2) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return 6371.0088 * c;
 }
@@ -11215,7 +11453,7 @@ function pointInPolygon(point, polygon) {
     const xi = polygon[i][0], yi = polygon[i][1];
     const xj = polygon[j][0], yj = polygon[j][1];
     const intersect = ((yi > y) !== (yj > y)) &&
-        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
     if (intersect) inside = !inside;
   }
   return inside;
@@ -11639,10 +11877,10 @@ const StyleStudio = {
     this.fx[type] = Boolean(enabled);
     this._applyFxOverlay(type, this.fx[type]);
     const cap = type.charAt(0).toUpperCase() + type.slice(1);
-    const btnOn  = $(`btn${cap}On`);
+    const btnOn = $(`btn${cap}On`);
     const btnOff = $(`btn${cap}Off`);
     if (btnOn && btnOff) {
-      btnOn.classList.toggle('active',  this.fx[type]);
+      btnOn.classList.toggle('active', this.fx[type]);
       btnOff.classList.toggle('active', !this.fx[type]);
     }
     this.saveToStorage();
@@ -11651,10 +11889,10 @@ const StyleStudio = {
   setPanZoomPad(enabled) {
     this.panZoomPad = Boolean(enabled);
     this._applyPanZoomPad(this.panZoomPad);
-    const btnOn  = $('btnPanZoomOn');
+    const btnOn = $('btnPanZoomOn');
     const btnOff = $('btnPanZoomOff');
     if (btnOn && btnOff) {
-      btnOn.classList.toggle('active',  this.panZoomPad);
+      btnOn.classList.toggle('active', this.panZoomPad);
       btnOff.classList.toggle('active', !this.panZoomPad);
     }
     this.saveToStorage();
@@ -11678,17 +11916,17 @@ const StyleStudio = {
     const R = (prop, val) => root.style.setProperty(prop, val);
 
     // ── Accent colours ────────────────────────────────────────────────────────
-    R('--accent-primary',   t.accentPrimary);
+    R('--accent-primary', t.accentPrimary);
     R('--accent-secondary', t.accentSecondary);
     // Legacy aliases consumed across all existing CSS
     R('--amber', t.accentPrimary);
-    R('--cyan',  t.accentSecondary);
+    R('--cyan', t.accentSecondary);
 
     // Derive dim / glow from accentSecondary so all hover/active states shift too
     const sec = t.accentSecondary;
     const secRgb = StyleStudio._hexToRgb(sec);
     if (secRgb) {
-      R('--cyan-dim',    `rgba(${secRgb}, 0.08)`);
+      R('--cyan-dim', `rgba(${secRgb}, 0.08)`);
       R('--border-glow', `rgba(${secRgb}, ${parseInt(t.glow, 10) / 100 || 0.30})`);
     }
 
@@ -11696,11 +11934,11 @@ const StyleStudio = {
     R('--bg-base', t.surfaceBg);
     const bgRgb = StyleStudio._hexToRgb(t.surfaceBg) || '7,11,18';
     const pOp = parseInt(t.panelOpacity, 10) / 100 || 0.88;
-    R('--bg-panel',    `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
-    R('--bg-surface',  `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
+    R('--bg-panel', `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
+    R('--bg-surface', `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
     R('--bg-elevated', `rgba(${bgRgb}, ${Math.min(pOp + 0.12, 1).toFixed(2)})`);
     // Header glass bg
-    R('--header-bg',   `rgba(${bgRgb}, 0.95)`);
+    R('--header-bg', `rgba(${bgRgb}, 0.95)`);
 
     // ── Border ────────────────────────────────────────────────────────────────
     const bOp = parseInt(t.borderOpacity, 10) / 100 || 0.15;
@@ -11712,40 +11950,40 @@ const StyleStudio = {
 
     // ── Border radius scale ───────────────────────────────────────────────────
     const rad = parseFloat(t.radius) || 1.0;
-    R('--r-sm', `${Math.round(6  * rad)}px`);
+    R('--r-sm', `${Math.round(6 * rad)}px`);
     R('--r-md', `${Math.round(10 * rad)}px`);
     R('--r-lg', `${Math.round(14 * rad)}px`);
 
     // ── Text colours ──────────────────────────────────────────────────────────
-    R('--text-primary',   t.textPrimary);
+    R('--text-primary', t.textPrimary);
     R('--text-secondary', t.textSecondary);
-    R('--text-dim',       t.textMuted);
-    R('--text-heading',   t.textHeading || t.textPrimary);
+    R('--text-dim', t.textMuted);
+    R('--text-heading', t.textHeading || t.textPrimary);
 
     // ── Signal colours ────────────────────────────────────────────────────────
-    R('--red',              t.signalCritical);
+    R('--red', t.signalCritical);
     R('--severity-critical', t.signalCritical);
-    R('--orange',           t.signalWarning);
-    R('--severity-high',    t.signalWarning);
-    R('--green',            t.signalNominal);
-    R('--severity-low',     t.signalNominal);
+    R('--orange', t.signalWarning);
+    R('--severity-high', t.signalWarning);
+    R('--green', t.signalNominal);
+    R('--severity-low', t.signalNominal);
     // severity-medium stays between warning & nominal
-    R('--severity-medium',  t.signalWarning);
+    R('--severity-medium', t.signalWarning);
 
     // ── Typography ────────────────────────────────────────────────────────────
     const uiFonts = {
-      INTER:  "'Inter', system-ui, sans-serif",
-      MONO:   "'JetBrains Mono', monospace",
+      INTER: "'Inter', system-ui, sans-serif",
+      MONO: "'JetBrains Mono', monospace",
       SYSTEM: "system-ui, -apple-system, sans-serif",
-      SERIF:  "'Georgia', 'Cambria', serif"
+      SERIF: "'Georgia', 'Cambria', serif"
     };
     R('--font-sans', uiFonts[t.uiFont] || uiFonts.INTER);
 
     const monoFonts = {
       JETBRAINS: "'JetBrains Mono', monospace",
-      COURIER:   "'Courier New', monospace",
-      CONSOLAS:  "'Consolas', monospace",
-      INTER:     "'Inter', sans-serif"
+      COURIER: "'Courier New', monospace",
+      CONSOLAS: "'Consolas', monospace",
+      INTER: "'Inter', sans-serif"
     };
     R('--font-mono', monoFonts[t.monoFont] || monoFonts.JETBRAINS);
 
@@ -11784,7 +12022,7 @@ const StyleStudio = {
         R('--accent-secondary', value);
         const rgb = StyleStudio._hexToRgb(value);
         if (rgb) {
-          R('--cyan-dim',    `rgba(${rgb}, 0.08)`);
+          R('--cyan-dim', `rgba(${rgb}, 0.08)`);
           R('--border-glow', `rgba(${rgb}, ${parseInt(t.glow, 10) / 100 || 0.30})`);
         }
         break;
@@ -11798,17 +12036,17 @@ const StyleStudio = {
         R('--bg-base', value);
         const bgRgb = StyleStudio._hexToRgb(value) || '7,11,18';
         const pOp = parseInt(t.panelOpacity, 10) / 100 || 0.88;
-        R('--bg-panel',    `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
-        R('--bg-surface',  `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
+        R('--bg-panel', `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
+        R('--bg-surface', `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
         R('--bg-elevated', `rgba(${bgRgb}, ${Math.min(pOp + 0.12, 1).toFixed(2)})`);
-        R('--header-bg',   `rgba(${bgRgb}, 0.95)`);
+        R('--header-bg', `rgba(${bgRgb}, 0.95)`);
         break;
       }
       case 'panelOpacity': {
         const bgRgb = StyleStudio._hexToRgb(t.surfaceBg) || '7,11,18';
         const pOp = parseInt(value, 10) / 100 || 0.88;
-        R('--bg-panel',    `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
-        R('--bg-surface',  `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
+        R('--bg-panel', `rgba(${bgRgb}, ${Math.min(pOp + 0.06, 1).toFixed(2)})`);
+        R('--bg-surface', `rgba(${bgRgb}, ${Math.min(pOp + 0.02, 1).toFixed(2)})`);
         R('--bg-elevated', `rgba(${bgRgb}, ${Math.min(pOp + 0.12, 1).toFixed(2)})`);
         break;
       }
@@ -11822,25 +12060,25 @@ const StyleStudio = {
       }
       case 'radius': {
         const rad = parseFloat(value) || 1.0;
-        R('--r-sm', `${Math.round(6  * rad)}px`);
+        R('--r-sm', `${Math.round(6 * rad)}px`);
         R('--r-md', `${Math.round(10 * rad)}px`);
         R('--r-lg', `${Math.round(14 * rad)}px`);
         break;
       }
-      case 'textPrimary':   R('--text-primary',   value); break;
-      case 'textSecondary': R('--text-secondary',  value); break;
-      case 'textMuted':     R('--text-dim',        value); break;
-      case 'textHeading':   R('--text-heading',    value); break;
+      case 'textPrimary': R('--text-primary', value); break;
+      case 'textSecondary': R('--text-secondary', value); break;
+      case 'textMuted': R('--text-dim', value); break;
+      case 'textHeading': R('--text-heading', value); break;
       case 'signalCritical':
-        R('--red',              value);
+        R('--red', value);
         R('--severity-critical', value);
         break;
       case 'signalWarning':
-        R('--orange',        value);
+        R('--orange', value);
         R('--severity-high', value);
         break;
       case 'signalNominal':
-        R('--green',        value);
+        R('--green', value);
         R('--severity-low', value);
         break;
       case 'signalInfo':
@@ -11848,10 +12086,10 @@ const StyleStudio = {
         break;
       case 'uiFont': {
         const uiFonts = {
-          INTER:  "'Inter', system-ui, sans-serif",
-          MONO:   "'JetBrains Mono', monospace",
+          INTER: "'Inter', system-ui, sans-serif",
+          MONO: "'JetBrains Mono', monospace",
           SYSTEM: "system-ui, -apple-system, sans-serif",
-          SERIF:  "'Georgia', 'Cambria', serif"
+          SERIF: "'Georgia', 'Cambria', serif"
         };
         R('--font-sans', uiFonts[value] || uiFonts.INTER);
         break;
@@ -11859,9 +12097,9 @@ const StyleStudio = {
       case 'monoFont': {
         const monoFonts = {
           JETBRAINS: "'JetBrains Mono', monospace",
-          COURIER:   "'Courier New', monospace",
-          CONSOLAS:  "'Consolas', monospace",
-          INTER:     "'Inter', sans-serif"
+          COURIER: "'Courier New', monospace",
+          CONSOLAS: "'Consolas', monospace",
+          INTER: "'Inter', sans-serif"
         };
         R('--font-mono', monoFonts[value] || monoFonts.JETBRAINS);
         break;
@@ -11885,8 +12123,8 @@ const StyleStudio = {
   _applyFxOverlay(type, enabled) {
     const idMap = {
       scanlines: 'styleStudioScanlines',
-      grain:     'styleStudioGrain',
-      vignette:  'styleStudioVignette'
+      grain: 'styleStudioGrain',
+      vignette: 'styleStudioVignette'
     };
     const el = $(idMap[type]);
     if (el) el.style.display = enabled ? 'block' : 'none';
