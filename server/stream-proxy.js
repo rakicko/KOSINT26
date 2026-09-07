@@ -4,13 +4,14 @@
  * Selective Manifest-Only Stream Proxy for KOSINT26
  *
  * HYBRID STREAMING ARCHITECTURE:
- * - Proxies ONLY the lightweight textual .m3u8 manifest files to inject CORS headers.
- * - Parses and rewrites all relative video segment (.ts / .m4s) URLs into absolute CDN paths.
- * - Clients download multi-megabyte video chunks DIRECTLY from broadcaster CDNs.
- * - Consumes virtually 0 outbound bandwidth on Render (under 100 GB/month limit).
+ * - Proxies lightweight textual .m3u8 manifest files to inject CORS and legitimate broadcaster headers.
+ * - Parses and rewrites relative video segment (.ts / .m4s) URLs into absolute CDN paths by default.
+ * - Clients download multi-megabyte video chunks DIRECTLY from broadcaster CDNs (0 Render bandwidth consumed).
+ * - Provides an optional header-spoofed segment proxy (/api/stream/segment) strictly for hotlink-protected CDNs.
  */
 
 const axios = require('axios');
+const express = require('express');
 
 /**
  * SSRF and Protocol Validator
@@ -66,12 +67,82 @@ function validateStreamUrl(rawUrl) {
 }
 
 /**
+ * Derives legitimate broadcaster upstream request headers (User-Agent, Referer, Origin)
+ * to bypass 403 Forbidden hotlink defenses on regional CDNs.
+ */
+function getBroadcasterHeaders(targetUrl, customReferer) {
+  let referer = customReferer ? String(customReferer).trim() : '';
+  let origin = '';
+
+  if (!referer) {
+    try {
+      const u = new URL(targetUrl);
+      const host = u.hostname.toLowerCase();
+
+      if (host.includes('bhtelecom.ba')) {
+        referer = 'https://webtv.bhtelecom.ba/';
+        origin = 'https://webtv.bhtelecom.ba';
+      } else if (host.includes('gjirafa.net') || host.includes('gjirafa.com')) {
+        referer = 'https://video.gjirafa.com/';
+        origin = 'https://video.gjirafa.com';
+      } else if (host.includes('rts.rs')) {
+        referer = 'https://www.rts.rs/';
+        origin = 'https://www.rts.rs';
+      } else if (host.includes('rtklive.com')) {
+        referer = 'https://www.rtklive.com/';
+        origin = 'https://www.rtklive.com';
+      } else if (host.includes('koha.net')) {
+        referer = 'https://www.koha.net/';
+        origin = 'https://www.koha.net';
+      } else if (host.includes('n1info.')) {
+        referer = 'https://n1info.rs/';
+        origin = 'https://n1info.rs';
+      } else if (host.includes('euronews.')) {
+        referer = 'https://euronews.rs/';
+        origin = 'https://euronews.rs';
+      } else if (host.includes('trt.net.tr') || host.includes('trt.com.tr') || host.includes('trtworld.com')) {
+        referer = 'https://www.trtworld.com/';
+        origin = 'https://www.trtworld.com';
+      } else {
+        referer = u.origin + '/';
+        origin = u.origin;
+      }
+    } catch {
+      referer = 'https://www.google.com/';
+      origin = 'https://www.google.com';
+    }
+  } else {
+    try {
+      origin = new URL(referer).origin;
+    } catch {
+      origin = referer;
+    }
+  }
+
+  return {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    'Referer': referer,
+    'Origin': origin,
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9,sr;q=0.8,sq;q=0.7',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'cross-site'
+  };
+}
+
+/**
  * Parses and rewrites relative segment & sub-manifest URIs in an HLS manifest.
  * - Sub-manifests (.m3u8): routed through manifest proxy so variant lists receive CORS headers.
- * - Video segments (.ts, .m4s, .aac): rewritten to absolute origin CDN URLs for direct client download.
+ * - Video segments (.ts, .m4s, .aac):
+ *     * Default: rewritten to absolute origin CDN URLs for direct client download (0 Render bandwidth).
+ *     * With proxySegments=true: routed through /api/stream/segment for hotlink-protected feeds.
  */
-function rewriteManifest(manifestText, manifestUrl) {
+function rewriteManifest(manifestText, manifestUrl, options = {}) {
   if (!manifestText || typeof manifestText !== 'string') return '';
+
+  const proxySegments = Boolean(options.proxySegments);
+  const referer = options.referer || '';
 
   const lines = manifestText.split(/\r?\n/);
   const rewritten = lines.map(line => {
@@ -94,13 +165,22 @@ function rewriteManifest(manifestText, manifestUrl) {
     try {
       const absUrl = new URL(trimmed, manifestUrl).href;
 
-      // If the line points to a child variant m3u8 playlist, route through the manifest proxy
-      // so the browser gets CORS headers on the sub-manifest without proxying video chunks
+      // Variant sub-playlist (.m3u8): route through manifest proxy
       if (absUrl.toLowerCase().includes('.m3u8')) {
-        return `/api/stream/manifest?url=${encodeURIComponent(absUrl)}`;
+        let proxyPath = `/api/stream/manifest?url=${encodeURIComponent(absUrl)}`;
+        if (referer) proxyPath += `&ref=${encodeURIComponent(referer)}`;
+        if (proxySegments) proxyPath += `&proxySegments=1`;
+        return proxyPath;
       }
 
-      // Media segment (.ts, .m4s, .mp4, .aac): point directly to broadcaster origin CDN
+      // Media segment (.ts, .m4s, .mp4, .aac):
+      if (proxySegments) {
+        let segPath = `/api/stream/segment?url=${encodeURIComponent(absUrl)}`;
+        if (referer) segPath += `&ref=${encodeURIComponent(referer)}`;
+        return segPath;
+      }
+
+      // Default: direct origin CDN path
       return absUrl;
     } catch {
       return line;
@@ -111,7 +191,7 @@ function rewriteManifest(manifestText, manifestUrl) {
 }
 
 /**
- * Express handler for GET /api/stream/manifest?url=...
+ * Express handler for GET /api/stream/manifest?url=...&ref=...&proxySegments=1
  */
 async function handleManifestProxy(req, res) {
   // CORS & No-Cache response headers
@@ -138,6 +218,9 @@ async function handleManifestProxy(req, res) {
   }
 
   const targetUrl = validation.url;
+  const customRef = req.query.ref || '';
+  const proxySegments = req.query.proxySegments === '1' || req.query.proxySegments === 'true';
+  const upstreamHeaders = getBroadcasterHeaders(targetUrl, customRef);
 
   try {
     let manifestText = '';
@@ -150,10 +233,7 @@ async function handleManifestProxy(req, res) {
       try {
         const upstreamRes = await fetch(targetUrl, {
           signal: controller.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-            'Accept': '*/*'
-          }
+          headers: upstreamHeaders
         });
 
         clearTimeout(timeoutId);
@@ -177,24 +257,23 @@ async function handleManifestProxy(req, res) {
       const response = await axios.get(targetUrl, {
         timeout: 6500,
         responseType: 'text',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-          'Accept': '*/*'
-        }
+        headers: upstreamHeaders
       });
       manifestText = response.data;
     }
 
     if (!manifestText || !manifestText.includes('#EXTM3U')) {
-      // Some servers might return an HTML error page or empty body
       return res.status(502).json({
         error: 'Upstream response is not a valid HLS manifest (#EXTM3U missing)',
         url: targetUrl
       });
     }
 
-    // Rewrite relative URLs to absolute CDN URLs
-    const rewritten = rewriteManifest(manifestText, targetUrl);
+    // Rewrite relative URLs to absolute CDN URLs (or segment proxy if requested)
+    const rewritten = rewriteManifest(manifestText, targetUrl, {
+      proxySegments,
+      referer: upstreamHeaders.Referer
+    });
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     return res.status(200).send(rewritten);
@@ -210,14 +289,80 @@ async function handleManifestProxy(req, res) {
   }
 }
 
+/**
+ * Express handler for GET /api/stream/segment?url=...&ref=...
+ * Streams a single media chunk (.ts/.m4s) with spoofed headers when broadcaster strictly forbids raw client IP/browser headers.
+ */
+async function handleSegmentProxy(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+  res.setHeader('Cache-Control', 'public, max-age=300');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  const rawTargetUrl = req.query.url;
+  const validation = validateStreamUrl(rawTargetUrl);
+
+  if (!validation.valid) {
+    return res.status(400).json({
+      error: 'Invalid or restricted segment URL',
+      details: validation.error
+    });
+  }
+
+  const targetUrl = validation.url;
+  const upstreamHeaders = getBroadcasterHeaders(targetUrl, req.query.ref);
+  if (req.headers.range) {
+    upstreamHeaders.Range = req.headers.range;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const upstreamRes = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: upstreamHeaders
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!upstreamRes.ok) {
+      return res.status(upstreamRes.status).send('Segment upstream error');
+    }
+
+    const contentType = upstreamRes.headers.get('content-type') || 'video/mp2t';
+    res.setHeader('Content-Type', contentType);
+
+    const contentLength = upstreamRes.headers.get('content-length');
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    if (upstreamRes.body) {
+      const { Readable } = require('stream');
+      Readable.fromWeb(upstreamRes.body).pipe(res);
+    } else {
+      const buffer = await upstreamRes.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    }
+  } catch (err) {
+    return res.status(502).send('Failed to proxy video segment');
+  }
+}
+
 // Router instantiation
-const express = require('express');
 const streamProxyRouter = express.Router();
 streamProxyRouter.get('/manifest', handleManifestProxy);
+streamProxyRouter.get('/segment', handleSegmentProxy);
 
 module.exports = {
   streamProxyRouter,
   handleManifestProxy,
+  handleSegmentProxy,
   validateStreamUrl,
+  getBroadcasterHeaders,
   rewriteManifest
 };

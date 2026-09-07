@@ -54,4 +54,21 @@ assert.ok(rewrittenMedia.includes('https://other-cdn.com/chunk_003.ts'), 'Absolu
 assert.ok(!rewrittenMedia.includes('/api/stream/manifest?url=https%3A%2F%2Forigin-cdn.com%2Flive%2Fstream%2Fchunk_001.ts'), 'Video chunks (.ts) must NEVER be proxied through backend');
 
 console.log('✓ Passed: Manifest rewritten correctly without video chunk proxying.');
+
+console.log('--- Testing Broadcaster Header Spoofing ---');
+const { getBroadcasterHeaders } = require('../server/stream-proxy');
+const rtsHeaders = getBroadcasterHeaders('https://webtvstream.bhtelecom.ba/rts1.m3u8');
+assert.strictEqual(rtsHeaders.Referer, 'https://webtv.bhtelecom.ba/', 'Referer should match bhtelecom portal');
+assert.ok(rtsHeaders['User-Agent'].includes('Mozilla/5.0'), 'Modern browser User-Agent must be set');
+
+const gjirafaHeaders = getBroadcasterHeaders('https://gjirafa-video-live.gjirafa.net/live.m3u8');
+assert.strictEqual(gjirafaHeaders.Referer, 'https://video.gjirafa.com/', 'Referer should match gjirafa video portal');
+
+console.log('--- Testing Selective Segment Proxy Rewriting ---');
+const rewrittenWithSegments = rewriteManifest(sampleMediaManifest, 'https://origin-cdn.com/live/stream/', { proxySegments: true, referer: 'https://webtv.bhtelecom.ba/' });
+assert.ok(rewrittenWithSegments.includes('/api/stream/segment?url='), 'When proxySegments=true, chunks route through segment proxy');
+assert.ok(rewrittenWithSegments.includes('ref=' + encodeURIComponent('https://webtv.bhtelecom.ba/')), 'Referer query parameter should be attached to segment proxy URL');
+
+console.log('✓ Passed: Broadcaster header spoofing & segment proxy rewriting verified.');
 console.log('\n--- ALL STREAM PROXY TESTS PASSED ---');
+

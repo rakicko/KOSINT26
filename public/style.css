@@ -9124,6 +9124,51 @@ body {
   outline: none;
 }
 
+.tactical-iframe-player {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #000000;
+  z-index: 4;
+}
+
+.feed-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 4px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.feed-mode-btn {
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.feed-mode-btn:hover {
+  color: #f8fafc;
+}
+
+.feed-mode-btn.active {
+  background: rgba(56, 189, 248, 0.22);
+  color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+}
+
 .video-channel-overlay {
   position: absolute;
   top: 10px;

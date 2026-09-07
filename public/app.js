@@ -9324,8 +9324,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'kosovo',
     category: 'public_broadcaster',
-    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk1/index.m3u8',
-    backupUrl: 'https://de1.dstv.cx/RTK1/index.m3u8',
+    streamUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk3/index.m3u8',
+    embedUrl: 'https://video.gjirafa.com/rtk1',
     webUrl: 'https://www.rtklive.com',
     location: 'Prishtinë, Kosovo',
     icon: '📺',
@@ -9338,8 +9339,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'kosovo',
     category: 'public_broadcaster',
-    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk2/index.m3u8',
-    backupUrl: 'https://de1.dstv.cx/RTK2/index.m3u8',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk3/index.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts_svet.m3u8',
+    embedUrl: 'https://video.gjirafa.com/rtk2',
     webUrl: 'https://www.rtklive.com/rtk2',
     location: 'Prishtinë, Kosovo',
     icon: '📺',
@@ -9353,7 +9355,8 @@ const LIVE_FEEDS_CHANNELS = [
     region: 'kosovo',
     category: 'news',
     streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk3/index.m3u8',
-    backupUrl: 'http://5.254.89.106/8703/index.m3u8',
+    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream-specific/1z8-byc-4ee-lc9/index.m3u8',
+    embedUrl: 'https://video.gjirafa.com/rtk3',
     webUrl: 'https://www.rtklive.com',
     location: 'Prishtinë, Kosovo',
     icon: '⚡',
@@ -9366,8 +9369,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'kosovo',
     category: 'news',
-    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/ktv/index.m3u8',
-    backupUrl: 'http://5.254.89.106/8705/index.m3u8',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/lj9-pxm-o53-rp0/tracks-v4a1/mono.m3u8',
+    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk3/index.m3u8',
+    embedUrl: 'https://www.koha.net/tv',
     webUrl: 'https://www.koha.net',
     location: 'Prishtinë, Kosovo',
     icon: '📺',
@@ -9380,8 +9384,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'kosovo',
     category: 'general',
-    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/klankosova/index.m3u8',
-    backupUrl: 'http://5.254.89.106/8706/index.m3u8',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-live/2cz-npl-jfn-9he/tracks-v2a1/mono.m3u8',
+    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream-specific/1z8-byc-4ee-lc9/index.m3u8',
+    embedUrl: 'https://klankosova.tv/live/',
     webUrl: 'https://klankosova.tv',
     location: 'Prishtinë, Kosovo',
     icon: '📺',
@@ -9394,8 +9399,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'kosovo',
     category: 'news',
-    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/dukagjini/index.m3u8',
-    backupUrl: 'http://5.254.89.106/8707/index.m3u8',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream-specific/1z8-byc-4ee-lc9/index.m3u8',
+    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk3/index.m3u8',
+    embedUrl: 'https://dukagjini.com/tv/',
     webUrl: 'https://www.dukagjini.com',
     location: 'Prishtinë / Pejë, Kosovo',
     icon: '⚡',
@@ -9409,7 +9415,8 @@ const LIVE_FEEDS_CHANNELS = [
     region: 'kosovo',
     category: 'news',
     streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream-specific/1z8-byc-4ee-lc9/index.m3u8',
-    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/t7/index.m3u8',
+    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk3/index.m3u8',
+    embedUrl: 'https://www.gazetaexpress.com',
     webUrl: 'https://www.gazetaexpress.com',
     location: 'Prishtinë, Kosovo',
     icon: '⚡',
@@ -9422,8 +9429,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'kosovo',
     category: 'news',
-    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/atv/index.m3u8',
-    backupUrl: 'http://5.254.89.106/8709/index.m3u8',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream-specific/1z8-byc-4ee-lc9/index.m3u8',
+    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-live/2cz-npl-jfn-9he/tracks-v2a1/mono.m3u8',
+    embedUrl: 'https://atvlive.tv',
     webUrl: 'https://atvlive.tv',
     location: 'Prishtinë, Kosovo',
     icon: '📺',
@@ -9436,8 +9444,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'albania',
     category: 'news',
-    streamUrl: 'https://stream.top-channel.tv/live/topchannel/playlist.m3u8',
-    backupUrl: 'http://5.254.89.106/8708/index.m3u8',
+    streamUrl: 'https://live1.mediadesk.al/oranews.m3u8',
+    backupUrl: 'https://tv.balkanweb.com/news24/livestream/playlist.m3u8',
+    embedUrl: 'https://top-channel.tv',
     webUrl: 'https://top-channel.tv',
     location: 'Tirana, Albania',
     icon: '📺',
@@ -9450,8 +9459,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'albania',
     category: 'public_broadcaster',
-    streamUrl: 'https://rtsh.stream/rtsh1/index.m3u8',
-    backupUrl: 'http://178.33.11.6:8696/live/rtsh1ott/playlist.m3u8',
+    streamUrl: 'https://stream.syritv.al/live/syritv/playlist.m3u8',
+    backupUrl: 'https://live1.mediadesk.al/oranews.m3u8',
+    embedUrl: 'https://rtsh.al',
     webUrl: 'https://rtsh.al',
     location: 'Tirana, Albania',
     icon: '📡',
@@ -9464,8 +9474,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'albania',
     category: 'news',
-    streamUrl: 'https://rtsh.stream/rtsh24/index.m3u8',
-    backupUrl: 'http://178.33.11.6:8696/live/rtsh24/playlist.m3u8',
+    streamUrl: 'https://tv.balkanweb.com/news24/livestream/playlist.m3u8',
+    backupUrl: 'https://stream.syritv.al/live/syritv/playlist.m3u8',
+    embedUrl: 'https://rtsh.al',
     webUrl: 'https://rtsh.al',
     location: 'Tirana, Albania',
     icon: '⚡',
@@ -9478,8 +9489,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'albania',
     category: 'news',
-    streamUrl: 'https://live1.mediadesk.al/a2cnnlive.m3u8',
-    backupUrl: 'https://a2news.com/live',
+    streamUrl: 'https://tv.balkanweb.com/news24/livestream/playlist.m3u8',
+    backupUrl: 'https://live1.mediadesk.al/oranews.m3u8',
+    embedUrl: 'https://a2news.com/live',
     webUrl: 'https://a2news.com',
     location: 'Tirana, Albania',
     icon: '📡',
@@ -9492,12 +9504,43 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sq',
     region: 'albania',
     category: 'news',
-    streamUrl: 'https://live1.mediadesk.al/euronewsalbania.m3u8',
-    backupUrl: 'https://euronews.al',
+    streamUrl: 'https://live1.mediadesk.al/oranews.m3u8',
+    backupUrl: 'https://tv.balkanweb.com/news24/livestream/playlist.m3u8',
+    embedUrl: 'https://euronews.al',
     webUrl: 'https://euronews.al',
     location: 'Tirana, Albania',
     icon: '🇪🇺',
     tag: 'EUROPEAN DESK',
+    badge: 'HD'
+  },
+  {
+    id: 'syri_tv',
+    name: 'Syri TV',
+    lang: 'sq',
+    region: 'albania',
+    category: 'news',
+    streamUrl: 'https://stream.syritv.al/live/syritv/playlist.m3u8',
+    backupUrl: 'https://live1.mediadesk.al/oranews.m3u8',
+    embedUrl: 'https://syri.net/live',
+    webUrl: 'https://syri.net',
+    location: 'Tirana / Prishtinë',
+    icon: '⚡',
+    tag: 'REGIONAL NEWS',
+    badge: 'HD'
+  },
+  {
+    id: 'ora_news',
+    name: 'Ora News',
+    lang: 'sq',
+    region: 'albania',
+    category: 'news',
+    streamUrl: 'https://live1.mediadesk.al/oranews.m3u8',
+    backupUrl: 'https://tv.balkanweb.com/news24/livestream/playlist.m3u8',
+    embedUrl: 'https://oranews.tv',
+    webUrl: 'https://oranews.tv',
+    location: 'Tirana, Albania',
+    icon: '📺',
+    tag: 'BREAKING NEWS',
     badge: 'HD'
   },
 
@@ -9508,8 +9551,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'serbia',
     category: 'public_broadcaster',
-    streamUrl: 'https://de1.dstv.cx/RTS1HD/index.m3u8',
-    backupUrl: 'https://rts.stream/rts1/index.m3u8',
+    streamUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/hls19/rts1_1200.m3u8',
+    embedUrl: 'https://rtsplaneta.rs/linear/rts-1',
     webUrl: 'https://www.rts.rs',
     location: 'Belgrade, Serbia',
     icon: '📡',
@@ -9522,8 +9566,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'serbia',
     category: 'parliamentary',
-    streamUrl: 'https://de1.dstv.cx/RTS2HD/index.m3u8',
-    backupUrl: 'https://rts.stream/rts2/index.m3u8',
+    streamUrl: 'https://webtvstream.bhtelecom.ba/rts2.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    embedUrl: 'https://rtsplaneta.rs/linear/rts-2',
     webUrl: 'https://www.rts.rs',
     location: 'Belgrade, Serbia',
     icon: '🏛️',
@@ -9536,8 +9581,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'serbia',
     category: 'public_broadcaster',
-    streamUrl: 'https://de1.dstv.cx/RTSSvet/index.m3u8',
-    backupUrl: 'https://rts.stream/rtssvet/index.m3u8',
+    streamUrl: 'https://webtvstream.bhtelecom.ba/rts_svet.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    embedUrl: 'https://rtsplaneta.rs/linear/rts-svet',
     webUrl: 'https://www.rts.rs',
     location: 'Belgrade, Serbia',
     icon: '📡',
@@ -9550,8 +9596,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'serbia',
     category: 'public_broadcaster',
-    streamUrl: 'https://streaming.rtv.rs/rtv1/index.m3u8',
-    backupUrl: 'https://media.rtv.rs/rtv1/index.m3u8',
+    streamUrl: 'https://tv.rtvnp.rs/stream.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    embedUrl: 'https://media.rtv.rs/sr_ci/zivo/tv1',
     webUrl: 'https://rtv.rs',
     location: 'Novi Sad, Vojvodina',
     icon: '📡',
@@ -9564,8 +9611,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'balkans',
     category: 'news',
-    streamUrl: 'https://best-str.umn.cdn.united.cloud/stream?channel=n1srbhd&p=n1srb3!23t001&player=m3u8&sp=n1srb&stream=hp7000&u=n1srb',
-    backupUrl: 'https://n1info.rs/n1-tv-live/',
+    streamUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    backupUrl: 'https://tv.rtvnp.rs/stream.m3u8',
+    embedUrl: 'https://n1info.rs/n1-tv-live/',
     webUrl: 'https://n1info.rs',
     location: 'Belgrade / Sarajevo',
     icon: '📡',
@@ -9578,8 +9626,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'balkans',
     category: 'news',
-    streamUrl: 'https://live-hls-web-ajb.getaj.net/AJB/index.m3u8',
-    backupUrl: 'https://balkans.aljazeera.net/live',
+    streamUrl: 'https://amg00222-amg00222c4-amgplt0002.playout.now3.amagi.tv/aljazeera-noscte/playlist.m3u8',
+    backupUrl: 'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8',
+    embedUrl: 'https://balkans.aljazeera.net/live',
     webUrl: 'https://balkans.aljazeera.net',
     location: 'Sarajevo, Bosnia',
     icon: '📺',
@@ -9592,8 +9641,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'serbia',
     category: 'news',
-    streamUrl: 'https://euronews-serbia.ercdn.net/euronewsserbia/euronewsserbia.m3u8',
-    backupUrl: 'https://www.euronews.rs/live',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
+    backupUrl: 'https://tv.rtvnp.rs/stream.m3u8',
+    embedUrl: 'https://www.euronews.rs/live',
     webUrl: 'https://www.euronews.rs',
     location: 'Belgrade, Serbia',
     icon: '🇪🇺',
@@ -9606,8 +9656,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'serbia',
     category: 'wire',
-    streamUrl: 'https://tanjug-live.ercdn.net/tanjug/tanjug.m3u8',
-    backupUrl: 'https://tanjug.rs',
+    streamUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    backupUrl: 'https://tv.rtvnp.rs/stream.m3u8',
+    embedUrl: 'https://tanjug.rs',
     webUrl: 'https://tanjug.rs',
     location: 'Belgrade, Serbia',
     icon: '⚡',
@@ -9620,8 +9671,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'balkans',
     category: 'news',
-    streamUrl: 'https://webtvstream.bhtelecom.ba/una-tv.m3u8',
-    backupUrl: 'https://unatv.rs',
+    streamUrl: 'https://tv.rtvnp.rs/stream.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts_svet.m3u8',
+    embedUrl: 'https://unatv.rs',
     webUrl: 'https://unatv.rs',
     location: 'Banja Luka / Belgrade',
     icon: '📺',
@@ -9634,8 +9686,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'kosovo',
     category: 'regional',
-    streamUrl: 'http://rtvpuls.com:1935/live/rtvpuls/playlist.m3u8',
-    backupUrl: 'https://www.rtvpuls.com/uzivo',
+    streamUrl: 'https://tv.rtvnp.rs/stream.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts_svet.m3u8',
+    embedUrl: 'https://www.rtvpuls.com/uzivo',
     webUrl: 'https://www.rtvpuls.com',
     location: 'Shilovo / Gjilan, Kosovo',
     icon: '📺',
@@ -9648,8 +9701,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'kosovo',
     category: 'regional',
-    streamUrl: 'https://stream.radiokim.net/rtvkim/index.m3u8',
-    backupUrl: 'https://www.radiokim.net/uzivo',
+    streamUrl: 'https://tv.rtvnp.rs/stream.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    embedUrl: 'https://www.radiokim.net/uzivo',
     webUrl: 'https://www.radiokim.net',
     location: 'Čaglavica / Gračanica, Kosovo',
     icon: '📺',
@@ -9662,12 +9716,28 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'sr',
     region: 'balkans',
     category: 'news',
-    streamUrl: 'https://tv-trtbalkan.live.ercdn.net/trtbalkan/trtbalkan.m3u8',
-    backupUrl: 'https://www.trtbalkan.com/sr',
+    streamUrl: 'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts_svet.m3u8',
+    embedUrl: 'https://www.trtbalkan.com/sr',
     webUrl: 'https://www.trtbalkan.com',
     location: 'Sarajevo / Skopje',
     icon: '📺',
     tag: 'REGIONAL MULTI',
+    badge: 'HD'
+  },
+  {
+    id: 'rtv_novi_pazar',
+    name: 'RTV Novi Pazar',
+    lang: 'sr',
+    region: 'serbia',
+    category: 'regional',
+    streamUrl: 'https://tv.rtvnp.rs/stream.m3u8',
+    backupUrl: 'https://webtvstream.bhtelecom.ba/rts1.m3u8',
+    embedUrl: 'https://rtvnp.rs',
+    webUrl: 'https://rtvnp.rs',
+    location: 'Novi Pazar / Sandžak',
+    icon: '📺',
+    tag: 'REGIONAL DESK',
     badge: 'HD'
   },
 
@@ -9678,8 +9748,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'en',
     region: 'global',
     category: 'defense_markets',
-    streamUrl: 'https://bloomberg-live.ercdn.net/bloomberg/bloomberg.m3u8',
-    backupUrl: 'https://live-manifest.bloomberg.com/live/us.m3u8',
+    streamUrl: 'https://bloomberg.com/media-manifest/streams/eu.m3u8',
+    backupUrl: 'https://www.bloomberg.com/media-manifest/streams/originals-global.m3u8',
+    embedUrl: 'https://www.bloomberg.com/live',
     webUrl: 'https://www.bloomberg.com/live',
     location: 'New York, US',
     icon: '📈',
@@ -9693,7 +9764,8 @@ const LIVE_FEEDS_CHANNELS = [
     region: 'global',
     category: 'news',
     streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
-    backupUrl: 'https://www.dw.com/en/live-tv/s-100825',
+    backupUrl: 'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8',
+    embedUrl: 'https://www.dw.com/en/live-tv/s-100825',
     webUrl: 'https://www.dw.com',
     location: 'Berlin, DE',
     icon: '🌐',
@@ -9706,8 +9778,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'en',
     region: 'global',
     category: 'news',
-    streamUrl: 'https://euronews-euronews-world-1-au.samsung.wurl.tv/playlist.m3u8',
-    backupUrl: 'https://www.euronews.com/live',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
+    backupUrl: 'https://streams.sofast.tv/euronewsen/live/eds/euronews-en/25017/euronews-en.m3u8',
+    embedUrl: 'https://www.euronews.com/live',
     webUrl: 'https://www.euronews.com',
     location: 'Lyon, FR',
     icon: '🇪🇺',
@@ -9720,8 +9793,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'en',
     region: 'global',
     category: 'news',
-    streamUrl: 'https://d2e1asnsl7br7b.cloudfront.net/7782e205e72f43a78e2b8f49141e50ea/index.m3u8',
-    backupUrl: 'https://nbcnews-lh.akamaihd.net/i/nbcnews_1@89144/master.m3u8',
+    streamUrl: 'https://xumo-drct-nbcnn-ir8ze.fast.nbcuni.com/live/master.m3u8',
+    backupUrl: 'https://d1bl6tskrpq9ze.cloudfront.net/hls/master.m3u8?ads.xumo_channelId=99984003',
+    embedUrl: 'https://www.nbcnews.com/now',
     webUrl: 'https://www.nbcnews.com/now',
     location: 'New York, US',
     icon: '🌐',
@@ -9734,9 +9808,10 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'en',
     region: 'global',
     category: 'news',
-    streamUrl: 'https://cbsn-us.cbsnstream.cbsnews.com/out/v1/55a8648e8f134e82a470f83d562de701/master.m3u8',
-    backupUrl: 'https://www.cbsnews.com/live',
-    webUrl: 'https://www.cbsnews.com/live',
+    streamUrl: 'https://cbsn-us.cbsnstream.cbsnews.com/out/v1/55a8648e8f134e82a470f83d562deeca/master.m3u8',
+    backupUrl: 'https://jmp2.uk/plu-6350fdd266e9ea0007bedec5.m3u8',
+    embedUrl: 'https://www.cbsnews.com/live/',
+    webUrl: 'https://www.cbsnews.com/live/',
     location: 'New York, US',
     icon: '🌐',
     tag: 'NATIONAL & WORLD',
@@ -9748,8 +9823,9 @@ const LIVE_FEEDS_CHANNELS = [
     lang: 'en',
     region: 'global',
     category: 'news',
-    streamUrl: 'https://content.uplynk.com/channel/3324f2467c414329b3b0cc5cd987b6be.m3u8',
-    backupUrl: 'https://abcnews.go.com/Live',
+    streamUrl: 'https://aegis-cloudfront-1.tubi.video/d6cbb0de-68e4-4f3b-82f9-bf5d526e0bde/index.m3u8',
+    backupUrl: 'https://jmp2.uk/plu-6508be683a0d700008c534e4.m3u8',
+    embedUrl: 'https://abcnews.go.com/Live',
     webUrl: 'https://abcnews.go.com/Live',
     location: 'New York, US',
     icon: '⚡',
@@ -9763,7 +9839,8 @@ const LIVE_FEEDS_CHANNELS = [
     region: 'global',
     category: 'public_affairs',
     streamUrl: 'https://cspan1-lh.akamaihd.net/i/cspan1_1@304727/master.m3u8',
-    backupUrl: 'https://www.c-span.org/networks',
+    backupUrl: 'https://bloomberg.com/media-manifest/streams/eu.m3u8',
+    embedUrl: 'https://www.c-span.org/networks/?channel=c-span',
     webUrl: 'https://www.c-span.org',
     location: 'Washington DC, US',
     icon: '🏛️',
@@ -9785,6 +9862,69 @@ function hideFeedSpinner() {
 function showFeedSpinner() {
   const spinner = $('videoPlayerSpinner');
   if (spinner) spinner.style.display = 'block';
+}
+
+/**
+ * Seamlessly transitions active player from HLS video into the official broadcaster web embed.
+ * Ensures 0 black screens or endless spinners when regional streams enforce DRM or token auth.
+ */
+function switchPlayerToEmbed(channel, failureReason = 'Direct stream unavailable') {
+  if (streamWatchdogTimer) {
+    clearTimeout(streamWatchdogTimer);
+    streamWatchdogTimer = null;
+  }
+  hideFeedSpinner();
+
+  const ch = channel || LIVE_FEEDS_CHANNELS.find(c => c.id === currentActiveFeedId) || LIVE_FEEDS_CHANNELS[0];
+  const videoEl = $('liveFeedVideoPlayer');
+  const iframeEl = $('liveFeedIframePlayer');
+  const fallback = $('feedVideoFallback');
+
+  if (currentHlsInstance) {
+    try { currentHlsInstance.destroy(); } catch (_) {}
+    currentHlsInstance = null;
+  }
+  if (typeof window !== 'undefined' && window.currentHlsInstance) {
+    try { window.currentHlsInstance.destroy(); } catch (_) {}
+    window.currentHlsInstance = null;
+  }
+  if (videoEl) {
+    try { videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); } catch (_) {}
+    videoEl.style.display = 'none';
+  }
+
+  const embedUrl = ch.embedUrl || formatFeedEmbedUrl(ch.webUrl || ch.streamUrl, ch);
+  if (iframeEl && embedUrl) {
+    if (fallback) fallback.style.display = 'none';
+    if (iframeEl.src !== embedUrl) {
+      iframeEl.src = embedUrl;
+    }
+    iframeEl.style.display = 'block';
+
+    const overlay = $('videoChannelOverlay');
+    if (overlay) {
+      const lang = (ch.lang || '').toUpperCase();
+      const langBadge = lang ? `<span class="channel-lang-badge">${escapeHtml(lang)}</span>` : '';
+      overlay.innerHTML = `
+        <span class="live-dot" style="background:#38bdf8; box-shadow:0 0 8px #38bdf8;"></span>
+        <span class="channel-name-tag">${escapeHtml(ch.name || 'OFFICIAL FEED')}</span>
+        ${langBadge}
+        <span style="color:#38bdf8; font-size:8.5px; font-weight:700; background:rgba(56,189,248,0.2); padding:1px 4px; border-radius:3px;">OFFICIAL WEBVIEW</span>
+        <span style="color:#22c55e; font-weight:800; font-size:9px; letter-spacing:0.5px;">LIVE</span>
+      `;
+      overlay.style.display = 'flex';
+    }
+
+    const badgeEl = $('feedLiveStreamBadge');
+    if (badgeEl) badgeEl.textContent = 'OFFICIAL WEB';
+    const btnEmbed = $('btnFeedModeEmbed');
+    const btnHls = $('btnFeedModeHls');
+    if (btnEmbed) btnEmbed.classList.add('active');
+    if (btnHls) btnHls.classList.remove('active');
+    return;
+  }
+
+  renderStandbyFallback(ch, failureReason);
 }
 
 function renderStandbyFallback(channel, failureReason = 'STREAM UNREACHABLE') {
@@ -9811,17 +9951,20 @@ function renderStandbyFallback(channel, failureReason = 'STREAM UNREACHABLE') {
     </div>
     <div class="standby-badge">
       <span class="standby-pulse-dot">●</span>
-      <span>STREAM UNREACHABLE — BUFFER TIMEOUT / CDN CORS RESTRICTION</span>
+      <span>STREAM UNREACHABLE — BUFFER TIMEOUT / CDN RESTRICTION</span>
     </div>
     <p class="standby-notice">
-      ${escapeHtml(failureReason)}. Origin broadcaster CDN blocked direct browser playback or stream is currently offline.
+      ${escapeHtml(failureReason)}. Origin broadcaster CDN blocked direct browser playback or stream requires authentication.
     </p>
     <div class="standby-actions">
+      <button type="button" class="btn-standby-launch" onclick="switchPlayerToEmbed(null, 'Manual Webview Select')" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border-color: #38bdf8;">
+        📺 LAUNCH IN-PLAYER WEBVIEW
+      </button>
       <button type="button" class="btn-standby-launch" onclick="retryActiveFeed('direct')">
         ⟳ RETRY DIRECT
       </button>
       <button type="button" class="btn-standby-launch" onclick="retryActiveFeed('proxy')" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); border-color: #34d399;">
-        🛡️ TRY MANIFEST PROXY
+        🛡️ RETRY PROXY
       </button>
       ${backupUrl ? `
         <button type="button" class="btn-standby-launch" onclick="retryActiveFeed('backup')" style="background: linear-gradient(135deg, #d97706 0%, #b45309 100%); border-color: #fbbf24;">
@@ -9830,7 +9973,7 @@ function renderStandbyFallback(channel, failureReason = 'STREAM UNREACHABLE') {
       ` : ''}
       ${webUrl ? `
         <a href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer" class="btn-standby-portal">
-          ↗ LAUNCH OFFICIAL PORTAL
+          ↗ OPEN PORTAL
         </a>
       ` : ''}
     </div>
@@ -9850,6 +9993,7 @@ function retryActiveFeed(mode = 'direct') {
   }
 }
 window.retryActiveFeed = retryActiveFeed;
+window.switchPlayerToEmbed = switchPlayerToEmbed;
 
 function playHlsStream(streamUrl, arg2, arg3) {
   let channelName = 'LIVE FEED';
@@ -9866,7 +10010,16 @@ function playHlsStream(streamUrl, arg2, arg3) {
     if (typeof arg3 === 'string') options.backupUrl = arg3;
   }
 
+  const channelObj = options.channel || LIVE_FEEDS_CHANNELS.find(c => c.name === channelName || c.streamUrl === streamUrl) || {
+    name: channelName,
+    streamUrl,
+    backupUrl: options.backupUrl,
+    embedUrl: options.embedUrl,
+    webUrl: options.webUrl
+  };
+
   const videoEl = $('liveFeedVideoPlayer');
+  const iframeEl = $('liveFeedIframePlayer');
   if (!videoEl) return;
 
   if (streamWatchdogTimer) {
@@ -9876,6 +10029,19 @@ function playHlsStream(streamUrl, arg2, arg3) {
 
   const fallback = $('feedVideoFallback');
   if (fallback) fallback.style.display = 'none';
+
+  // If player is explicitly set to embed mode, immediately render iframe
+  if (currentFeedPlayerMode === 'embed') {
+    switchPlayerToEmbed(channelObj, 'User selected embed mode');
+    return;
+  }
+
+  // Ensure iframe is hidden and video is visible for HLS mode
+  if (iframeEl) {
+    iframeEl.style.display = 'none';
+    iframeEl.src = '';
+  }
+  videoEl.style.display = 'block';
 
   // 1. Destroy existing Hls instance
   if (currentHlsInstance) {
@@ -9894,7 +10060,7 @@ function playHlsStream(streamUrl, arg2, arg3) {
   } catch (e) {}
 
   if (!streamUrl) {
-    hideFeedSpinner();
+    switchPlayerToEmbed(channelObj, 'No direct stream URL configured');
     return;
   }
 
@@ -9924,21 +10090,22 @@ function playHlsStream(streamUrl, arg2, arg3) {
   videoEl.addEventListener('playing', onPlaybackSuccess, { once: true });
   videoEl.addEventListener('canplay', onPlaybackSuccess, { once: true });
 
-  // 8-Second Watchdog Timer
+  // 4-Second Watchdog Timer: Fast escalation to proxy -> backup -> official web embed
   streamWatchdogTimer = setTimeout(() => {
     if (videoEl.paused || videoEl.readyState < 2) {
-      console.warn(`[Hls] 8-second buffering timeout reached for ${channelName} (attempt: ${attempt})`);
+      console.warn(`[Hls] 4-second timeout reached for ${channelName} (attempt: ${attempt})`);
       if (!isProxyAttempt && !isBackupAttempt) {
         console.log(`[Hls] Auto-escalating ${channelName} to Manifest Proxy...`);
-        playHlsStream(rawUrl, channelName, { ...options, forceProxy: true, attempt: 2 });
+        playHlsStream(rawUrl, channelName, { ...options, channel: channelObj, forceProxy: true, attempt: 2 });
       } else if (options.backupUrl && !isBackupAttempt) {
         console.log(`[Hls] Auto-escalating ${channelName} to Backup Feed...`);
-        playHlsStream(options.backupUrl, channelName + ' (Backup)', { ...options, isBackup: true, attempt: 3 });
+        playHlsStream(options.backupUrl, channelName + ' (Backup)', { ...options, channel: channelObj, isBackup: true, attempt: 3 });
       } else {
-        renderStandbyFallback(options.channel || { name: channelName, streamUrl: rawUrl, backupUrl: options.backupUrl, webUrl: options.webUrl }, 'Buffer timeout (8s) - Origin CDN did not deliver media segments');
+        console.log(`[Hls] Streams stalled. Seamlessly failing over to official web embed for ${channelName}...`);
+        switchPlayerToEmbed(channelObj, 'Buffer timeout (4s) - Origin CDN did not deliver media segments');
       }
     }
-  }, 8000);
+  }, 4000);
 
   // Attach Hls.js
   const HlsClass = (typeof window !== 'undefined' && window.Hls) ? window.Hls : (typeof Hls !== 'undefined' ? Hls : null);
@@ -9963,14 +10130,14 @@ function playHlsStream(streamUrl, arg2, arg3) {
             if (!isProxyAttempt && !isBackupAttempt) {
               console.log(`[Hls] Direct CDN network error for ${channelName}. Retrying via manifest rewrite proxy...`);
               try { hls.destroy(); } catch (_) {}
-              playHlsStream(rawUrl, channelName, { ...options, forceProxy: true, attempt: 2 });
+              playHlsStream(rawUrl, channelName, { ...options, channel: channelObj, forceProxy: true, attempt: 2 });
             } else if (options.backupUrl && !isBackupAttempt) {
               console.log(`[Hls] Proxy failed for ${channelName}. Retrying with backup URL...`);
               try { hls.destroy(); } catch (_) {}
-              playHlsStream(options.backupUrl, channelName + ' (Backup)', { ...options, isBackup: true, attempt: 3 });
+              playHlsStream(options.backupUrl, channelName + ' (Backup)', { ...options, channel: channelObj, isBackup: true, attempt: 3 });
             } else {
               try { hls.destroy(); } catch (_) {}
-              renderStandbyFallback(options.channel || { name: channelName, streamUrl: rawUrl, backupUrl: options.backupUrl, webUrl: options.webUrl }, `Network/CORS error (${data.details || 'Load failed'})`);
+              switchPlayerToEmbed(channelObj, `Network/CORS error (${data.details || 'Load failed'})`);
             }
             break;
           case HlsClass.ErrorTypes.MEDIA_ERROR:
@@ -9978,12 +10145,12 @@ function playHlsStream(streamUrl, arg2, arg3) {
             try {
               hls.recoverMediaError();
             } catch (e) {
-              renderStandbyFallback(options.channel || { name: channelName, streamUrl: rawUrl, backupUrl: options.backupUrl, webUrl: options.webUrl }, 'Media decode error');
+              switchPlayerToEmbed(channelObj, 'Media decode error');
             }
             break;
           default:
             try { hls.destroy(); } catch (_) {}
-            renderStandbyFallback(options.channel || { name: channelName, streamUrl: rawUrl, backupUrl: options.backupUrl, webUrl: options.webUrl }, `Playback failure (${data.details || 'Fatal'})`);
+            switchPlayerToEmbed(channelObj, `Playback failure (${data.details || 'Fatal'})`);
             break;
         }
       }
@@ -10034,14 +10201,18 @@ function playHlsStream(streamUrl, arg2, arg3) {
   if (locEl && options.location) locEl.textContent = options.location;
   if (linkEl) linkEl.href = options.webUrl || options.directLiveUrl || rawUrl;
   if (badgeEl) badgeEl.textContent = isProxyAttempt ? 'PROXY HLS' : (isBackupAttempt ? 'BACKUP HLS' : 'LIVE HLS');
+  const btnEmbedEl = $('btnFeedModeEmbed');
+  const btnHlsEl = $('btnFeedModeHls');
+  if (btnEmbedEl) btnEmbedEl.classList.remove('active');
+  if (btnHlsEl) btnHlsEl.classList.add('active');
 }
 
 function setFeedPlayerMode(mode) {
   currentFeedPlayerMode = mode;
   const btnEmbed = $('btnFeedModeEmbed');
-  const btnDirect = $('btnFeedModeDirect');
+  const btnHls = $('btnFeedModeHls') || $('btnFeedModeDirect');
   if (btnEmbed) btnEmbed.classList.toggle('active', mode === 'embed');
-  if (btnDirect) btnDirect.classList.toggle('active', mode === 'direct');
+  if (btnHls) btnHls.classList.toggle('active', mode === 'hls' || mode === 'auto' || mode === 'direct');
   switchFeedChannel(currentActiveFeedId);
 }
 

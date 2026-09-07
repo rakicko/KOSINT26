@@ -692,9 +692,9 @@
                       </div>
                     </div>
                     <div class="feed-player-badges">
-                      <div class="feed-mode-toggle" id="feedModeToggle" title="Toggle between embedded iframe and direct launch mode" style="display:none;">
-                        <button type="button" class="feed-mode-btn active" id="btnFeedModeEmbed" onclick="setFeedPlayerMode('embed')">EMBED</button>
-                        <button type="button" class="feed-mode-btn" id="btnFeedModeDirect" onclick="setFeedPlayerMode('direct')">DIRECT / POP</button>
+                      <div class="feed-mode-toggle" id="feedModeToggle" title="Toggle between HLS Stream and Official Broadcaster Webview">
+                        <button type="button" class="feed-mode-btn active" id="btnFeedModeHls" onclick="setFeedPlayerMode('hls')">HLS STREAM</button>
+                        <button type="button" class="feed-mode-btn" id="btnFeedModeEmbed" onclick="setFeedPlayerMode('embed')">OFFICIAL WEBVIEW</button>
                       </div>
                       <span class="badge-live-stream" id="feedLiveStreamBadge">LIVE HLS</span>
                       <a id="feedExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="feed-ext-btn"
@@ -704,6 +704,7 @@
                   <div class="feed-video-wrap" id="liveFeedVideoFrame">
                     <div class="tactical-video-wrapper">
                       <video id="liveFeedVideoPlayer" class="tactical-video-player" controls autoplay muted playsinline></video>
+                      <iframe id="liveFeedIframePlayer" class="tactical-iframe-player" style="display:none;" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
                       <div id="videoChannelOverlay" class="video-channel-overlay"></div>
                       <div id="videoPlayerSpinner" class="video-player-spinner" style="display:none;"></div>
                     </div>
