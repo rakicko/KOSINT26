@@ -199,6 +199,28 @@ console.log('=== Civil Unrest & Public Gatherings (Hague Verdict 16 Sept 2026) T
 
   console.log('✓ Verified opened marker styling, elimination of white popup background/tip, and tactical close button.');
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Test 6: Popup Close Button HTML Structural Isolation
+  // ─────────────────────────────────────────────────────────────────────────────
+  console.log('--- Test 6: Popup Close Button HTML Structural Isolation ---');
+
+  const popupCode = fs.readFileSync(path.join(__dirname, '..', 'public', 'civil-unrest-map.js'), 'utf8');
+  assert.ok(popupCode.includes('class="civil-popup-close-btn"'), 'civil-popup-close-btn must be present in civil-unrest-map.js HTML template');
+
+  const sampleProps = geojson.features[0].properties;
+  const mockFeatureGeoJson = geojson.features[0];
+  const builtHtml = moduleApi.buildPopupHtml ? moduleApi.buildPopupHtml(sampleProps) : '';
+  
+  if (builtHtml) {
+    assert.ok(builtHtml.includes('<button type="button" class="civil-popup-close-btn"'), 'Close button element must exist in popup HTML');
+    const badgeIndex = builtHtml.indexOf('class="civil-badge');
+    const badgeEndIndex = builtHtml.indexOf('</span>', badgeIndex);
+    const btnIndex = builtHtml.indexOf('class="civil-popup-close-btn"');
+    assert.ok(btnIndex < badgeIndex || btnIndex > badgeEndIndex, 'Close button must NOT be nested inside civil-badge container');
+  }
+
+  console.log('✓ Verified close button is isolated at the top-level of the popup card template.');
+
   console.log('\n=== ALL CIVIL UNREST MODULE TESTS PASSED ===');
 })().catch(err => {
   console.error('Test Suite Failed:', err);

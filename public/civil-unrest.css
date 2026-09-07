@@ -266,7 +266,8 @@
 .leaflet-popup-close-button,
 .civil-unrest-leaflet-popup .leaflet-popup-close-button,
 .civil-unrest-maplibre-popup .maplibregl-popup-close-button,
-.civil-unrest-maplibre-popup .mapboxgl-popup-close-button {
+.civil-unrest-maplibre-popup .mapboxgl-popup-close-button,
+.civil-popup-close-btn {
   position: absolute !important;
   top: 12px !important;
   right: 12px !important;
@@ -299,7 +300,8 @@
 .leaflet-popup-close-button:hover,
 .civil-unrest-leaflet-popup .leaflet-popup-close-button:hover,
 .civil-unrest-maplibre-popup .maplibregl-popup-close-button:hover,
-.civil-unrest-maplibre-popup .mapboxgl-popup-close-button:hover {
+.civil-unrest-maplibre-popup .mapboxgl-popup-close-button:hover,
+.civil-popup-close-btn:hover {
   background: rgba(239, 68, 68, 0.8) !important;
   border-color: rgba(239, 68, 68, 0.7) !important;
   color: #ffffff !important;

@@ -472,6 +472,7 @@ function buildPopupHtml(properties) {
 
   return `
     <div class="civil-popup-card status-${properties.category}" id="popup-${properties.id}">
+      <button type="button" class="civil-popup-close-btn" onclick="if (window.CivilUnrestMap && typeof window.CivilUnrestMap.closeActivePopup === 'function') window.CivilUnrestMap.closeActivePopup();" title="Close popup">✕</button>
       <div class="civil-popup-header">
         <div class="civil-popup-tags">
           <span class="civil-badge ${badgeClass}">
@@ -538,6 +539,28 @@ function buildPopupHtml(properties) {
   `;
 }
 
+function closeActivePopup() {
+  if (state.activePopup) {
+    try {
+      if (typeof state.activePopup.remove === 'function') {
+        state.activePopup.remove();
+      } else if (state.map && typeof state.map.closePopup === 'function') {
+        state.map.closePopup(state.activePopup);
+      }
+    } catch (e) {}
+    state.activePopup = null;
+  }
+  if (state.popupIntervalId) {
+    clearInterval(state.popupIntervalId);
+    state.popupIntervalId = null;
+  }
+  state.markers.forEach(m => {
+    if (m.element) {
+      m.element.classList.remove('active');
+    }
+  });
+}
+
 /**
  * Smoothly centers and zooms the map onto the target gathering
  */
@@ -593,14 +616,7 @@ function openMarkerPopup(markerObj) {
     state.popupIntervalId = null;
   }
 
-  if (state.activePopup) {
-    if (typeof state.activePopup.remove === 'function') {
-      state.activePopup.remove();
-    } else if (typeof state.map?.closePopup === 'function') {
-      state.map.closePopup(state.activePopup);
-    }
-    state.activePopup = null;
-  }
+  closeActivePopup();
 
   // Update active marker styling
   state.selectedId = p.id;
@@ -617,7 +633,7 @@ function openMarkerPopup(markerObj) {
     const categoryClass = `status-${p.category}`;
     const popup = new maplibreglLib.Popup({
       offset: 16,
-      closeButton: true,
+      closeButton: false,
       closeOnClick: true,
       className: `civil-unrest-maplibre-popup ${categoryClass}`
     })
@@ -629,23 +645,12 @@ function openMarkerPopup(markerObj) {
 
     if (typeof popup.on === 'function') {
       popup.on('close', () => {
-        if (state.activePopup === popup) {
-          state.activePopup = null;
-        }
-        if (state.popupIntervalId) {
-          clearInterval(state.popupIntervalId);
-          state.popupIntervalId = null;
-        }
-        state.markers.forEach(m => {
-          if (m.element) {
-            m.element.classList.remove('active');
-          }
-        });
+        closeActivePopup();
       });
     }
   } else if (marker && typeof marker.bindPopup === 'function') {
     // Leaflet marker
-    marker.bindPopup(html, { className: 'civil-unrest-leaflet-popup', offset: [0, -10] }).openPopup();
+    marker.bindPopup(html, { className: 'civil-unrest-leaflet-popup', offset: [0, -10], closeButton: false }).openPopup();
     state.activePopup = marker.getPopup();
   } else if (typeof window !== 'undefined' && typeof window.openMapPopup === 'function') {
     // KOSINT global popup helper
@@ -1086,6 +1091,8 @@ const CivilUnrestMapModule = {
   setFilter,
   setSearch,
   clearSearch,
+  buildPopupHtml,
+  closeActivePopup,
   getGeoJSON: () => state.geoJsonData,
   getState: () => state
 };
@@ -1112,6 +1119,8 @@ export {
   setFilter,
   setSearch,
   clearSearch,
+  buildPopupHtml,
+  closeActivePopup,
   EMBEDDED_CIVIL_UNREST_GEOJSON
 };
 
