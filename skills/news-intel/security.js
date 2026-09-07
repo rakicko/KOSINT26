@@ -6,6 +6,13 @@ const SPORTS_ENTERTAINMENT_BLACKLIST = /\b(fudbal|utakmic[ae]|lig[ae]|gol|golov[
 
 const POLITICAL_KEYWORDS_REGEX = /\b(skupština|skupstina|kuvend|kuvendi|kuvendit|sednica|sednice|seancë|seance|seanca|seancës|vlada|vlade|vladi|qeveri|qeveria|qeverisë|qeverise|ministar|ministra|ministri|ministër|minister|ministrit|izbori|izborima|zgjedhje|zgjedhjet|zgjedhjeve|dijalog|dijaloga|dialogu|dialog|ambasada|ambasade|ambasadë|ambasada|ambasadës|sporazum|sporazuma|marrëveshje|marreveshje|marrëveshja|parlament|parlamenti)\b/i;
 
+const WELFARE_GIVEAWAY_NOISE_REGEX = /\b(6\.?000\s*(?:dinara|rsd)|u\s*ponoć\s*počin|u\s*ponoc\s*pocin|novčan[ae]\s*pomoć|novcan[ae]\s*pomoc|prijava\s*za\s*(?:novčanu\s*|novcanu\s*)?pomoć|prijava\s*za\s*(?:novčanu\s*|novcanu\s*)?pomoc|pomoć\s*države|pomoc\s*drzave|pomoć\s*mladima|pomoc\s*mladima|pomoć\s*penzionerima|pomoc\s*penzionerima|isplata\s*penzij|povećanje\s*penzij|povecanje\s*penzij|nagradn[ae]\s*igr[ae]|uzmi\s*račun|uzmi\s*racun|vaučer[ie]?|vaucer[ie]?|lutrij[ae]|loto|ndihm[aë]\s*financiare|loj[ëe]\s*shpërblyese|pensionet)\b/i;
+
+function isWelfareOrGiveawayNoise(title = '', description = '') {
+  const text = `${title} ${description}`.trim();
+  return WELFARE_GIVEAWAY_NOISE_REGEX.test(text);
+}
+
 function isSportsOrEntertainment(title = '', description = '', signals = null) {
   const text = `${title} ${description}`.trim();
   if (!SPORTS_ENTERTAINMENT_BLACKLIST.test(text)) return false;
@@ -48,15 +55,15 @@ function calculateSecurityScore(signals, title = '', description = '', published
   const fullText = `${title} ${description}`.trim();
   const titleNorm = normalizeMultilingualText(title).transliteratedText;
 
-  // 0. Hard Sports & Entertainment Blacklist
-  if (isSportsOrEntertainment(title, description, signals)) {
+  // 0. Hard Sports, Entertainment & Welfare/Giveaway Blacklist
+  if (isSportsOrEntertainment(title, description, signals) || isWelfareOrGiveawayNoise(title, description)) {
     return {
       intensityScore: 1,
       severity: 'low',
       category: 'other',
       eventType: 'commentary',
       confidence: 0.10,
-      tags: ['sports_entertainment_excluded'],
+      tags: ['noise_excluded'],
       isSecurityRelevant: false
     };
   }
@@ -246,10 +253,301 @@ function calculateSecurityScore(signals, title = '', description = '', published
   };
 }
 
+const NORTH_KOSOVO_LOCATIONS_REGEX = /\b(sever\s*kosov|veri\s*(?:u|t[eë]|it)?\s*(?:i|e)?\s*kosov|north\s*kosovo|severn[aoj]\s*mitrovic|mitrovic|zve[cč]|leposav|zubin\s*potok|banjsk|gazivod|ujman|ib[ae]r)/i;
+
+const PRIORITY_CHECKPOINT_REGEX = /\b(jarinj|b[eë]rnjak|brnjak|merdar|dheu\s*i\s*bardh|bela\s*zemlj|mutivod|mu[cč]ibab|hani\s*i\s*elezit|gllobo[cč]i[cç]|stan[cč]i[cç]|kull[eë]|v[eë]rmi[cç]|checkpoint|punkt|vendkalim|prelaz|gate\s*(?:1|31))/i;
+
+/**
+ * World Monitor dynamic threat & time-decay news ranking:
+ *
+ * 1. Base severity score: critical = 4000, high = 3000, medium = 2000, low = 1000
+ * 2. Context boost: +500 if location is North Kosovo or priority checkpoint
+ * 3. Time decay penalty: -50 points per elapsed hour from item.pubDate
+ *
+ * @param {object} item - News article or clustered event item
+ * @param {number|Date} [referenceTime=Date.now()] - Reference timestamp for elapsed hour calculation
+ * @returns {number} Effective ranking score
+ */
+function calculateEffectiveRank(item, referenceTime = Date.now()) {
+  if (!item || typeof item !== 'object') return 0;
+
+  // 1. Base severity score: critical = 4000, high = 3000, medium = 2000, low = 1000
+  const SEVERITY_BASE = {
+    critical: 4000,
+    high: 3000,
+    medium: 2000,
+    low: 1000
+  };
+
+  const sev = String(item.severity || '').toLowerCase().trim();
+  let baseScore = SEVERITY_BASE[sev];
+  if (baseScore === undefined) {
+    const intensity = Number(item.intensityScore) || 0;
+    if (intensity >= 9) baseScore = 4000;
+    else if (intensity >= 7) baseScore = 3000;
+    else if (intensity >= 4) baseScore = 2000;
+    else baseScore = 1000;
+  }
+
+  // 2. Context boost: +500 if location is North Kosovo or priority checkpoint
+  const isNorthOrCheckpoint = isNorthKosovoOrCheckpoint(item);
+  const contextBoost = isNorthOrCheckpoint ? 500 : 0;
+
+  // 3. Time decay penalty: -50 points per elapsed hour from item.pubDate
+  const rawDate = item.pubDate || item.publishedAt || item.published || item.timestamp || item.date || item.lastUpdated;
+  let elapsedHours = 0;
+  if (rawDate) {
+    const pubTime = new Date(rawDate).getTime();
+    const refTime = typeof referenceTime === 'number' ? referenceTime : new Date(referenceTime).getTime();
+    if (!isNaN(pubTime) && !isNaN(refTime)) {
+      const elapsedMs = Math.max(0, refTime - pubTime);
+      elapsedHours = elapsedMs / (3600 * 1000);
+    }
+  }
+
+  const timeDecayPenalty = elapsedHours * 50;
+
+  const finalRank = Math.round((baseScore + contextBoost - timeDecayPenalty) * 100) / 100;
+  return finalRank;
+}
+
+/**
+ * Checks whether an item is located in North Kosovo or at a priority border checkpoint
+ */
+function isNorthKosovoOrCheckpoint(item) {
+  if (!item || typeof item !== 'object') return false;
+
+  // Direct flag
+  if (item.isNorth === true) return true;
+
+  // Check signals / entities if present
+  const signalsLocs = (item._signals && item._signals.locations) ||
+                      (item.signals && item.signals.locations) ||
+                      (item.multilingualEntities && item.multilingualEntities.locations) ||
+                      (Array.isArray(item.locations) ? item.locations : []);
+
+  if (Array.isArray(signalsLocs) && signalsLocs.length > 0) {
+    for (const loc of signalsLocs) {
+      if (!loc) continue;
+      if (loc.isNorth) return true;
+      const lid = String(loc.id || '').toLowerCase();
+      const lname = String(loc.name || '').toLowerCase();
+      if (lid.includes('jarinje') || lid.includes('brnjak') || lid.includes('bridge') || lid.includes('merdare') ||
+          lname.includes('jarinje') || lname.includes('brnjak') || lname.includes('bridge') || lname.includes('merdare')) {
+        return true;
+      }
+    }
+  }
+
+  // Check tags
+  if (Array.isArray(item.tags)) {
+    for (const tag of item.tags) {
+      const t = String(tag).toLowerCase();
+      if (t === 'north_kosovo' || t === 'ibar_bridge' || t === 'checkpoint' || t.includes('jarinje') || t.includes('brnjak') || t.includes('merdare')) {
+        return true;
+      }
+    }
+  }
+
+  // Check location string / title / description
+  const locText = typeof item.location === 'string' ? item.location : (item.location?.name || '');
+  const searchTarget = `${locText} ${item.title || ''} ${item.description || ''}`.trim();
+
+  if (NORTH_KOSOVO_LOCATIONS_REGEX.test(searchTarget) || PRIORITY_CHECKPOINT_REGEX.test(searchTarget)) {
+    // Guard against KEK / Obiliq / Kastriot false positive North detection
+    const fullText = `${item.title || ''} ${item.description || ''} ${typeof item.location === 'string' ? item.location : ''}`.trim();
+    if (/\b(kek|obiliq|kastriot)\b/i.test(fullText) && !/\b(mitrovic|zve[cč]|leposav|zubin|jarinj|brnjak|banjsk)\b/i.test(fullText)) {
+      return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * World Monitor-Inspired Regional Tension Index (RTI)
+ * Analogous to Country Instability Index (CII)
+ *
+ * Deterministic calculation across a rolling 24-hour window:
+ * - Filter items within rolling 24h of referenceTime (default Date.now())
+ * - Weighted scores:
+ *   - critical incident: 2.5 pts
+ *   - high incident:     1.5 pts
+ *   - medium incident:   0.8 pts
+ *   - low incident:      0.3 pts
+ * - Context multiplier: x 1.4 if North Kosovo or priority checkpoints
+ * - Trend: Compare last 12 hours vs prior 12 hours (12h-24h). Movement: RISING (↑), STABLE (→), FALLING (↓)
+ * - Normalized strict scale: 1.0 to 10.0 (clamped, default baseline = 1.5)
+ * - DEFCON / Status levels:
+ *   - 1.0 - 3.4: LOW / NORMAL
+ *   - 3.5 - 5.9: MODERATE / GUARDED
+ *   - 6.0 - 7.9: ELEVATED / HIGH ALERT
+ *   - 8.0 - 10.0: CRITICAL / ACTIVE CONFLICT
+ *
+ * @param {Array<object>} newsItems - List of clustered or raw intelligence items
+ * @param {number|Date|string} [referenceTime=Date.now()] - Point in time to compute 24h rolling index
+ * @returns {object} { score: number, level: string, trend: 'RISING'|'STABLE'|'FALLING', delta24h: number, incidentCount24h: number }
+ */
+function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
+  const refTime = referenceTime ? new Date(referenceTime).getTime() : Date.now();
+  const validRefTime = isNaN(refTime) ? Date.now() : refTime;
+
+  const SEVERITY_WEIGHTS = {
+    critical: 2.5,
+    high: 1.5,
+    medium: 0.8,
+    low: 0.3
+  };
+
+  const BASELINE_SCORE = 1.5;
+  const WINDOW_24H_MS = 24 * 3600 * 1000;
+  const WINDOW_12H_MS = 12 * 3600 * 1000;
+
+  if (!Array.isArray(newsItems) || newsItems.length === 0) {
+    return {
+      score: BASELINE_SCORE,
+      level: 'LOW / NORMAL',
+      trend: 'STABLE',
+      delta24h: 0,
+      incidentCount24h: 0,
+      breakdown: {
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        northKosovo: 0,
+        recent12hCount: 0,
+        prior12hCount: 0
+      },
+      generatedAt: new Date(validRefTime).toISOString()
+    };
+  }
+
+  let recentScore = 0;
+  let priorScore = 0;
+  let recent12hCount = 0;
+  let prior12hCount = 0;
+
+  let countCritical = 0;
+  let countHigh = 0;
+  let countMedium = 0;
+  let countLow = 0;
+  let countNorth = 0;
+
+  for (const item of newsItems) {
+    if (!item || typeof item !== 'object') continue;
+    if (item.category === 'other') continue; // Exclude non-security / sports
+
+    const rawDate = item.pubDate || item.publishedAt || item.published || item.timestamp || item.date || item.lastUpdated;
+    let elapsedMs = 0;
+    if (rawDate) {
+      const pubTime = new Date(rawDate).getTime();
+      if (!isNaN(pubTime)) {
+        elapsedMs = validRefTime - pubTime;
+      }
+    }
+
+    // Rolling 24-hour window filter (allow up to 10 min clock skew)
+    if (elapsedMs < -600000 || elapsedMs > WINDOW_24H_MS) {
+      continue;
+    }
+
+    // Determine incident severity
+    const sev = String(item.severity || '').toLowerCase().trim();
+    let weight = SEVERITY_WEIGHTS[sev];
+    if (weight === undefined) {
+      const intensity = Number(item.intensityScore) || 0;
+      if (intensity >= 9) weight = SEVERITY_WEIGHTS.critical;
+      else if (intensity >= 7) weight = SEVERITY_WEIGHTS.high;
+      else if (intensity >= 4) weight = SEVERITY_WEIGHTS.medium;
+      else weight = SEVERITY_WEIGHTS.low;
+    }
+
+    // Context multiplier: x 1.4 if North Kosovo or priority checkpoint
+    const isNorth = isNorthKosovoOrCheckpoint(item);
+    const multiplier = isNorth ? 1.4 : 1.0;
+    const finalItemScore = weight * multiplier;
+
+    // Track breakdown statistics
+    if (weight === SEVERITY_WEIGHTS.critical) countCritical++;
+    else if (weight === SEVERITY_WEIGHTS.high) countHigh++;
+    else if (weight === SEVERITY_WEIGHTS.medium) countMedium++;
+    else countLow++;
+
+    if (isNorth) countNorth++;
+
+    // Partition into recent 12h vs prior 12h (12h-24h)
+    if (elapsedMs <= WINDOW_12H_MS) {
+      recentScore += finalItemScore;
+      recent12hCount++;
+    } else {
+      priorScore += finalItemScore;
+      prior12hCount++;
+    }
+  }
+
+  const incidentCount24h = recent12hCount + prior12hCount;
+  const totalPoints24h = recentScore + priorScore;
+
+  // Trend: Compare last 12 hours vs prior 12 hours (12h-24h)
+  const rawDelta = recentScore - priorScore;
+  const delta24h = Math.round(rawDelta * 10) / 10;
+
+  let trend = 'STABLE';
+  if (delta24h > 0.1) {
+    trend = 'RISING';
+  } else if (delta24h < -0.1) {
+    trend = 'FALLING';
+  }
+
+  // Normalize on strict scale of 1.0 to 10.0 (clamped, default baseline = 1.5)
+  const rawNormalized = BASELINE_SCORE + totalPoints24h;
+  const score = Math.min(10.0, Math.max(1.0, Math.round(rawNormalized * 10) / 10));
+
+  // Assign DEFCON / Status level
+  let level = 'LOW / NORMAL';
+  if (score >= 8.0) {
+    level = 'CRITICAL / ACTIVE CONFLICT';
+  } else if (score >= 6.0) {
+    level = 'ELEVATED / HIGH ALERT';
+  } else if (score >= 3.5) {
+    level = 'MODERATE / GUARDED';
+  } else {
+    level = 'LOW / NORMAL';
+  }
+
+  return {
+    score,
+    level,
+    trend,
+    delta24h,
+    incidentCount24h,
+    breakdown: {
+      critical: countCritical,
+      high: countHigh,
+      medium: countMedium,
+      low: countLow,
+      northKosovo: countNorth,
+      recent12hCount,
+      prior12hCount
+    },
+    generatedAt: new Date(validRefTime).toISOString()
+  };
+}
+
 module.exports = {
   hasKosovoContext,
   calculateSecurityScore,
+  calculateEffectiveRank,
+  calculateRegionalTension,
+  isNorthKosovoOrCheckpoint,
   isSportsOrEntertainment,
+  isWelfareOrGiveawayNoise,
+  WELFARE_GIVEAWAY_NOISE_REGEX,
   SPORTS_ENTERTAINMENT_BLACKLIST,
-  POLITICAL_KEYWORDS_REGEX
+  POLITICAL_KEYWORDS_REGEX,
+  NORTH_KOSOVO_LOCATIONS_REGEX,
+  PRIORITY_CHECKPOINT_REGEX
 };
+

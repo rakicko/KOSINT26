@@ -5,6 +5,20 @@ import {
   MINEFIELDS_KOSOVO_GEOJSON,
   KFOR_MSR_ROUTES_GEOJSON
 } from './operational-zones.js';
+import {
+  calculateThreatRangeRings,
+  categorizeMilStdSymbol,
+  createTacticalThreatMarkerElement,
+  isPointInKosovoOperationalZone,
+  getTacticalLayerState,
+  setTacticalLayerVisibility,
+  isTacticalLayerVisible
+} from './tactical-map.js';
+import { initCivilUnrestLayer } from './civil-unrest-map.js';
+
+if (typeof window !== 'undefined') {
+  window.maplibregl = maplibregl;
+}
 
 'use strict';
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -410,7 +424,9 @@ const state = {
   staffToken: typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('staff_warden_token') : null,
   staffLocations: [],
   staffFilteredLocations: [],
-  staffInactivityTimer: null
+  staffInactivityTimer: null,
+  cachedSitrep: null,
+  regionalTension: null
 };
 
 function clearMarkerList(markerList) {
@@ -539,6 +555,32 @@ const moduleLayers = {
     },
     clear: () => {
       if (typeof toggleMinefieldsLayer === 'function') toggleMinefieldsLayer(false);
+    }
+  },
+  civilUnrest: {
+    markers: [],
+    render: () => {
+      if (window.CivilUnrestMap) {
+        window.CivilUnrestMap.toggleCivilUnrestLayer(true);
+      }
+      if (typeof $ === 'function' && $('toggleLayerCivilUnrest')) {
+        $('toggleLayerCivilUnrest').checked = true;
+      }
+      if (typeof syncTacticalLayersOnMap === 'function') {
+        syncTacticalLayersOnMap();
+      }
+    },
+    clear: () => {
+      if (window.CivilUnrestMap) {
+        window.CivilUnrestMap.toggleCivilUnrestLayer(false);
+      }
+      if (typeof $ === 'function' && $('toggleLayerCivilUnrest')) {
+        $('toggleLayerCivilUnrest').checked = false;
+      }
+      closeMapPopup();
+      if (typeof syncTacticalLayersOnMap === 'function') {
+        syncTacticalLayersOnMap();
+      }
     }
   }
 };
@@ -961,6 +1003,13 @@ function renderNews(news) {
 
   $('newsMeta').textContent = `${totalEvents} Events`;
 
+  // Update World Monitor Regional Tension Index (RTI)
+  if (Array.isArray(items)) {
+    const tension = calculateRegionalTension(items);
+    state.regionalTension = tension;
+    renderRegionalTension(tension);
+  }
+
   filterNewsItems(items, state.newsTab || state.newsFilter || 'all');
 }
 
@@ -974,6 +1023,326 @@ function getArticlePubTime(item) {
   if (!raw) return NaN;
   const time = new Date(raw).getTime();
   return isNaN(time) ? NaN : time;
+}
+
+const NORTH_KOSOVO_LOCATIONS_REGEX = /\b(sever\s*kosov|veri\s*(?:u|t[eë]|it)?\s*(?:i|e)?\s*kosov|north\s*kosovo|severn[aoj]\s*mitrovic|mitrovic|zve[cč]|leposav|zubin\s*potok|banjsk|gazivod|ujman|ib[ae]r)/i;
+
+const PRIORITY_CHECKPOINT_REGEX = /\b(jarinj|b[eë]rnjak|brnjak|merdar|dheu\s*i\s*bardh|bela\s*zemlj|mutivod|mu[cč]ibab|hani\s*i\s*elezit|gllobo[cč]i[cç]|stan[cč]i[cç]|kull[eë]|v[eë]rmi[cç]|checkpoint|punkt|vendkalim|prelaz|gate\s*(?:1|31))/i;
+
+/**
+ * Checks whether an item is located in North Kosovo or at a priority border checkpoint
+ */
+function isNorthKosovoOrCheckpoint(item) {
+  if (!item || typeof item !== 'object') return false;
+
+  // Direct flag
+  if (item.isNorth === true) return true;
+
+  // Check signals / entities if present
+  const signalsLocs = (item._signals && item._signals.locations) ||
+                      (item.signals && item.signals.locations) ||
+                      (item.multilingualEntities && item.multilingualEntities.locations) ||
+                      (Array.isArray(item.locations) ? item.locations : []);
+
+  if (Array.isArray(signalsLocs) && signalsLocs.length > 0) {
+    for (const loc of signalsLocs) {
+      if (!loc) continue;
+      if (loc.isNorth) return true;
+      const lid = String(loc.id || '').toLowerCase();
+      const lname = String(loc.name || '').toLowerCase();
+      if (lid.includes('jarinje') || lid.includes('brnjak') || lid.includes('bridge') || lid.includes('merdare') ||
+          lname.includes('jarinje') || lname.includes('brnjak') || lname.includes('bridge') || lname.includes('merdare')) {
+        return true;
+      }
+    }
+  }
+
+  // Check tags
+  if (Array.isArray(item.tags)) {
+    for (const tag of item.tags) {
+      const t = String(tag).toLowerCase();
+      if (t === 'north_kosovo' || t === 'ibar_bridge' || t === 'checkpoint' || t.includes('jarinje') || t.includes('brnjak') || t.includes('merdare')) {
+        return true;
+      }
+    }
+  }
+
+  // Check location string / title / description
+  const locText = typeof item.location === 'string' ? item.location : (item.location?.name || '');
+  const searchTarget = `${locText} ${item.title || ''} ${item.description || ''}`.trim();
+
+  if (NORTH_KOSOVO_LOCATIONS_REGEX.test(searchTarget) || PRIORITY_CHECKPOINT_REGEX.test(searchTarget)) {
+    // Guard against KEK / Obiliq / Kastriot false positive North detection
+    const fullText = `${item.title || ''} ${item.description || ''} ${typeof item.location === 'string' ? item.location : ''}`.trim();
+    if (/\b(kek|obiliq|kastriot)\b/i.test(fullText) && !/\b(mitrovic|zve[cč]|leposav|zubin|jarinj|brnjak|banjsk)\b/i.test(fullText)) {
+      return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * World Monitor dynamic threat & time-decay news ranking:
+ *
+ * 1. Base severity score: critical = 4000, high = 3000, medium = 2000, low = 1000
+ * 2. Context boost: +500 if location is North Kosovo or priority checkpoint
+ * 3. Time decay penalty: -50 points per elapsed hour from item.pubDate
+ *
+ * @param {object} item - News article or clustered event item
+ * @param {number|Date} [referenceTime=Date.now()] - Reference timestamp for elapsed hour calculation
+ * @returns {number} Effective ranking score
+ */
+function calculateEffectiveRank(item, referenceTime = Date.now()) {
+  if (!item || typeof item !== 'object') return 0;
+
+  // 1. Base severity score: critical = 4000, high = 3000, medium = 2000, low = 1000
+  const SEVERITY_BASE = {
+    critical: 4000,
+    high: 3000,
+    medium: 2000,
+    low: 1000
+  };
+
+  const sev = String(item.severity || '').toLowerCase().trim();
+  let baseScore = SEVERITY_BASE[sev];
+  if (baseScore === undefined) {
+    const intensity = Number(item.intensityScore) || 0;
+    if (intensity >= 9) baseScore = 4000;
+    else if (intensity >= 7) baseScore = 3000;
+    else if (intensity >= 4) baseScore = 2000;
+    else baseScore = 1000;
+  }
+
+  // 2. Context boost: +500 if location is North Kosovo or priority checkpoint
+  const isNorthOrCheckpoint = isNorthKosovoOrCheckpoint(item);
+  const contextBoost = isNorthOrCheckpoint ? 500 : 0;
+
+  // 3. Time decay penalty: -50 points per elapsed hour from item.pubDate
+  const rawDate = item.pubDate || item.publishedAt || item.published || item.timestamp || item.date || item.lastUpdated;
+  let elapsedHours = 0;
+  if (rawDate) {
+    const pubTime = new Date(rawDate).getTime();
+    const refTime = typeof referenceTime === 'number' ? referenceTime : new Date(referenceTime).getTime();
+    if (!isNaN(pubTime) && !isNaN(refTime)) {
+      const elapsedMs = Math.max(0, refTime - pubTime);
+      elapsedHours = elapsedMs / (3600 * 1000);
+    }
+  }
+
+  const timeDecayPenalty = elapsedHours * 50;
+
+  const finalRank = Math.round((baseScore + contextBoost - timeDecayPenalty) * 100) / 100;
+  return finalRank;
+}
+
+/**
+ * World Monitor-Inspired Regional Tension Index (RTI)
+ * Analogous to Country Instability Index (CII)
+ *
+ * Deterministic calculation across a rolling 24-hour window:
+ * - Filter items within rolling 24h of referenceTime (default Date.now())
+ * - Weighted scores:
+ *   - critical incident: 2.5 pts
+ *   - high incident:     1.5 pts
+ *   - medium incident:   0.8 pts
+ *   - low incident:      0.3 pts
+ * - Context multiplier: x 1.4 if North Kosovo or priority checkpoints
+ * - Trend: Compare last 12 hours vs prior 12 hours (12h-24h). Movement: RISING (↑), STABLE (→), FALLING (↓)
+ * - Normalized strict scale: 1.0 to 10.0 (clamped, default baseline = 1.5)
+ * - DEFCON / Status levels:
+ *   - 1.0 - 3.4: LOW / NORMAL
+ *   - 3.5 - 5.9: MODERATE / GUARDED
+ *   - 6.0 - 7.9: ELEVATED / HIGH ALERT
+ *   - 8.0 - 10.0: CRITICAL / ACTIVE CONFLICT
+ *
+ * @param {Array<object>} newsItems - List of clustered or raw intelligence items
+ * @param {number|Date|string} [referenceTime=Date.now()] - Point in time to compute 24h rolling index
+ * @returns {object} { score: number, level: string, trend: 'RISING'|'STABLE'|'FALLING', delta24h: number, incidentCount24h: number }
+ */
+function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
+  const refTime = referenceTime ? new Date(referenceTime).getTime() : Date.now();
+  const validRefTime = isNaN(refTime) ? Date.now() : refTime;
+
+  const SEVERITY_WEIGHTS = {
+    critical: 2.5,
+    high: 1.5,
+    medium: 0.8,
+    low: 0.3
+  };
+
+  const BASELINE_SCORE = 1.5;
+  const WINDOW_24H_MS = 24 * 3600 * 1000;
+  const WINDOW_12H_MS = 12 * 3600 * 1000;
+
+  if (!Array.isArray(newsItems) || newsItems.length === 0) {
+    return {
+      score: BASELINE_SCORE,
+      level: 'LOW / NORMAL',
+      trend: 'STABLE',
+      delta24h: 0,
+      incidentCount24h: 0,
+      breakdown: {
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        northKosovo: 0,
+        recent12hCount: 0,
+        prior12hCount: 0
+      },
+      generatedAt: new Date(validRefTime).toISOString()
+    };
+  }
+
+  let recentScore = 0;
+  let priorScore = 0;
+  let recent12hCount = 0;
+  let prior12hCount = 0;
+
+  let countCritical = 0;
+  let countHigh = 0;
+  let countMedium = 0;
+  let countLow = 0;
+  let countNorth = 0;
+
+  for (const item of newsItems) {
+    if (!item || typeof item !== 'object') continue;
+    if (item.category === 'other') continue;
+
+    const rawDate = item.pubDate || item.publishedAt || item.published || item.timestamp || item.date || item.lastUpdated;
+    let elapsedMs = 0;
+    if (rawDate) {
+      const pubTime = new Date(rawDate).getTime();
+      if (!isNaN(pubTime)) {
+        elapsedMs = validRefTime - pubTime;
+      }
+    }
+
+    // Rolling 24-hour window filter (allow up to 10 min clock skew)
+    if (elapsedMs < -600000 || elapsedMs > WINDOW_24H_MS) {
+      continue;
+    }
+
+    const sev = String(item.severity || '').toLowerCase().trim();
+    let weight = SEVERITY_WEIGHTS[sev];
+    if (weight === undefined) {
+      const intensity = Number(item.intensityScore) || 0;
+      if (intensity >= 9) weight = SEVERITY_WEIGHTS.critical;
+      else if (intensity >= 7) weight = SEVERITY_WEIGHTS.high;
+      else if (intensity >= 4) weight = SEVERITY_WEIGHTS.medium;
+      else weight = SEVERITY_WEIGHTS.low;
+    }
+
+    const isNorth = isNorthKosovoOrCheckpoint(item);
+    const multiplier = isNorth ? 1.4 : 1.0;
+    const finalItemScore = weight * multiplier;
+
+    if (weight === SEVERITY_WEIGHTS.critical) countCritical++;
+    else if (weight === SEVERITY_WEIGHTS.high) countHigh++;
+    else if (weight === SEVERITY_WEIGHTS.medium) countMedium++;
+    else countLow++;
+
+    if (isNorth) countNorth++;
+
+    if (elapsedMs <= WINDOW_12H_MS) {
+      recentScore += finalItemScore;
+      recent12hCount++;
+    } else {
+      priorScore += finalItemScore;
+      prior12hCount++;
+    }
+  }
+
+  const incidentCount24h = recent12hCount + prior12hCount;
+  const totalPoints24h = recentScore + priorScore;
+
+  const rawDelta = recentScore - priorScore;
+  const delta24h = Math.round(rawDelta * 10) / 10;
+
+  let trend = 'STABLE';
+  if (delta24h > 0.1) {
+    trend = 'RISING';
+  } else if (delta24h < -0.1) {
+    trend = 'FALLING';
+  }
+
+  const rawNormalized = BASELINE_SCORE + totalPoints24h;
+  const score = Math.min(10.0, Math.max(1.0, Math.round(rawNormalized * 10) / 10));
+
+  let level = 'LOW / NORMAL';
+  if (score >= 8.0) {
+    level = 'CRITICAL / ACTIVE CONFLICT';
+  } else if (score >= 6.0) {
+    level = 'ELEVATED / HIGH ALERT';
+  } else if (score >= 3.5) {
+    level = 'MODERATE / GUARDED';
+  } else {
+    level = 'LOW / NORMAL';
+  }
+
+  return {
+    score,
+    level,
+    trend,
+    delta24h,
+    incidentCount24h,
+    breakdown: {
+      critical: countCritical,
+      high: countHigh,
+      medium: countMedium,
+      low: countLow,
+      northKosovo: countNorth,
+      recent12hCount,
+      prior12hCount
+    },
+    generatedAt: new Date(validRefTime).toISOString()
+  };
+}
+
+/**
+ * Returns or dynamically calculates the effective tactical rank of an intelligence item.
+ */
+function getArticleRank(item) {
+  if (!item) return 0;
+  return calculateEffectiveRank(item);
+}
+
+/**
+ * Sorts news articles by effective rank (_rank) descending (World Monitor dynamic threat & time-decay).
+ * - Highest ranking items appear first.
+ * - Gracefully decays as articles age.
+ * - Ties are ordered deterministically by publication timestamp (newest first), then title.
+ */
+function sortNewsByRank(items) {
+  if (!Array.isArray(items)) return [];
+  return [...items].sort((a, b) => {
+    const rankA = typeof a._rank === 'number' ? a._rank : getArticleRank(a);
+    const rankB = typeof b._rank === 'number' ? b._rank : getArticleRank(b);
+
+    if (rankB !== rankA) {
+      return rankB - rankA;
+    }
+
+    const timeA = getArticlePubTime(a);
+    const timeB = getArticlePubTime(b);
+    const validA = !isNaN(timeA);
+    const validB = !isNaN(timeB);
+
+    if (validA && validB) {
+      if (timeB !== timeA) return timeB - timeA;
+      const titleA = String(a.title || a.url || '');
+      const titleB = String(b.title || b.url || '');
+      return titleA.localeCompare(titleB);
+    }
+    if (validA && !validB) return -1;
+    if (!validA && validB) return 1;
+
+    const titleA = String(a.title || a.url || '');
+    const titleB = String(b.title || b.url || '');
+    return titleA.localeCompare(titleB);
+  });
 }
 
 /**
@@ -1022,11 +1391,51 @@ function isOpinionNewsItem(item) {
   return (item.category || '').toLowerCase() === 'opinion';
 }
 
+function timeAgo(iso) {
+  return formatTimeAgo(iso);
+}
+
+function escapeHtml(str) {
+  return escHtml(str);
+}
+
+const WELFARE_GIVEAWAY_NOISE_REGEX = /\b(6\.?000\s*(?:dinara|rsd)|u\s*ponoć\s*počin|u\s*ponoc\s*pocin|novčan[ae]\s*pomoć|novcan[ae]\s*pomoc|prijava\s*za\s*(?:novčanu\s*|novcanu\s*)?pomoć|prijava\s*za\s*(?:novčanu\s*|novcanu\s*)?pomoc|pomoć\s*države|pomoc\s*drzave|pomoć\s*mladima|pomoc\s*mladima|pomoć\s*penzionerima|pomoc\s*penzionerima|isplata\s*penzij|povećanje\s*penzij|povecanje\s*penzij|nagradn[ae]\s*igr[ae]|uzmi\s*račun|uzmi\s*racun|vaučer[ie]?|vaucer[ie]?|lutrij[ae]|loto|ndihm[aë]\s*financiare|loj[ëe]\s*shpërblyese|pensionet)\b/i;
+
+function isWelfareNoiseItem(item) {
+  if (!item) return false;
+  const text = `${item.title || ''} ${item.description || ''}`.trim();
+  return WELFARE_GIVEAWAY_NOISE_REGEX.test(text);
+}
+
+function renderNewsVerificationBadge(item) {
+  if (!item) return '';
+  const status = item.verificationStatus || (
+    (Array.isArray(item.languages) && item.languages.includes('sr') && item.languages.includes('sq'))
+      ? 'CROSS-VERIFIED'
+      : (((item.sourceCount || 1) >= 3 || (Array.isArray(item.participatingSources) && item.participatingSources.length >= 3) || (Array.isArray(item.sources) && item.sources.length >= 3))
+          ? 'MULTI-SOURCE'
+          : 'SINGLE-SOURCE')
+  );
+
+  const count = item.sourceCount || (Array.isArray(item.participatingSources) && item.participatingSources.length > 0 ? item.participatingSources.length : (Array.isArray(item.sources) ? item.sources.length : 1));
+
+  if (status === 'CROSS-VERIFIED') {
+    return `<span class="news-badge-verify verify-cross" title="Reported by both Serbian and Albanian sources">[VERIFIED]</span>`;
+  }
+  if (status === 'MULTI-SOURCE') {
+    return `<span class="news-badge-verify verify-multi" title="Reported by ${count} sources of the same linguistic bloc">[MULTI: ${count}]</span>`;
+  }
+  return `<span class="news-badge-verify verify-single" title="Reported by a single news source">[SINGLE]</span>`;
+}
+
 const SERBIAN_NEWS_SOURCES = ['kossev', 'radio mitrovica sever', 'radio kim', 'kosova.info'];
 const ALBANIAN_NEWS_SOURCES = ['koha', 'gazeta express', 'indeks online', 'lajmi', 'jepize', 'mitropol', 'mitrovicasot', 'telegrafi', 'kallxo'];
 
 function isSerbianNewsItem(item) {
   if (!item) return false;
+  // If cross-verified across blocs, preserve visibility on Serbian tab
+  if (item.verificationStatus === 'CROSS-VERIFIED') return true;
+  if (Array.isArray(item.languages) && item.languages.includes('sr')) return true;
   if (item.language === 'al' || item.language === 'sq') return false;
   const src = String(item.primarySource || item.source || '').toLowerCase();
   if (ALBANIAN_NEWS_SOURCES.some(s => src.includes(s))) return false;
@@ -1038,7 +1447,7 @@ function isSerbianNewsItem(item) {
 
   if (item.language === 'sr' || item.language === 'serbian') return true;
   if (SERBIAN_NEWS_SOURCES.some(s => src.includes(s))) return true;
-  const sources = Array.isArray(item.sources) ? item.sources : [];
+  const sources = Array.isArray(item.sources) ? item.sources : (Array.isArray(item.participatingSources) ? item.participatingSources : []);
   if (sources.some(s => SERBIAN_NEWS_SOURCES.some(ss => String(s).toLowerCase().includes(ss)))) return true;
   if (/[\u0400-\u04FF]/.test(text)) return true;
   return false;
@@ -1046,6 +1455,9 @@ function isSerbianNewsItem(item) {
 
 function isAlbanianNewsItem(item) {
   if (!item) return false;
+  // If cross-verified across blocs, preserve visibility on Albanian tab
+  if (item.verificationStatus === 'CROSS-VERIFIED') return true;
+  if (Array.isArray(item.languages) && item.languages.includes('sq')) return true;
   return !isSerbianNewsItem(item);
 }
 
@@ -1082,11 +1494,69 @@ function ensureTriageTabButtons() {
   }
 }
 
+function renderNewsCard(item) {
+  if (!item) return '';
+  const s = item.intensityScore || 1;
+  const sev = (item.severity || (s >= 9 ? 'critical' : s >= 7 ? 'high' : s >= 4 ? 'medium' : 'low')).toLowerCase();
+  const sevClass = sev === 'critical' ? 'sev-critical' : sev === 'high' ? 'sev-high' : sev === 'medium' ? 'sev-medium' : 'sev-low';
+  const sevLabel = sev.toUpperCase();
+
+  // Category / news type tag
+  const rawCat = (item.category || 'INTEL').replace(/_/g, ' ');
+  const catLabel = rawCat.toUpperCase();
+
+  const title = item.title || item.canonicalTitle || 'Untitled Intelligence Item';
+  const rawUrl = item.url ? String(item.url).trim() : '';
+  const validUrl = (rawUrl && isValidArticleUrl(rawUrl)) ? rawUrl : '';
+  const verifyBadgeHtml = renderNewsVerificationBadge(item);
+  const sourceStr = item.source || item.primarySource || '';
+  const timeStr = timeAgo(item.publishedAt || item.pubDate || item.date || item.timestamp);
+
+  const cardInner = `
+    <!-- Row 1: Compact Meta Bar -->
+    <div class="news-card-meta-row news-card-meta">
+      <div class="news-card-meta-left">
+        <span class="badge-severity news-badge-sev badge-${sev} ${sevClass}">${sevLabel}</span>
+        <span class="badge-category news-badge-cat">${escHtml(catLabel)}</span>
+        ${verifyBadgeHtml}
+      </div>
+      <div class="news-card-meta-right">
+        ${timeStr ? `<span class="news-card-time">${escHtml(timeStr)}</span>` : ''}
+        ${sourceStr ? `<span class="news-card-source">${escHtml(sourceStr)}</span>` : ''}
+        ${validUrl ? '<span class="news-card-ext">↗</span>' : ''}
+      </div>
+    </div>
+
+    <!-- Row 2: Prominent Full Headline -->
+    <div class="news-card-title-row">
+      <h4 class="news-card-headline news-card-title" title="${escHtml(title)}">${escHtml(title)}</h4>
+    </div>
+  `;
+
+  if (validUrl) {
+    return `
+      <a class="news-item-card news-simple-card ${sevClass} severity-${sev}" href="${escHtml(validUrl)}" target="_blank" rel="noopener noreferrer" title="${escHtml(title)}">
+        ${cardInner}
+      </a>
+    `;
+  }
+
+  return `
+    <div class="news-item-card news-simple-card ${sevClass} severity-${sev}" title="${escHtml(title)}">
+      ${cardInner}
+    </div>
+  `;
+}
+
+function renderNewsList(items, filter) {
+  return filterNewsItems(items, filter);
+}
+
 function filterNewsItems(items, filter) {
   ensureTriageTabButtons();
   state.newsTab = filter || state.newsTab || 'all';
   state.newsFilter = state.newsTab;
-  items = items || [];
+  items = (items || []).filter(i => !isWelfareNoiseItem(i));
 
   let filtered = items;
 
@@ -1126,7 +1596,23 @@ function filterNewsItems(items, filter) {
     });
   }
 
-  const sorted = sortNewsByChronological(filtered);
+  // Pre-calculate / refresh effective ranks for dynamic time-decay
+  items.forEach(item => {
+    if (item) {
+      if (!item.pubDate && item.publishedAt) {
+        item.pubDate = item.publishedAt;
+      }
+      item._rank = getArticleRank(item);
+    }
+  });
+
+  // World Monitor dynamic threat & time-decay news ranking (_rank descending)
+  const sorted = sortNewsByRank(filtered);
+
+  // Preserve cached tactical SitRep banner across tab transitions
+  if (state.cachedSitrep) {
+    renderFlashSitRep(state.cachedSitrep);
+  }
 
   const list = $('newsList');
   if (!list) return;
@@ -1142,43 +1628,7 @@ function filterNewsItems(items, filter) {
     return;
   }
 
-  list.innerHTML = sorted.map((item) => {
-    const s = item.intensityScore || 1;
-    const sev = (item.severity || (s >= 9 ? 'critical' : s >= 7 ? 'high' : s >= 4 ? 'medium' : 'low')).toLowerCase();
-    const sevClass = sev === 'critical' ? 'sev-critical' : sev === 'high' ? 'sev-high' : sev === 'medium' ? 'sev-medium' : 'sev-low';
-    const sevLabel = sev.toUpperCase();
-
-    // Category / news type tag
-    const rawCat = (item.category || 'operational').replace(/_/g, ' ');
-    const catLabel = rawCat.toUpperCase();
-
-    const title = item.title || item.canonicalTitle || 'Untitled Intelligence Item';
-    const rawUrl = item.url ? String(item.url).trim() : '';
-    const validUrl = (rawUrl && isValidArticleUrl(rawUrl)) ? rawUrl : '';
-
-    if (validUrl) {
-      return `
-        <a class="news-simple-card ${sevClass}" href="${escHtml(validUrl)}" target="_blank" rel="noopener noreferrer" title="${escHtml(title)}">
-          <div class="news-card-meta">
-            <span class="news-badge-sev ${sevClass}">${sevLabel}</span>
-            <span class="news-badge-cat">${escHtml(catLabel)}</span>
-          </div>
-          <div class="news-card-title">${escHtml(title)}</div>
-          <span class="news-card-ext">↗</span>
-        </a>
-      `;
-    }
-
-    return `
-      <div class="news-simple-card ${sevClass}" title="${escHtml(title)}">
-        <div class="news-card-meta">
-          <span class="news-badge-sev ${sevClass}">${sevLabel}</span>
-          <span class="news-badge-cat">${escHtml(catLabel)}</span>
-        </div>
-        <div class="news-card-title">${escHtml(title)}</div>
-      </div>
-    `;
-  }).join('');
+  list.innerHTML = sorted.map(renderNewsCard).join('');
 }
 
 function switchNewsTab(tab, btn) {
@@ -1198,6 +1648,206 @@ function toggleNewsUrgent(btn) {
 
 function filterNews(cat, btn) {
   switchNewsTab(cat, btn);
+}
+
+/**
+ * Requests and renders a World Monitor Flash SitRep
+ */
+async function requestFlashSitRep() {
+  const btn = $('btnNewsSitRep');
+  if (btn) btn.classList.add('loading');
+
+  try {
+    const rawItems = state.data?.news?.items || [];
+    const sorted = sortNewsByRank(rawItems);
+    const topItems = sorted.slice(0, 10);
+
+    const res = await fetch('/api/news/sitrep', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: topItems })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server returned ${res.status}`);
+    }
+
+    const data = await res.json();
+    state.cachedSitrep = data;
+    renderFlashSitRep(data);
+  } catch (err) {
+    console.error('[news] SitRep generation failed:', err);
+  } finally {
+    if (btn) btn.classList.remove('loading');
+  }
+}
+
+/**
+ * Displays the high-contrast Tactical Situation Report banner/card
+ */
+function renderFlashSitRep(data) {
+  const container = $('newsSitrepContainer');
+  if (!container || !data) return;
+
+  const sections = data.sections || {};
+  const timeStr = data.generatedAt ? new Date(data.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'JUST NOW';
+  const clusterCount = data.itemClusterCount || 10;
+
+  container.innerHTML = `
+    <div class="sitrep-card" id="sitrepCard">
+      <div class="sitrep-header">
+        <div class="sitrep-title-group">
+          <span class="sitrep-badge">⚡ FLASH SITREP</span>
+          <span class="sitrep-title">TACTICAL SITUATION REPORT</span>
+        </div>
+        <div class="sitrep-meta-group">
+          <span class="sitrep-time">${clusterCount} CLUSTERS · ${timeStr}</span>
+          <button class="sitrep-close-btn" onclick="closeFlashSitRep()" title="Close SitRep">✕</button>
+        </div>
+      </div>
+      <div class="sitrep-body">
+        <div class="sitrep-bullet-item">
+          <span class="sitrep-bullet-icon">🚨</span>
+          <div>
+            <span class="sitrep-bullet-label">Field Incidents:</span>
+            <span class="sitrep-bullet-text">${escHtml(sections.fieldIncidents || 'No kinetic actions reported.')}</span>
+          </div>
+        </div>
+        <div class="sitrep-bullet-item">
+          <span class="sitrep-bullet-icon">🚧</span>
+          <div>
+            <span class="sitrep-bullet-label">Friction Points & Routes:</span>
+            <span class="sitrep-bullet-text">${escHtml(sections.frictionPointsRoutes || 'Corridors report baseline transit.')}</span>
+          </div>
+        </div>
+        <div class="sitrep-bullet-item">
+          <span class="sitrep-bullet-icon">🏛️</span>
+          <div>
+            <span class="sitrep-bullet-label">Institutional / Political Posture:</span>
+            <span class="sitrep-bullet-text">${escHtml(sections.institutionalPoliticalPosture || 'Institutional baseline steady.')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  container.style.display = 'block';
+}
+
+/**
+ * Closes and clears the Flash SitRep banner
+ */
+function closeFlashSitRep() {
+  const container = $('newsSitrepContainer');
+  if (container) container.style.display = 'none';
+  state.cachedSitrep = null;
+}
+
+/**
+ * Displays the World Monitor-Inspired Regional Tension Index (RTI) Badge
+ * Formats: TENSION: 6.4 ELEVATED [↑] with dynamic color-coding
+ */
+function renderRegionalTension(data) {
+  if (!data) return;
+  const badge = $('regionalTensionBadge');
+  if (!badge) return;
+
+  const scoreEl = $('tensionScore');
+  const levelEl = $('tensionLevel');
+  const trendEl = $('tensionTrend');
+
+  const score = typeof data.score === 'number' ? data.score : 1.5;
+  const scoreStr = score.toFixed(1);
+
+  let shortLevel = 'NORMAL';
+  let badgeClass = 'tension-low';
+  if (score >= 8.0) {
+    shortLevel = 'CRITICAL';
+    badgeClass = 'tension-critical';
+  } else if (score >= 6.0) {
+    shortLevel = 'ELEVATED';
+    badgeClass = 'tension-elevated';
+  } else if (score >= 3.5) {
+    shortLevel = 'MODERATE';
+    badgeClass = 'tension-moderate';
+  } else {
+    shortLevel = 'NORMAL';
+    badgeClass = 'tension-low';
+  }
+
+  let trendArrow = '[→]';
+  if (data.trend === 'RISING') {
+    trendArrow = '[↑]';
+  } else if (data.trend === 'FALLING') {
+    trendArrow = '[↓]';
+  }
+
+  if (scoreEl) scoreEl.textContent = scoreStr;
+  if (levelEl) levelEl.textContent = shortLevel;
+  if (trendEl) trendEl.textContent = trendArrow;
+
+  badge.className = `regional-tension-badge ${badgeClass}`;
+
+  // Tooltip details
+  const ttLevel = $('tooltipTensionLevel');
+  const ttScore = $('tooltipTensionScore');
+  const ttTrend = $('tooltipTensionTrend');
+  const ttIncidents = $('tooltipTensionIncidents');
+  const ttDelta = $('tooltipTensionDelta');
+
+  const fullLevel = data.level || (shortLevel === 'CRITICAL' ? 'CRITICAL / ACTIVE CONFLICT' : shortLevel === 'ELEVATED' ? 'ELEVATED / HIGH ALERT' : shortLevel === 'MODERATE' ? 'MODERATE / GUARDED' : 'LOW / NORMAL');
+  if (ttLevel) ttLevel.textContent = fullLevel;
+  if (ttScore) ttScore.textContent = `${scoreStr} / 10.0`;
+  if (ttTrend) ttTrend.textContent = `${data.trend || 'STABLE'} ${trendArrow}`;
+  if (ttIncidents) {
+    const northCnt = data.breakdown?.northKosovo ?? 0;
+    ttIncidents.textContent = `${data.incidentCount24h || 0} (North: ${northCnt})`;
+  }
+  if (ttDelta) {
+    const delta = typeof data.delta24h === 'number' ? data.delta24h : 0;
+    ttDelta.textContent = `${delta > 0 ? '+' : ''}${delta.toFixed(1)} pts`;
+  }
+}
+
+/**
+ * Toggles the visibility of the RTI breakdown tooltip
+ */
+function toggleRegionalTensionTooltip(event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const tooltip = $('tensionTooltip');
+  if (!tooltip) return;
+  const isHidden = tooltip.style.display === 'none' || !tooltip.style.display;
+  tooltip.style.display = isHidden ? 'flex' : 'none';
+}
+
+/**
+ * Fetches computed regional tension from backend API /api/news/tension
+ */
+async function fetchRegionalTension() {
+  try {
+    const res = await fetch('/api/news/tension');
+    if (res.ok) {
+      const data = await res.json();
+      state.regionalTension = data;
+      renderRegionalTension(data);
+      return data;
+    }
+  } catch (err) {
+    console.warn('[tension] Error fetching regional tension:', err);
+  }
+  return null;
+}
+
+// Global click listener to auto-close tension tooltip when clicking elsewhere
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (e) => {
+    const badge = $('regionalTensionBadge');
+    const tooltip = $('tensionTooltip');
+    if (badge && tooltip && !badge.contains(e.target)) {
+      tooltip.style.display = 'none';
+    }
+  });
 }
 
 function renderWeather(weather, explicitCityName) {
@@ -2356,10 +3006,24 @@ function buildNewsPopupHtml(item) {
     </div>
   ` : '';
 
+  const participating = Array.isArray(item.participatingSources) && item.participatingSources.length > 0
+    ? item.participatingSources
+    : (Array.isArray(item.sources) && item.sources.length > 0 ? item.sources : (item.source || item.primarySource ? [item.source || item.primarySource] : []));
+
+  const sourcesListHtml = participating.length > 0 ? `
+    <div class="news-popup-sources-bloc">
+      <div class="news-sources-title">PARTICIPATING SOURCES (${participating.length}):</div>
+      <div class="news-sources-tags">
+        ${participating.map(s => `<span class="news-source-tag">${escHtml(String(s))}</span>`).join('')}
+      </div>
+    </div>
+  ` : '';
+
   const eventContent = `
     <div class="news-event">
       <div class="news-event-header">
         <span class="news-event-status-badge ${statusClass}">STATUS: ${escHtml(status)}</span>
+        ${renderNewsVerificationBadge(item)}
       </div>
       <div class="news-event-metrics-bar">
         <span>${sourceCount} SOURCES</span>
@@ -2370,6 +3034,7 @@ function buildNewsPopupHtml(item) {
       </div>
       ${headlineHtml}
       ${developmentsTimelineHtml}
+      ${sourcesListHtml}
     </div>
   `;
 
@@ -2726,12 +3391,94 @@ function deduplicateNewsItems(items, similarityThreshold = 0.82) {
   });
 }
 
+function updateTacticalThreatRangeRingsLayer(itemsWithCoords) {
+  if (!state.map) return;
+
+  if (!isTacticalLayerVisible('incidents')) {
+    clearTacticalThreatRangeRingsLayer();
+    return;
+  }
+
+  const criticalAndHigh = (itemsWithCoords || []).filter(entry =>
+    (entry.sev === 'CRITICAL' || entry.sev === 'HIGH') &&
+    isPointInKosovoOperationalZone(entry.coords)
+  );
+
+  const allFeatures = [];
+  criticalAndHigh.forEach(entry => {
+    const rings = calculateThreatRangeRings(entry.coords, {
+      severity: entry.sev,
+      id: entry.itemId
+    });
+    if (rings && Array.isArray(rings.features)) {
+      allFeatures.push(...rings.features);
+    }
+  });
+
+  const geojson = {
+    type: 'FeatureCollection',
+    features: allFeatures
+  };
+
+  const sourceId = 'tactical-threat-rings-geojson';
+  const existingSource = state.map.getSource(sourceId);
+
+  if (existingSource) {
+    existingSource.setData(geojson);
+  } else if (state.map.isStyleLoaded()) {
+    try {
+      state.map.addSource(sourceId, {
+        type: 'geojson',
+        data: geojson
+      });
+
+      state.map.addLayer({
+        id: 'tactical-threat-rings-fill',
+        type: 'fill',
+        source: sourceId,
+        paint: {
+          'fill-color': ['get', 'fillColor'],
+          'fill-opacity': 0.8
+        }
+      });
+
+      state.map.addLayer({
+        id: 'tactical-threat-rings-line',
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color': ['get', 'strokeColor'],
+          'line-width': ['get', 'strokeWidth'],
+          'line-dasharray': [4, 2]
+        }
+      });
+    } catch (_) {}
+  }
+}
+
+function clearTacticalThreatRangeRingsLayer() {
+  if (!state.map) return;
+  const source = state.map.getSource('tactical-threat-rings-geojson');
+  if (source) {
+    try {
+      source.setData({ type: 'FeatureCollection', features: [] });
+    } catch (_) {}
+  }
+}
+
 function renderNewsMapMarkers(newsData) {
   if (!state.map || state.activeMapModule !== 'news') return;
   clearMarkerList(moduleLayers.news.markers);
 
+  if (!isTacticalLayerVisible('incidents')) {
+    clearTacticalThreatRangeRingsLayer();
+    updateMapBadgeAndMeta();
+    return;
+  }
+
   const data = newsData || state.data?.news;
   if (!data || data.error || !Array.isArray(data.items)) {
+    clearTacticalThreatRangeRingsLayer();
     updateMapBadgeAndMeta();
     return;
   }
@@ -2782,7 +3529,12 @@ function renderNewsMapMarkers(newsData) {
       moduleLayers.news.markers.push(marker);
     } else {
       const { item, color, itemId, coords, sev } = c.item;
-      const el = createMapMarkerElement(color, 12, 2, sev);
+      let el;
+      if (sev === 'CRITICAL' || sev === 'HIGH') {
+        el = createTacticalThreatMarkerElement(item, { severity: sev });
+      } else {
+        el = createMapMarkerElement(color, 12, 2, sev);
+      }
       el.dataset.newsId = itemId;
 
       el.addEventListener('click', (e) => {
@@ -2808,6 +3560,7 @@ function renderNewsMapMarkers(newsData) {
     }
   });
 
+  updateTacticalThreatRangeRingsLayer(itemsWithCoords);
   updateMapBadgeAndMeta();
 }
 
@@ -3783,7 +4536,8 @@ function toggleModule(panelId) {
     'alertPanel': 'alert',
     'settingsPanel': 'settings',
     'staffPanel': 'staff',
-    'minePanel': 'mines'
+    'minePanel': 'mines',
+    'civilUnrestPanel': 'civilUnrest'
   };
 
   const targetModule = panelToModule[panelId] || null;
@@ -3835,7 +4589,15 @@ function toggleModule(panelId) {
     setActiveMapModule(targetModule, state.data);
 
     // Triggers with targetModule guard
-    if (targetModule === 'news') {
+    if (targetModule === 'civilUnrest') {
+      if (window.CivilUnrestMap) {
+        window.CivilUnrestMap.toggleCivilUnrestLayer(true);
+        window.CivilUnrestMap.renderCivilUnrestWidget('#civilUnrestWidgetMount');
+      }
+      if (typeof $ === 'function' && $('toggleLayerCivilUnrest')) {
+        $('toggleLayerCivilUnrest').checked = true;
+      }
+    } else if (targetModule === 'news') {
       if (state.data?.news) renderNews(state.data.news);
     } else if (targetModule === 'wildfire') {
       window.updateWildfireLayer(state.wildfireFilter);
@@ -3893,11 +4655,22 @@ function closeModulePanel() {
   }
   closeCCTVViewer();
 
+  // Completely exit Civil Unrest layer and remove markers when exiting
+  if (window.CivilUnrestMap && typeof window.CivilUnrestMap.toggleCivilUnrestLayer === 'function') {
+    window.CivilUnrestMap.toggleCivilUnrestLayer(false);
+  }
+  if (typeof $ === 'function' && $('toggleLayerCivilUnrest')) {
+    $('toggleLayerCivilUnrest').checked = false;
+  }
+
   setActiveMapModule(null);
 
   document.querySelectorAll('.nav-rail-btn, .module-btn').forEach(btn => btn.classList.remove('active'));
   if (state.map) {
     setTimeout(() => state.map.resize(), 200);
+  }
+  if (typeof syncTacticalLayersOnMap === 'function') {
+    syncTacticalLayersOnMap();
   }
 }
 
@@ -4471,6 +5244,7 @@ function initMap() {
     initTacticalLayers(state.map);
     initOSIRISLayersAndControls(state.map);
     initDrawingTools(state.map);
+    initCivilUnrestLayer(state.map, { maplibregl, visible: false, container: '#civilUnrestWidgetMount' });
   });
 
   state.map.on('zoomend', () => {
@@ -4989,7 +5763,7 @@ function renderTacticalMineMarkers(visible) {
 function renderTacticalKforBases(visible) {
   tacticalKforMarkers.forEach(m => m.remove());
   tacticalKforMarkers = [];
-  if (!visible || !state.map) return;
+  if (!visible || !state.map || !isTacticalLayerVisible('bases')) return;
 
   KFOR_BASES_GEOJSON.features.forEach(base => {
     const p = base.properties;
@@ -5244,6 +6018,7 @@ function initTacticalLayers(map) {
 
 function syncTacticalLayersOnMap() {
   if (!state.map) return;
+  const showIncidents = $('toggleLayerIncidents') ? $('toggleLayerIncidents').checked : false;
   const showMines = $('toggleLayerMines') ? $('toggleLayerMines').checked : false;
   const showKfor = $('toggleLayerKfor') ? $('toggleLayerKfor').checked : false;
   const showCorridors = $('toggleLayerCorridors') ? $('toggleLayerCorridors').checked : false;
@@ -5253,7 +6028,9 @@ function syncTacticalLayersOnMap() {
   const showRadiation = $('toggleLayerRadiation') ? $('toggleLayerRadiation').checked : false;
   const showWeather = $('toggleLayerWeather') ? $('toggleLayerWeather').checked : false;
   const showAqi = $('toggleLayerAqi') ? $('toggleLayerAqi').checked : false;
+  const showCivilUnrest = $('toggleLayerCivilUnrest') ? $('toggleLayerCivilUnrest').checked : false;
 
+  if (showIncidents && state.data?.news) renderNewsMapMarkers(state.data.news);
   if (showMines) toggleMinefieldsLayer(true);
   if (showKfor) renderTacticalKforBases(true);
   if (showCorridors && state.map.getLayer('corridors-points')) state.map.setLayoutProperty('corridors-points', 'visibility', 'visible');
@@ -5263,8 +6040,11 @@ function syncTacticalLayersOnMap() {
   if (showRadiation && state.data?.radiation) renderRadiationMapMarkers(state.data.radiation);
   if (showWeather && state.data?.weather) renderWeatherMapMarkers(state.data.weather);
   if (showAqi && state.data?.aqi) renderAqiMapMarkers(state.data.aqi);
+  if (window.CivilUnrestMap) window.CivilUnrestMap.toggleCivilUnrestLayer(showCivilUnrest);
 
   let activeCount = 0;
+  if ($('toggleLayerCivilUnrest')?.checked) activeCount++;
+  if ($('toggleLayerIncidents')?.checked) activeCount++;
   if ($('toggleLayerMines')?.checked) activeCount++;
   if ($('toggleLayerKfor')?.checked) activeCount++;
   if ($('toggleLayerCorridors')?.checked) activeCount++;
@@ -5286,7 +6066,16 @@ function toggleTacticalLayer(layerGroup, isVisible) {
   if (!state.map) return;
   const visibility = isVisible ? 'visible' : 'none';
 
-  if (layerGroup === 'abl') {
+  if (layerGroup === 'incidents') {
+    setTacticalLayerVisibility('incidents', isVisible);
+    if (isVisible) {
+      renderNewsMapMarkers(state.data?.news);
+    } else {
+      clearMarkerList(moduleLayers.news.markers);
+      clearTacticalThreatRangeRingsLayer();
+      closeNewsPopup();
+    }
+  } else if (layerGroup === 'abl') {
     ['abl-contour', 'abl-casing', 'abl-glow'].forEach(layerId => {
       if (state.map.getLayer(layerId)) {
         state.map.setLayoutProperty(layerId, 'visibility', visibility);
@@ -5299,7 +6088,8 @@ function toggleTacticalLayer(layerGroup, isVisible) {
       }
     });
     renderTacticalMunLabels(isVisible);
-  } else if (layerGroup === 'kfor') {
+  } else if (layerGroup === 'kfor' || layerGroup === 'bases') {
+    setTacticalLayerVisibility('bases', isVisible);
     renderTacticalKforBases(isVisible);
   } else if (layerGroup === 'corridors') {
     if (state.map.getLayer('corridors-points')) {
@@ -5314,7 +6104,8 @@ function toggleTacticalLayer(layerGroup, isVisible) {
     renderTacticalMsrMarkers(isVisible);
   } else if (layerGroup === 'mines') {
     toggleMinefieldsLayer(isVisible);
-  } else if (layerGroup === 'border') {
+  } else if (layerGroup === 'border' || layerGroup === 'checkpoints') {
+    setTacticalLayerVisibility('checkpoints', isVisible);
     toggleBorderTacticalLayer(isVisible);
   } else if (layerGroup === 'seismic') {
     toggleSeismicTacticalLayer(isVisible);
@@ -5324,9 +6115,14 @@ function toggleTacticalLayer(layerGroup, isVisible) {
     toggleWeatherTacticalLayer(isVisible);
   } else if (layerGroup === 'aqi') {
     toggleAqiTacticalLayer(isVisible);
+  } else if (layerGroup === 'civilUnrest' || layerGroup === 'civil-unrest') {
+    if (window.CivilUnrestMap) {
+      window.CivilUnrestMap.toggleCivilUnrestLayer(isVisible);
+    }
   }
 
   let activeCount = 0;
+  if ($('toggleLayerIncidents')?.checked) activeCount++;
   if ($('toggleLayerMines')?.checked) activeCount++;
   if ($('toggleLayerKfor')?.checked) activeCount++;
   if ($('toggleLayerCorridors')?.checked) activeCount++;
@@ -5336,6 +6132,7 @@ function toggleTacticalLayer(layerGroup, isVisible) {
   if ($('toggleLayerRadiation')?.checked) activeCount++;
   if ($('toggleLayerWeather')?.checked) activeCount++;
   if ($('toggleLayerAqi')?.checked) activeCount++;
+  if ($('toggleLayerCivilUnrest')?.checked) activeCount++;
 
   const badge = $('tacticalLayersActiveBadge');
   if (badge) {
@@ -5408,7 +6205,7 @@ function toggleAqiTacticalLayer(visible) {
 }
 
 function toggleTacticalLayersMenu(forceState) {
-  const menu = $('tacticalLayersMenu');
+  const menu = $('tacticalLayersMenu') || $('tacticalLayersDropdown');
   if (!menu) return;
   const isCurrentlyOpen = menu.style.display === 'block';
   const shouldOpen = typeof forceState === 'boolean' ? forceState : !isCurrentlyOpen;
@@ -5416,6 +6213,7 @@ function toggleTacticalLayersMenu(forceState) {
   const btn = $('btnTacticalLayersToggle');
   if (btn) btn.classList.toggle('active', shouldOpen);
 }
+window.toggleTacticalLayersMenu = toggleTacticalLayersMenu;
 
 function updateMap(data) {
   if (!state.mapInitialized || !state.map || !data) return;
@@ -6917,7 +7715,7 @@ function selectBorderCrossing(crossingId) {
 
 function renderBorderMapMarkers(borderData) {
   const isTacticalActive = (typeof $ === 'function' && $('toggleLayerBorder')) ? $('toggleLayerBorder').checked : false;
-  if (!state.map || (state.activeMapModule !== 'border' && !isTacticalActive)) return;
+  if (!state.map || (state.activeMapModule !== 'border' && !isTacticalActive) || !isTacticalLayerVisible('checkpoints')) return;
   clearMarkerList(moduleLayers.border.markers);
 
   const data = borderData || state.borderData;
@@ -7477,8 +8275,18 @@ window.fetchAndRender = fetchAndRender;
 window.ALERT_THRESHOLDS = ALERT_THRESHOLDS;
 window.renderNews = renderNews;
 window.filterNewsItems = filterNewsItems;
+window.calculateEffectiveRank = calculateEffectiveRank;
+window.getArticleRank = getArticleRank;
+window.sortNewsByRank = sortNewsByRank;
 window.sortNewsByChronological = sortNewsByChronological;
 window.getArticlePubTime = getArticlePubTime;
+window.requestFlashSitRep = requestFlashSitRep;
+window.renderFlashSitRep = renderFlashSitRep;
+window.closeFlashSitRep = closeFlashSitRep;
+window.calculateRegionalTension = calculateRegionalTension;
+window.renderRegionalTension = renderRegionalTension;
+window.toggleRegionalTensionTooltip = toggleRegionalTensionTooltip;
+window.fetchRegionalTension = fetchRegionalTension;
 window.KOSOVO_WEATHER_CITIES = KOSOVO_WEATHER_CITIES;
 window.selectWeatherCity = selectWeatherCity;
 window.fetchCityWeather = fetchCityWeather;
@@ -7601,7 +8409,12 @@ async function submitStaffLogin(e) {
   try {
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Verifying...';
+      submitBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/>
+        </svg>
+        <span>Verifying...</span>
+      `;
     }
     if (errEl) errEl.style.display = 'none';
 
@@ -7639,7 +8452,13 @@ async function submitStaffLogin(e) {
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = '🔓 Authenticate & Decrypt';
+      submitBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+        </svg>
+        <span>Authenticate & Decrypt</span>
+      `;
     }
   }
 }
@@ -8408,7 +9227,6 @@ const SECTOR_MARKET_DATA = {
     topDown: '▼ EUR/USD -0.31%',
     quotes: [
       { ticker: 'EUR/USD', corp: 'Euro / US Dollar', price: '1.0842', change: '-0.31%', isUp: false },
-      { ticker: 'USD/RSD', corp: 'US Dollar / Serbian Dinar', price: '109.85', change: '+0.25%', isUp: true },
       { ticker: 'EUR/RSD', corp: 'Euro / Serbian Dinar', price: '117.15', change: '+0.02%', isUp: true },
       { ticker: 'USD/CHF', corp: 'US Dollar / Swiss Franc', price: '0.8654', change: '+0.38%', isUp: true }
     ]
@@ -8497,187 +9315,831 @@ function switchDefenseSector(sectorKey, tabEl) {
   }
 }
 
-// 2. LIVE BROADCAST FEEDS (BALKANS & GLOBAL)
+// 2. LIVE BROADCAST FEEDS (IPTV HLS ENGINE - SR, SQ & GLOBAL LINEUP)
 const LIVE_FEEDS_CHANNELS = [
-  // Balkan Free Channels
+  // ── Albanian Language Feeds (Kosovo & Albania - SQ) ─────────────────────────
   {
-    id: 'aljazeera_balkans',
-    name: 'Al Jazeera Balkans',
-    location: 'Sarajevo, BA',
-    region: 'balkans',
+    id: 'rtk_1',
+    name: 'RTK 1',
+    lang: 'sq',
+    region: 'kosovo',
+    category: 'public_broadcaster',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk1/index.m3u8',
+    backupUrl: 'https://de1.dstv.cx/RTK1/index.m3u8',
+    webUrl: 'https://www.rtklive.com',
+    location: 'Prishtinë, Kosovo',
     icon: '📺',
-    tag: 'REGIONAL NEWS',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/bNyUyrR0PHo?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://balkans.aljazeera.net/live'
+    tag: 'PUBLIC BROADCASTER',
+    badge: 'HD'
+  },
+  {
+    id: 'rtk_2',
+    name: 'RTK 2',
+    lang: 'sr',
+    region: 'kosovo',
+    category: 'public_broadcaster',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk2/index.m3u8',
+    backupUrl: 'https://de1.dstv.cx/RTK2/index.m3u8',
+    webUrl: 'https://www.rtklive.com/rtk2',
+    location: 'Prishtinë, Kosovo',
+    icon: '📺',
+    tag: 'MULTI-ETHNIC / SR',
+    badge: 'HD'
+  },
+  {
+    id: 'rtk_3',
+    name: 'RTK 3',
+    lang: 'sq',
+    region: 'kosovo',
+    category: 'news',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/rtk3/index.m3u8',
+    backupUrl: 'http://5.254.89.106/8703/index.m3u8',
+    webUrl: 'https://www.rtklive.com',
+    location: 'Prishtinë, Kosovo',
+    icon: '⚡',
+    tag: 'NEWS 24/7',
+    badge: 'HD'
+  },
+  {
+    id: 'ktv_koha',
+    name: 'Koha / KTV Kohavision',
+    lang: 'sq',
+    region: 'kosovo',
+    category: 'news',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/ktv/index.m3u8',
+    backupUrl: 'http://5.254.89.106/8705/index.m3u8',
+    webUrl: 'https://www.koha.net',
+    location: 'Prishtinë, Kosovo',
+    icon: '📺',
+    tag: 'INDEPENDENT INTEL',
+    badge: 'HD'
+  },
+  {
+    id: 'klan_kosova',
+    name: 'Klan Kosova',
+    lang: 'sq',
+    region: 'kosovo',
+    category: 'general',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/klankosova/index.m3u8',
+    backupUrl: 'http://5.254.89.106/8706/index.m3u8',
+    webUrl: 'https://klankosova.tv',
+    location: 'Prishtinë, Kosovo',
+    icon: '📺',
+    tag: 'NATIONAL BROADCASTER',
+    badge: 'HD'
+  },
+  {
+    id: 'rtv_dukagjini',
+    name: 'RTV Dukagjini',
+    lang: 'sq',
+    region: 'kosovo',
+    category: 'news',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/dukagjini/index.m3u8',
+    backupUrl: 'http://5.254.89.106/8707/index.m3u8',
+    webUrl: 'https://www.dukagjini.com',
+    location: 'Prishtinë / Pejë, Kosovo',
+    icon: '⚡',
+    tag: 'DEBATE & BREAKING',
+    badge: 'HD'
+  },
+  {
+    id: 't7_kosova',
+    name: 'T7',
+    lang: 'sq',
+    region: 'kosovo',
+    category: 'news',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream-specific/1z8-byc-4ee-lc9/index.m3u8',
+    backupUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/t7/index.m3u8',
+    webUrl: 'https://www.gazetaexpress.com',
+    location: 'Prishtinë, Kosovo',
+    icon: '⚡',
+    tag: 'EXPRESS NEWS',
+    badge: 'HD'
+  },
+  {
+    id: 'atv_kosova',
+    name: 'ATV Kosova',
+    lang: 'sq',
+    region: 'kosovo',
+    category: 'news',
+    streamUrl: 'https://gjirafa-video-live.gjirafa.net/gjvideo-livestream/atv/index.m3u8',
+    backupUrl: 'http://5.254.89.106/8709/index.m3u8',
+    webUrl: 'https://atvlive.tv',
+    location: 'Prishtinë, Kosovo',
+    icon: '📺',
+    tag: 'LIVE NEWS',
+    badge: 'HD'
+  },
+  {
+    id: 'top_channel',
+    name: 'Top Channel Albania',
+    lang: 'sq',
+    region: 'albania',
+    category: 'news',
+    streamUrl: 'https://stream.top-channel.tv/live/topchannel/playlist.m3u8',
+    backupUrl: 'http://5.254.89.106/8708/index.m3u8',
+    webUrl: 'https://top-channel.tv',
+    location: 'Tirana, Albania',
+    icon: '📺',
+    tag: 'NATIONAL NEWS',
+    badge: 'HD'
+  },
+  {
+    id: 'rtsh_1',
+    name: 'RTSH 1',
+    lang: 'sq',
+    region: 'albania',
+    category: 'public_broadcaster',
+    streamUrl: 'https://rtsh.stream/rtsh1/index.m3u8',
+    backupUrl: 'http://178.33.11.6:8696/live/rtsh1ott/playlist.m3u8',
+    webUrl: 'https://rtsh.al',
+    location: 'Tirana, Albania',
+    icon: '📡',
+    tag: 'PUBLIC BROADCASTER',
+    badge: 'HD'
+  },
+  {
+    id: 'rtsh_24',
+    name: 'RTSH 24',
+    lang: 'sq',
+    region: 'albania',
+    category: 'news',
+    streamUrl: 'https://rtsh.stream/rtsh24/index.m3u8',
+    backupUrl: 'http://178.33.11.6:8696/live/rtsh24/playlist.m3u8',
+    webUrl: 'https://rtsh.al',
+    location: 'Tirana, Albania',
+    icon: '⚡',
+    tag: 'NEWS 24/7',
+    badge: 'HD'
+  },
+  {
+    id: 'a2_cnn',
+    name: 'A2 CNN Albania',
+    lang: 'sq',
+    region: 'albania',
+    category: 'news',
+    streamUrl: 'https://live1.mediadesk.al/a2cnnlive.m3u8',
+    backupUrl: 'https://a2news.com/live',
+    webUrl: 'https://a2news.com',
+    location: 'Tirana, Albania',
+    icon: '📡',
+    tag: 'CNN AFFILIATE',
+    badge: 'HD'
+  },
+  {
+    id: 'euronews_albania',
+    name: 'Euronews Albania',
+    lang: 'sq',
+    region: 'albania',
+    category: 'news',
+    streamUrl: 'https://live1.mediadesk.al/euronewsalbania.m3u8',
+    backupUrl: 'https://euronews.al',
+    webUrl: 'https://euronews.al',
+    location: 'Tirana, Albania',
+    icon: '🇪🇺',
+    tag: 'EUROPEAN DESK',
+    badge: 'HD'
+  },
+
+  // ── Serbian Language Feeds (Kosovo, Serbia & Region - SR) ───────────────────
+  {
+    id: 'rts_1',
+    name: 'RTS 1',
+    lang: 'sr',
+    region: 'serbia',
+    category: 'public_broadcaster',
+    streamUrl: 'https://de1.dstv.cx/RTS1HD/index.m3u8',
+    backupUrl: 'https://rts.stream/rts1/index.m3u8',
+    webUrl: 'https://www.rts.rs',
+    location: 'Belgrade, Serbia',
+    icon: '📡',
+    tag: 'PUBLIC BROADCASTER',
+    badge: 'HD'
+  },
+  {
+    id: 'rts_2',
+    name: 'RTS 2',
+    lang: 'sr',
+    region: 'serbia',
+    category: 'parliamentary',
+    streamUrl: 'https://de1.dstv.cx/RTS2HD/index.m3u8',
+    backupUrl: 'https://rts.stream/rts2/index.m3u8',
+    webUrl: 'https://www.rts.rs',
+    location: 'Belgrade, Serbia',
+    icon: '🏛️',
+    tag: 'PARLIAMENTARY & CULTURE',
+    badge: 'HD'
+  },
+  {
+    id: 'rts_svet',
+    name: 'RTS Svet',
+    lang: 'sr',
+    region: 'serbia',
+    category: 'public_broadcaster',
+    streamUrl: 'https://de1.dstv.cx/RTSSvet/index.m3u8',
+    backupUrl: 'https://rts.stream/rtssvet/index.m3u8',
+    webUrl: 'https://www.rts.rs',
+    location: 'Belgrade, Serbia',
+    icon: '📡',
+    tag: 'INTERNATIONAL DESK',
+    badge: 'HD'
+  },
+  {
+    id: 'rtv_1',
+    name: 'RTV 1',
+    lang: 'sr',
+    region: 'serbia',
+    category: 'public_broadcaster',
+    streamUrl: 'https://streaming.rtv.rs/rtv1/index.m3u8',
+    backupUrl: 'https://media.rtv.rs/rtv1/index.m3u8',
+    webUrl: 'https://rtv.rs',
+    location: 'Novi Sad, Vojvodina',
+    icon: '📡',
+    tag: 'VOJVODINA PUBLIC',
+    badge: 'LIVE'
   },
   {
     id: 'n1_info',
     name: 'N1 Info Balkans',
-    location: 'Belgrade / Sarajevo / Zagreb',
+    lang: 'sr',
     region: 'balkans',
+    category: 'news',
+    streamUrl: 'https://best-str.umn.cdn.united.cloud/stream?channel=n1srbhd&p=n1srb3!23t001&player=m3u8&sp=n1srb&stream=hp7000&u=n1srb',
+    backupUrl: 'https://n1info.rs/n1-tv-live/',
+    webUrl: 'https://n1info.rs',
+    location: 'Belgrade / Sarajevo',
     icon: '📡',
     tag: 'CNN AFFILIATE',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/bNyUyrR0PHo?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://n1info.rs/live-tv/'
+    badge: 'HD'
   },
   {
-    id: 'rts_svet',
-    name: 'RTS Svet / RTS Planeta',
-    location: 'Belgrade, RS',
+    id: 'aljazeera_balkans',
+    name: 'Al Jazeera Balkans',
+    lang: 'sr',
     region: 'balkans',
-    icon: '🇷🇸',
-    tag: 'PUBLIC BROADCASTER',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/bNyUyrR0PHo?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://www.rts.rs/rts/rts-uzivo.html'
-  },
-  {
-    id: 'rtk_live',
-    name: 'RTK 1 / RTK Live',
-    location: 'Prishtinë, XK',
-    region: 'balkans',
-    icon: '🇽🇰',
-    tag: 'PUBLIC BROADCASTER',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/bNyUyrR0PHo?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://www.rtklive.com/'
-  },
-  {
-    id: 'trt_balkan',
-    name: 'TRT Balkan',
-    location: 'Sarajevo / Skopje',
-    region: 'balkans',
+    category: 'news',
+    streamUrl: 'https://live-hls-web-ajb.getaj.net/AJB/index.m3u8',
+    backupUrl: 'https://balkans.aljazeera.net/live',
+    webUrl: 'https://balkans.aljazeera.net',
+    location: 'Sarajevo, Bosnia',
     icon: '📺',
     tag: 'REGIONAL NEWS',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/s2P82L6jK1k?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://trtbalkan.com/'
+    badge: 'HD'
   },
   {
     id: 'euronews_serbia',
     name: 'Euronews Serbia',
-    location: 'Belgrade, RS',
-    region: 'balkans',
+    lang: 'sr',
+    region: 'serbia',
+    category: 'news',
+    streamUrl: 'https://euronews-serbia.ercdn.net/euronewsserbia/euronewsserbia.m3u8',
+    backupUrl: 'https://www.euronews.rs/live',
+    webUrl: 'https://www.euronews.rs',
+    location: 'Belgrade, Serbia',
     icon: '🇪🇺',
     tag: 'EUROPEAN NEWS',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/Lu_bQ2qB-1Y?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://www.euronews.rs/'
+    badge: 'HD'
+  },
+  {
+    id: 'tanjug_tv',
+    name: 'Tanjug TV',
+    lang: 'sr',
+    region: 'serbia',
+    category: 'wire',
+    streamUrl: 'https://tanjug-live.ercdn.net/tanjug/tanjug.m3u8',
+    backupUrl: 'https://tanjug.rs',
+    webUrl: 'https://tanjug.rs',
+    location: 'Belgrade, Serbia',
+    icon: '⚡',
+    tag: 'WIRE NEWS 24/7',
+    badge: 'HD'
+  },
+  {
+    id: 'una_tv',
+    name: 'Una TV',
+    lang: 'sr',
+    region: 'balkans',
+    category: 'news',
+    streamUrl: 'https://webtvstream.bhtelecom.ba/una-tv.m3u8',
+    backupUrl: 'https://unatv.rs',
+    webUrl: 'https://unatv.rs',
+    location: 'Banja Luka / Belgrade',
+    icon: '📺',
+    tag: 'REGIONAL NETWORK',
+    badge: 'HD'
+  },
+  {
+    id: 'rtv_puls',
+    name: 'RTV Puls',
+    lang: 'sr',
+    region: 'kosovo',
+    category: 'regional',
+    streamUrl: 'http://rtvpuls.com:1935/live/rtvpuls/playlist.m3u8',
+    backupUrl: 'https://www.rtvpuls.com/uzivo',
+    webUrl: 'https://www.rtvpuls.com',
+    location: 'Shilovo / Gjilan, Kosovo',
+    icon: '📺',
+    tag: 'CENTRAL KOSOVO',
+    badge: 'LOCAL'
+  },
+  {
+    id: 'rtv_kim',
+    name: 'RTV Kim',
+    lang: 'sr',
+    region: 'kosovo',
+    category: 'regional',
+    streamUrl: 'https://stream.radiokim.net/rtvkim/index.m3u8',
+    backupUrl: 'https://www.radiokim.net/uzivo',
+    webUrl: 'https://www.radiokim.net',
+    location: 'Čaglavica / Gračanica, Kosovo',
+    icon: '📺',
+    tag: 'CENTRAL KOSOVO',
+    badge: 'LOCAL'
+  },
+  {
+    id: 'trt_balkan',
+    name: 'TRT Balkan',
+    lang: 'sr',
+    region: 'balkans',
+    category: 'news',
+    streamUrl: 'https://tv-trtbalkan.live.ercdn.net/trtbalkan/trtbalkan.m3u8',
+    backupUrl: 'https://www.trtbalkan.com/sr',
+    webUrl: 'https://www.trtbalkan.com',
+    location: 'Sarajevo / Skopje',
+    icon: '📺',
+    tag: 'REGIONAL MULTI',
+    badge: 'HD'
   },
 
-  // US & Global Channels requested by user
+  // ── Core International Intelligence Feeds ───────────────────────────────────
   {
     id: 'bloomberg',
     name: 'Bloomberg TV',
-    location: 'New York, US',
+    lang: 'en',
     region: 'global',
+    category: 'defense_markets',
+    streamUrl: 'https://bloomberg-live.ercdn.net/bloomberg/bloomberg.m3u8',
+    backupUrl: 'https://live-manifest.bloomberg.com/live/us.m3u8',
+    webUrl: 'https://www.bloomberg.com/live',
+    location: 'New York, US',
     icon: '📈',
     tag: 'FINANCIAL / DEFENSE',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://www.bloomberg.com/live'
+    badge: 'FREE'
+  },
+  {
+    id: 'dw_news',
+    name: 'DW News English',
+    lang: 'en',
+    region: 'global',
+    category: 'news',
+    streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+    backupUrl: 'https://www.dw.com/en/live-tv/s-100825',
+    webUrl: 'https://www.dw.com',
+    location: 'Berlin, DE',
+    icon: '🌐',
+    tag: 'GLOBAL WIRE',
+    badge: 'HD'
+  },
+  {
+    id: 'euronews_en',
+    name: 'Euronews English',
+    lang: 'en',
+    region: 'global',
+    category: 'news',
+    streamUrl: 'https://euronews-euronews-world-1-au.samsung.wurl.tv/playlist.m3u8',
+    backupUrl: 'https://www.euronews.com/live',
+    webUrl: 'https://www.euronews.com',
+    location: 'Lyon, FR',
+    icon: '🇪🇺',
+    tag: 'EUROPEAN WIRE',
+    badge: 'HD'
   },
   {
     id: 'nbc_news_now',
     name: 'NBC News NOW',
-    location: 'New York, US',
+    lang: 'en',
     region: 'global',
+    category: 'news',
+    streamUrl: 'https://d2e1asnsl7br7b.cloudfront.net/7782e205e72f43a78e2b8f49141e50ea/index.m3u8',
+    backupUrl: 'https://nbcnews-lh.akamaihd.net/i/nbcnews_1@89144/master.m3u8',
+    webUrl: 'https://www.nbcnews.com/now',
+    location: 'New York, US',
     icon: '🌐',
     tag: '24/7 STREAMING',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/UKy3T_9g0F8?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://www.nbcnews.com/now'
+    badge: 'FREE'
   },
   {
     id: 'cbs_news_247',
     name: 'CBS News 24/7',
-    location: 'New York, US',
+    lang: 'en',
     region: 'global',
-    icon: '👁️',
+    category: 'news',
+    streamUrl: 'https://cbsn-us.cbsnstream.cbsnews.com/out/v1/55a8648e8f134e82a470f83d562de701/master.m3u8',
+    backupUrl: 'https://www.cbsnews.com/live',
+    webUrl: 'https://www.cbsnews.com/live',
+    location: 'New York, US',
+    icon: '🌐',
     tag: 'NATIONAL & WORLD',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/gN0PZCe-5q0?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://www.cbsnews.com/live/'
+    badge: 'FREE'
   },
   {
     id: 'abc_news_live',
     name: 'ABC News Live',
+    lang: 'en',
+    region: 'global',
+    category: 'news',
+    streamUrl: 'https://content.uplynk.com/channel/3324f2467c414329b3b0cc5cd987b6be.m3u8',
+    backupUrl: 'https://abcnews.go.com/Live',
+    webUrl: 'https://abcnews.go.com/Live',
     location: 'New York, US',
-    region: 'global',
-    icon: '🔴',
+    icon: '⚡',
     tag: 'BREAKING NEWS',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/w_Ma8oQLmSM?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://abcnews.go.com/Live'
-  },
-  {
-    id: 'dw_news',
-    name: 'DW News Global 24/7',
-    location: 'Berlin, DE',
-    region: 'global',
-    icon: '🇩🇪',
-    tag: 'INTERNATIONAL NEWS',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/Lu_bQ2qB-1Y?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://www.dw.com/en/live-tv/s-100825'
+    badge: 'FREE'
   },
   {
     id: 'c_span',
     name: 'C-SPAN',
-    location: 'Washington DC, US',
+    lang: 'en',
     region: 'global',
+    category: 'public_affairs',
+    streamUrl: 'https://cspan1-lh.akamaihd.net/i/cspan1_1@304727/master.m3u8',
+    backupUrl: 'https://www.c-span.org/networks',
+    webUrl: 'https://www.c-span.org',
+    location: 'Washington DC, US',
     icon: '🏛️',
-    tag: 'PUBLIC AFFAIRS & CONGRESS',
-    badge: 'FREE',
-    embedUrl: 'https://www.youtube.com/embed/dp8PhLsUcFE?autoplay=1&mute=1&playsinline=1',
-    webUrl: 'https://www.c-span.org/'
+    tag: 'CONGRESS & POLICY',
+    badge: 'FREE'
   }
 ];
 
 let currentActiveFeedId = 'bloomberg';
+let currentHlsInstance = null;
+let currentFeedPlayerMode = 'auto'; // 'auto' | 'embed' | 'direct'
+let streamWatchdogTimer = null;
 
-function formatFeedEmbedUrl(rawUrl) {
-  if (!rawUrl) return '';
-  let url = rawUrl.trim();
-  if (url.includes('youtube.com/watch?v=')) {
-    const vId = url.split('watch?v=')[1].split('&')[0];
-    return `https://www.youtube.com/embed/${vId}?autoplay=1&mute=1&playsinline=1&enablejsapi=1`;
+function hideFeedSpinner() {
+  const spinner = $('videoPlayerSpinner');
+  if (spinner) spinner.style.display = 'none';
+}
+
+function showFeedSpinner() {
+  const spinner = $('videoPlayerSpinner');
+  if (spinner) spinner.style.display = 'block';
+}
+
+function renderStandbyFallback(channel, failureReason = 'STREAM UNREACHABLE') {
+  const fallback = $('feedVideoFallback');
+  if (!fallback) return;
+
+  hideFeedSpinner();
+
+  const ch = channel || {};
+  const name = ch.name || 'BROADCAST FEED';
+  const loc = ch.location || 'Tactical Feed';
+  const icon = ch.icon || '📺';
+  const streamUrl = ch.streamUrl || '';
+  const backupUrl = ch.backupUrl || '';
+  const webUrl = ch.webUrl || ch.directLiveUrl || '';
+
+  fallback.innerHTML = `
+    <div class="standby-header">
+      <span class="standby-icon">${icon}</span>
+      <div class="standby-info">
+        <span class="standby-title">${escapeHtml(name)}</span>
+        <span class="standby-sub">${escapeHtml(loc)}</span>
+      </div>
+    </div>
+    <div class="standby-badge">
+      <span class="standby-pulse-dot">●</span>
+      <span>STREAM UNREACHABLE — BUFFER TIMEOUT / CDN CORS RESTRICTION</span>
+    </div>
+    <p class="standby-notice">
+      ${escapeHtml(failureReason)}. Origin broadcaster CDN blocked direct browser playback or stream is currently offline.
+    </p>
+    <div class="standby-actions">
+      <button type="button" class="btn-standby-launch" onclick="retryActiveFeed('direct')">
+        ⟳ RETRY DIRECT
+      </button>
+      <button type="button" class="btn-standby-launch" onclick="retryActiveFeed('proxy')" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); border-color: #34d399;">
+        🛡️ TRY MANIFEST PROXY
+      </button>
+      ${backupUrl ? `
+        <button type="button" class="btn-standby-launch" onclick="retryActiveFeed('backup')" style="background: linear-gradient(135deg, #d97706 0%, #b45309 100%); border-color: #fbbf24;">
+          📺 BACKUP STREAM
+        </button>
+      ` : ''}
+      ${webUrl ? `
+        <a href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer" class="btn-standby-portal">
+          ↗ LAUNCH OFFICIAL PORTAL
+        </a>
+      ` : ''}
+    </div>
+  `;
+  fallback.style.display = 'flex';
+}
+
+function retryActiveFeed(mode = 'direct') {
+  const channel = LIVE_FEEDS_CHANNELS.find(c => c.id === currentActiveFeedId) || LIVE_FEEDS_CHANNELS[0];
+  if (!channel) return;
+  if (mode === 'proxy') {
+    playHlsStream(channel.streamUrl, channel.name, { ...channel, forceProxy: true, attempt: 2 });
+  } else if (mode === 'backup' && channel.backupUrl) {
+    playHlsStream(channel.backupUrl, channel.name + ' (Backup)', { ...channel, isBackup: true, attempt: 3 });
+  } else {
+    playHlsStream(channel.streamUrl, channel.name, { ...channel, forceDirect: true, attempt: 1 });
   }
-  if (url.includes('youtu.be/')) {
-    const vId = url.split('youtu.be/')[1].split('?')[0];
-    return `https://www.youtube.com/embed/${vId}?autoplay=1&mute=1&playsinline=1&enablejsapi=1`;
+}
+window.retryActiveFeed = retryActiveFeed;
+
+function playHlsStream(streamUrl, arg2, arg3) {
+  let channelName = 'LIVE FEED';
+  let options = {};
+
+  if (typeof arg2 === 'string' && (arg2.startsWith('http://') || arg2.startsWith('https://'))) {
+    options.backupUrl = arg2;
+    channelName = typeof arg3 === 'string' ? arg3 : (arg3?.name || 'LIVE FEED');
+    if (typeof arg3 === 'object') options = { ...options, ...arg3 };
+  } else {
+    if (typeof arg2 === 'string') channelName = arg2;
+    if (typeof arg2 === 'object' && arg2 !== null) options = arg2;
+    if (typeof arg3 === 'object' && arg3 !== null) options = { ...options, ...arg3 };
+    if (typeof arg3 === 'string') options.backupUrl = arg3;
   }
-  if (url.includes('youtube.com/embed') && !url.includes('autoplay=')) {
-    return url + (url.includes('?') ? '&' : '?') + 'autoplay=1&mute=1&playsinline=1&enablejsapi=1';
+
+  const videoEl = $('liveFeedVideoPlayer');
+  if (!videoEl) return;
+
+  if (streamWatchdogTimer) {
+    clearTimeout(streamWatchdogTimer);
+    streamWatchdogTimer = null;
   }
-  return url;
+
+  const fallback = $('feedVideoFallback');
+  if (fallback) fallback.style.display = 'none';
+
+  // 1. Destroy existing Hls instance
+  if (currentHlsInstance) {
+    try { currentHlsInstance.destroy(); } catch (e) { console.warn('[Hls] Destroy error:', e); }
+    currentHlsInstance = null;
+  }
+  if (typeof window !== 'undefined' && window.currentHlsInstance) {
+    try { window.currentHlsInstance.destroy(); } catch (e) { console.warn('[Hls] Window destroy error:', e); }
+    window.currentHlsInstance = null;
+  }
+
+  try {
+    videoEl.pause();
+    videoEl.removeAttribute('src');
+    videoEl.load();
+  } catch (e) {}
+
+  if (!streamUrl) {
+    hideFeedSpinner();
+    return;
+  }
+
+  const rawUrl = String(streamUrl).trim();
+  const attempt = options.attempt || (options.forceProxy ? 2 : 1);
+  const isProxyAttempt = attempt === 2 || options.forceProxy;
+  const isBackupAttempt = options.isBackup || attempt === 3;
+
+  let effectiveUrl = rawUrl;
+  if (isProxyAttempt) {
+    effectiveUrl = `/api/stream/manifest?url=${encodeURIComponent(rawUrl)}`;
+  }
+
+  showFeedSpinner();
+
+  function onPlaybackSuccess() {
+    if (streamWatchdogTimer) {
+      clearTimeout(streamWatchdogTimer);
+      streamWatchdogTimer = null;
+    }
+    hideFeedSpinner();
+    if (fallback) fallback.style.display = 'none';
+  }
+
+  videoEl.removeEventListener('playing', onPlaybackSuccess);
+  videoEl.removeEventListener('canplay', onPlaybackSuccess);
+  videoEl.addEventListener('playing', onPlaybackSuccess, { once: true });
+  videoEl.addEventListener('canplay', onPlaybackSuccess, { once: true });
+
+  // 8-Second Watchdog Timer
+  streamWatchdogTimer = setTimeout(() => {
+    if (videoEl.paused || videoEl.readyState < 2) {
+      console.warn(`[Hls] 8-second buffering timeout reached for ${channelName} (attempt: ${attempt})`);
+      if (!isProxyAttempt && !isBackupAttempt) {
+        console.log(`[Hls] Auto-escalating ${channelName} to Manifest Proxy...`);
+        playHlsStream(rawUrl, channelName, { ...options, forceProxy: true, attempt: 2 });
+      } else if (options.backupUrl && !isBackupAttempt) {
+        console.log(`[Hls] Auto-escalating ${channelName} to Backup Feed...`);
+        playHlsStream(options.backupUrl, channelName + ' (Backup)', { ...options, isBackup: true, attempt: 3 });
+      } else {
+        renderStandbyFallback(options.channel || { name: channelName, streamUrl: rawUrl, backupUrl: options.backupUrl, webUrl: options.webUrl }, 'Buffer timeout (8s) - Origin CDN did not deliver media segments');
+      }
+    }
+  }, 8000);
+
+  // Attach Hls.js
+  const HlsClass = (typeof window !== 'undefined' && window.Hls) ? window.Hls : (typeof Hls !== 'undefined' ? Hls : null);
+
+  if (HlsClass && typeof HlsClass.isSupported === 'function' && HlsClass.isSupported()) {
+    const hls = new HlsClass({
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 60,
+      maxBufferLength: 30,
+      manifestLoadingTimeOut: 6000,
+      manifestLoadingMaxRetry: 2,
+      levelLoadingTimeOut: 6000,
+      fragLoadingTimeOut: 8000
+    });
+
+    hls.on(HlsClass.Events.ERROR, function (event, data) {
+      if (data && data.fatal) {
+        console.warn(`[Hls] Fatal error encountered (${data.type}/${data.details}) on ${channelName}:`, data);
+        switch (data.type) {
+          case HlsClass.ErrorTypes.NETWORK_ERROR:
+            if (!isProxyAttempt && !isBackupAttempt) {
+              console.log(`[Hls] Direct CDN network error for ${channelName}. Retrying via manifest rewrite proxy...`);
+              try { hls.destroy(); } catch (_) {}
+              playHlsStream(rawUrl, channelName, { ...options, forceProxy: true, attempt: 2 });
+            } else if (options.backupUrl && !isBackupAttempt) {
+              console.log(`[Hls] Proxy failed for ${channelName}. Retrying with backup URL...`);
+              try { hls.destroy(); } catch (_) {}
+              playHlsStream(options.backupUrl, channelName + ' (Backup)', { ...options, isBackup: true, attempt: 3 });
+            } else {
+              try { hls.destroy(); } catch (_) {}
+              renderStandbyFallback(options.channel || { name: channelName, streamUrl: rawUrl, backupUrl: options.backupUrl, webUrl: options.webUrl }, `Network/CORS error (${data.details || 'Load failed'})`);
+            }
+            break;
+          case HlsClass.ErrorTypes.MEDIA_ERROR:
+            console.log('[Hls] Media error, attempting recovery...');
+            try {
+              hls.recoverMediaError();
+            } catch (e) {
+              renderStandbyFallback(options.channel || { name: channelName, streamUrl: rawUrl, backupUrl: options.backupUrl, webUrl: options.webUrl }, 'Media decode error');
+            }
+            break;
+          default:
+            try { hls.destroy(); } catch (_) {}
+            renderStandbyFallback(options.channel || { name: channelName, streamUrl: rawUrl, backupUrl: options.backupUrl, webUrl: options.webUrl }, `Playback failure (${data.details || 'Fatal'})`);
+            break;
+        }
+      }
+    });
+
+    hls.loadSource(effectiveUrl);
+    hls.attachMedia(videoEl);
+    hls.on(HlsClass.Events.MANIFEST_PARSED, function () {
+      videoEl.play().catch(e => console.warn('[Hls] Autoplay prevented:', e));
+    });
+
+    currentHlsInstance = hls;
+    if (typeof window !== 'undefined') window.currentHlsInstance = hls;
+
+  } else if (videoEl.canPlayType && videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+    videoEl.src = effectiveUrl;
+    videoEl.addEventListener('loadedmetadata', function () {
+      videoEl.play().catch(e => console.warn('[Video] Autoplay prevented:', e));
+    }, { once: true });
+  } else {
+    videoEl.src = effectiveUrl;
+    videoEl.play().catch(e => console.warn('[Video] Autoplay prevented:', e));
+  }
+
+  // Update active channel overlay
+  const overlay = $('videoChannelOverlay');
+  if (overlay) {
+    const lang = (options.lang || '').toUpperCase();
+    const langBadge = lang ? `<span class="channel-lang-badge">${escapeHtml(lang)}</span>` : '';
+    const proxyBadge = isProxyAttempt ? '<span style="color:#38bdf8; font-size:8.5px; font-weight:700; background:rgba(56,189,248,0.2); padding:1px 4px; border-radius:3px;">PROXY</span>' : '';
+    overlay.innerHTML = `
+      <span class="live-dot"></span>
+      <span class="channel-name-tag">${escapeHtml(channelName)}</span>
+      ${langBadge}
+      ${proxyBadge}
+      <span style="color:#22c55e; font-weight:800; font-size:9px; letter-spacing:0.5px;">LIVE</span>
+    `;
+    overlay.style.display = 'flex';
+  }
+
+  // Update header badges
+  const nameEl = $('activeFeedName');
+  const locEl = $('activeFeedLoc');
+  const linkEl = $('feedExternalLink');
+  const badgeEl = $('feedLiveStreamBadge');
+
+  if (nameEl) nameEl.textContent = channelName;
+  if (locEl && options.location) locEl.textContent = options.location;
+  if (linkEl) linkEl.href = options.webUrl || options.directLiveUrl || rawUrl;
+  if (badgeEl) badgeEl.textContent = isProxyAttempt ? 'PROXY HLS' : (isBackupAttempt ? 'BACKUP HLS' : 'LIVE HLS');
+}
+
+function setFeedPlayerMode(mode) {
+  currentFeedPlayerMode = mode;
+  const btnEmbed = $('btnFeedModeEmbed');
+  const btnDirect = $('btnFeedModeDirect');
+  if (btnEmbed) btnEmbed.classList.toggle('active', mode === 'embed');
+  if (btnDirect) btnDirect.classList.toggle('active', mode === 'direct');
+  switchFeedChannel(currentActiveFeedId);
+}
+
+function launchActiveDirectFeed() {
+  const channel = LIVE_FEEDS_CHANNELS.find(c => c.id === currentActiveFeedId);
+  if (!channel) return;
+  const targetUrl = channel.streamUrl || channel.directLiveUrl || channel.webUrl;
+  if (targetUrl) {
+    window.open(targetUrl, '_blank', 'noopener,noreferrer,width=1280,height=720');
+  }
+}
+
+function getRecentHeadlinesForChannel(channel) {
+  const items = state.data?.news?.items || [];
+  if (!items.length) return [];
+  const filters = channel.sourceFilter || [channel.name];
+  const matched = items.filter(it => {
+    const src = (it.source || '').toLowerCase();
+    const title = (it.title || '').toLowerCase();
+    return filters.some(f => src.includes(f.toLowerCase()) || title.includes(f.toLowerCase()));
+  });
+  if (matched.length) return matched.slice(0, 3);
+  return items.slice(0, 3);
+}
+
+
+function formatFeedEmbedUrl(rawUrl, channel) {
+  return rawUrl || (channel && (channel.streamUrl || channel.embedUrl)) || '';
+}
+
+function getFeedChannelIcon(c) {
+  if (c.icon && !['🇦🇱', '🇽🇰', '🇷🇸', '🇪🇺'].includes(c.icon)) {
+    return c.icon;
+  }
+  if (c.category === 'wire') return '⚡';
+  if (c.category === 'parliamentary' || c.category === 'public_affairs') return '🏛️';
+  if (c.category === 'financial' || c.category === 'business') return '📈';
+  if (c.category === 'public_broadcaster') return '📡';
+  if (c.region === 'global') return '🌐';
+  if (c.category === 'defense') return '🛡️';
+  return '📺';
+}
+
+function cleanFeedTag(tag) {
+  if (!tag) return 'INTEL';
+  return tag.replace(/\s+(SR|SQ)$/i, '').trim();
 }
 
 function renderLiveFeeds(region = 'all') {
   const container = $('feedChannelsGrid');
   if (!container) return;
 
-  const filtered = region === 'all'
-    ? LIVE_FEEDS_CHANNELS
-    : LIVE_FEEDS_CHANNELS.filter(c => c.region === region);
+  let filtered = LIVE_FEEDS_CHANNELS;
+  if (region === 'sr') {
+    filtered = LIVE_FEEDS_CHANNELS.filter(c => c.lang === 'sr');
+  } else if (region === 'sq') {
+    filtered = LIVE_FEEDS_CHANNELS.filter(c => c.lang === 'sq');
+  } else if (region === 'int') {
+    filtered = LIVE_FEEDS_CHANNELS.filter(c => c.lang === 'en' || c.region === 'global');
+  } else if (region === 'balkans') {
+    filtered = LIVE_FEEDS_CHANNELS.filter(c => c.lang === 'sr' || c.lang === 'sq');
+  } else if (region === 'global') {
+    filtered = LIVE_FEEDS_CHANNELS.filter(c => c.region === 'global' || c.lang === 'en');
+  }
 
-  container.innerHTML = filtered.map(c => `
-    <div class="feed-card ${c.id === currentActiveFeedId ? 'active' : ''}" onclick="switchFeedChannel('${c.id}')" data-feed-id="${c.id}">
-      <div class="feed-card-info">
-        <span class="feed-card-icon">${c.icon}</span>
-        <div class="feed-card-meta">
-          <span class="feed-card-name">${c.name}</span>
-          <span class="feed-card-loc">${c.location}</span>
+  container.innerHTML = filtered.map(c => {
+    const icon = getFeedChannelIcon(c);
+    const tag = cleanFeedTag(c.tag || c.category || 'INTEL');
+    const badge = c.badge || 'HLS';
+    const badgeLower = badge.toLowerCase();
+    const badgeClass = badgeLower === 'hd' ? 'badge-hd' :
+                       badgeLower === 'local' ? 'badge-local' :
+                       badgeLower === 'wire' ? 'badge-wire' : 'badge-live';
+    const lang = (c.lang || 'en').toLowerCase();
+
+    return `
+      <div class="feed-card ${c.id === currentActiveFeedId ? 'active' : ''}" onclick="switchFeedChannel('${c.id}')" data-feed-id="${c.id}">
+        <div class="feed-card-main">
+          <div class="feed-card-icon-frame">
+            <span class="feed-card-icon">${icon}</span>
+          </div>
+          <div class="feed-card-details">
+            <div class="feed-card-title-row">
+              <span class="feed-card-name">${escapeHtml(c.name)}</span>
+              <span class="feed-card-lang-pill channel-lang-badge lang-${lang}">${lang.toUpperCase()}</span>
+            </div>
+            <div class="feed-card-sub-row">
+              <span class="feed-card-loc">${escapeHtml(c.location || '')}</span>
+            </div>
+          </div>
+        </div>
+        <div class="feed-card-badges">
+          <span class="feed-tag-pill feed-tag-badge">${escapeHtml(tag)}</span>
+          <span class="feed-badge-pill feed-badge-free ${badgeClass}">${escapeHtml(badge)}</span>
         </div>
       </div>
-      <div class="feed-card-tags">
-        <span class="feed-tag-badge">${c.tag}</span>
-        <span class="feed-badge-free">${c.badge}</span>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   const activeBadge = $('feedsLiveBadge');
   if (activeBadge) {
@@ -8693,39 +10155,14 @@ function switchFeedRegion(region, btn) {
 }
 
 function switchFeedChannel(channelId) {
-  const channel = LIVE_FEEDS_CHANNELS.find(c => c.id === channelId);
+  const channel = LIVE_FEEDS_CHANNELS.find(c => c.id === channelId) || LIVE_FEEDS_CHANNELS[0];
   if (!channel) return;
-  currentActiveFeedId = channelId;
+  currentActiveFeedId = channel.id;
 
-  const frame = $('liveFeedVideoFrame');
-  const nameEl = $('activeFeedName');
-  const locEl = $('activeFeedLoc');
-  const linkEl = $('feedExternalLink');
-  const fallback = $('feedVideoFallback');
-  const fallbackTitle = $('fallbackChannelTitle');
-  const fallbackLink = $('fallbackExternalLink');
-
-  if (nameEl) nameEl.textContent = channel.name;
-  if (locEl) locEl.textContent = channel.location;
-  if (linkEl) linkEl.href = channel.webUrl || channel.embedUrl || '#';
-  if (fallbackTitle) fallbackTitle.textContent = channel.name;
-  if (fallbackLink) fallbackLink.href = channel.webUrl || channel.embedUrl || '#';
-
-  if (frame) {
-    const finalUrl = formatFeedEmbedUrl(channel.embedUrl);
-    if (finalUrl) {
-      frame.src = finalUrl;
-      frame.style.display = 'block';
-      if (fallback) fallback.style.display = 'none';
-    } else {
-      frame.src = '';
-      frame.style.display = 'none';
-      if (fallback) fallback.style.display = 'flex';
-    }
-  }
+  playHlsStream(channel.streamUrl, channel.name, channel);
 
   document.querySelectorAll('.feed-card').forEach(card => {
-    card.classList.toggle('active', card.dataset.feedId === channelId);
+    card.classList.toggle('active', card.dataset.feedId === channel.id);
   });
 }
 
@@ -8733,22 +10170,12 @@ function connectCustomFeedStream() {
   const input = $('feedCustomStreamInput');
   if (!input || !input.value.trim()) return;
   const rawUrl = input.value.trim();
-  const embedUrl = formatFeedEmbedUrl(rawUrl);
 
-  const frame = $('liveFeedVideoFrame');
-  const nameEl = $('activeFeedName');
-  const locEl = $('activeFeedLoc');
-  const linkEl = $('feedExternalLink');
-  const fallback = $('feedVideoFallback');
-
-  if (frame) {
-    frame.src = embedUrl;
-    frame.style.display = 'block';
-  }
-  if (fallback) fallback.style.display = 'none';
-  if (nameEl) nameEl.textContent = 'CUSTOM TACTICAL FEED';
-  if (locEl) locEl.textContent = 'USER STREAM';
-  if (linkEl) linkEl.href = rawUrl;
+  playHlsStream(rawUrl, 'CUSTOM TACTICAL STREAM', {
+    lang: 'custom',
+    location: 'USER HLS STREAM',
+    category: 'custom'
+  });
 }
 
 // 3. TACTICAL DRAWING TOOLS & AOI MEASUREMENT
@@ -10021,6 +11448,11 @@ try {
 
 window.toggleDefenseMarketPanel = toggleDefenseMarketPanel;
 window.switchDefenseSector = switchDefenseSector;
+window.LIVE_FEEDS_CHANNELS = LIVE_FEEDS_CHANNELS;
+window.playHlsStream = playHlsStream;
+window.formatFeedEmbedUrl = formatFeedEmbedUrl;
+window.setFeedPlayerMode = setFeedPlayerMode;
+window.launchActiveDirectFeed = launchActiveDirectFeed;
 window.renderLiveFeeds = renderLiveFeeds;
 window.switchFeedRegion = switchFeedRegion;
 window.switchFeedChannel = switchFeedChannel;

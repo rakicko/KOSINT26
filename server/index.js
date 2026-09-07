@@ -13,10 +13,13 @@ const { fetchTelegram, fetchMediaThumbnail } = require('../skills/telegram-monit
 const { fetchBorders } = require('../skills/border-monitor/skill');
 const staffService = require('./staff-service');
 const mineService = require('./mine-service');
+const { synthesizeFlashSitRep } = require('./sitrep');
+const { getRegionalTension } = require('./tension');
 const auth = require('./auth');
 const rateLimit = require('express-rate-limit');
 const cache = require('./cache');
 const { CACHE_TTL } = cache;
+const { streamProxyRouter } = require('./stream-proxy');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -69,6 +72,9 @@ app.use(express.static(path.join(__dirname, '../public'), {
     }
   }
 }));
+
+// ── HLS Selective Manifest Proxy (Bandwidth-Protected for Render) ───────────
+app.use('/api/stream', streamProxyRouter);
 
 // ── SSE clients registry ─────────────────────────────────────────────────────
 const sseClients = new Set();
@@ -208,6 +214,32 @@ app.post('/api/status', auth.requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── API: Flash SitRep Generator ───────────────────────────────────────────────
+app.post('/api/news/sitrep', async (req, res) => {
+  try {
+    const { items } = req.body || {};
+    const sitrepData = await synthesizeFlashSitRep(items);
+    res.json(sitrepData);
+  } catch (err) {
+    console.error('[server] sitrep synthesis error:', err);
+    res.status(500).json({ error: err.message || 'Failed to synthesize tactical SitRep' });
+  }
+});
+
+// ── API: Regional Tension Index (RTI) ─────────────────────────────────────────
+app.get('/api/news/tension', async (req, res) => {
+  try {
+    const tensionData = await getRegionalTension();
+    res.json(tensionData);
+  } catch (err) {
+    console.error('[server] regional tension calculation error:', err);
+    res.status(500).json({ error: err.message || 'Failed to compute regional tension' });
+  }
+});
+
+// ── API: Stream Manifest-Only Proxy ──────────────────────────────────────────
+app.use('/api/stream', streamProxyRouter);
 
 // ── API: Get alert history ────────────────────────────────────────────────────
 app.get('/api/alerts', auth.requireAuth, (req, res) => {
@@ -494,8 +526,13 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🛰️  SENTINEL Dashboard running at http://localhost:${PORT}`);
-  console.log(`   SSE feed at http://localhost:${PORT}/events`);
-  console.log(`   API docs: POST /api/status, GET /api/alerts, GET /api/locations\n`);
-});
+let server;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log(`\n🛰️  SENTINEL Dashboard running at http://localhost:${PORT}`);
+    console.log(`   SSE feed at http://localhost:${PORT}/events`);
+    console.log(`   API docs: POST /api/status, GET /api/alerts, GET /api/locations\n`);
+  });
+}
+
+module.exports = { app, server };

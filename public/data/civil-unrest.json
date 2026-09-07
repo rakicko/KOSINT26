@@ -1,0 +1,359 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "title": "Kosovo Public Gatherings Ahead of Hague Verdict",
+    "event": "Specialist Chambers Verdict Viewing & Support Gatherings",
+    "targetDate": "2026-09-16T10:00:00+02:00",
+    "referenceDate": "2026-09-07T00:00:00+02:00",
+    "case": "Hashim Tha\u00e7i, Kadri Veseli, Jakup Krasniqi, Rexhep Selimi",
+    "totalLocations": 15,
+    "version": "1.0.0"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "gathering-prishtina",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [21.1633, 42.6639]
+      },
+      "properties": {
+        "id": "gathering-prishtina",
+        "order": 1,
+        "location": "Prishtina",
+        "municipality": "Prishtin\u00eb",
+        "venue": "Mother Teresa Boulevard / central square",
+        "status": "confirmed_viewing",
+        "statusLabel": "Confirmed public viewing (16 Sept)",
+        "symbolType": "star-circle",
+        "severity": "high",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "confirmed",
+        "crowdEstimate": "15,000 - 25,000",
+        "tacticalNotes": "Live broadcast screening of Hague verdict on 16 September. Main pedestrian boulevard cordoned. High institutional and diplomatic presence."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-ferizaj",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [21.1557, 42.3705]
+      },
+      "properties": {
+        "id": "gathering-ferizaj",
+        "order": 2,
+        "location": "Ferizaj",
+        "municipality": "Ferizaj",
+        "venue": "City square",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown) / support activity",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "3,000 - 5,000",
+        "tacticalNotes": "Ora e Pritjes countdown screen installed in central square. Local civic and veteran community assembly."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-vushtrri",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.9664, 42.8236]
+      },
+      "properties": {
+        "id": "gathering-vushtrri",
+        "order": 3,
+        "location": "Vushtrri",
+        "municipality": "Vushtrri",
+        "venue": "Adem Jashari Square",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "2,500 - 4,000",
+        "tacticalNotes": "Countdown monitor staged in Adem Jashari Square. Gathering announced ahead of verdict delivery."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-skenderaj",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.7892, 42.7483]
+      },
+      "properties": {
+        "id": "gathering-skenderaj",
+        "order": 4,
+        "location": "Skenderaj",
+        "municipality": "Skenderaj",
+        "venue": "Adem Jashari Square",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "4,000 - 7,000",
+        "tacticalNotes": "Drenica focal assembly. Screen installed for Ora e Pritjes. Strong public engagement anticipated."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-prizren",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.7415, 42.2096]
+      },
+      "properties": {
+        "id": "gathering-prizren",
+        "order": 5,
+        "location": "Prizren",
+        "municipality": "Prizren",
+        "venue": "Shad\u00ebrvan",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "5,000 - 8,000",
+        "tacticalNotes": "Shad\u00ebrvan historic plaza. Dense foot traffic zone; public countdown monitor active."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-viti",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [21.3583, 42.3214]
+      },
+      "properties": {
+        "id": "gathering-viti",
+        "order": 6,
+        "location": "Viti (Vitina)",
+        "municipality": "Viti",
+        "venue": "Venue not specified",
+        "status": "ovl_uck_support",
+        "statusLabel": "Countdown / support activity (local OVL-U\u00c7K branch)",
+        "symbolType": "purple-ring",
+        "severity": "elevated",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "ovl_uck",
+        "crowdEstimate": "1,500 - 3,000",
+        "tacticalNotes": "Countdown and support activity organized with participation of the local OVL-U\u00c7K branch. Venue to be specified upon municipal permit."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-rahovec",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.6558, 42.3994]
+      },
+      "properties": {
+        "id": "gathering-rahovec",
+        "order": 7,
+        "location": "Rahovec",
+        "municipality": "Rahovec",
+        "venue": "City square",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "1,500 - 2,500",
+        "tacticalNotes": "City square public assembly point. Screen installed for live countdown transmission."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-malisheve",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.7456, 42.4828]
+      },
+      "properties": {
+        "id": "gathering-malisheve",
+        "order": 8,
+        "location": "Malishev\u00eb",
+        "municipality": "Malishev\u00eb",
+        "venue": "Sheshi i D\u00ebshmor\u00ebve",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "2,000 - 4,000",
+        "tacticalNotes": "Sheshi i D\u00ebshmor\u00ebve central square gathering. Countdown screen installed."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-mitrovice",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.8660, 42.8887]
+      },
+      "properties": {
+        "id": "gathering-mitrovice",
+        "order": 9,
+        "location": "Mitrovic\u00eb (South)",
+        "municipality": "Mitrovic\u00eb e Jugut",
+        "venue": "Meh\u00eb Uka Square",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown) \u00b7 Proximity to Ibar Bridge",
+        "symbolType": "blue-ring",
+        "severity": "elevated",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "3,000 - 6,000",
+        "tacticalNotes": "Meh\u00eb Uka Square gathering. Strategic sensitivity due to ~350m proximity to Main Ibar Bridge and KFOR MSU cordon."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-gjakove",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.4300, 42.3800]
+      },
+      "properties": {
+        "id": "gathering-gjakove",
+        "order": 10,
+        "location": "Gjakov\u00eb",
+        "municipality": "Gjakov\u00eb",
+        "venue": "Venue not specified",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "3,000 - 5,000",
+        "tacticalNotes": "Public gathering announced; municipal confirmation of exact public plaza pending."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-drenas",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.8931, 42.6247]
+      },
+      "properties": {
+        "id": "gathering-drenas",
+        "order": 11,
+        "location": "Drenas",
+        "municipality": "Drenas (Gllogoc)",
+        "venue": "Fehmi and Xhev\u00eb Lladrovci Square",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "3,000 - 5,500",
+        "tacticalNotes": "Fehmi and Xhev\u00eb Lladrovci Square. Stage setup and countdown screen active."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-suhareke",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.8247, 42.3589]
+      },
+      "properties": {
+        "id": "gathering-suhareke",
+        "order": 12,
+        "location": "Suharek\u00eb",
+        "municipality": "Suharek\u00eb (Therand\u00eb)",
+        "venue": "Sheshi i Qytetit (Art Center)",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "2,000 - 3,500",
+        "tacticalNotes": "City square adjacent to Art Center. Public screen displaying verdict countdown."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-decan",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.2886, 42.5358]
+      },
+      "properties": {
+        "id": "gathering-decan",
+        "order": 13,
+        "location": "De\u00e7an",
+        "municipality": "De\u00e7an",
+        "venue": "City centre",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "2,000 - 3,500",
+        "tacticalNotes": "City centre assembly. Support activities along central axis."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-gjilan",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [21.4683, 42.4635]
+      },
+      "properties": {
+        "id": "gathering-gjilan",
+        "order": 14,
+        "location": "Gjilan",
+        "municipality": "Gjilan",
+        "venue": "Venue not specified",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "3,000 - 5,000",
+        "tacticalNotes": "Ora e Pritjes announced for Gjilan. Final venue location being arranged."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gathering-kacanik",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [21.2592, 42.2319]
+      },
+      "properties": {
+        "id": "gathering-kacanik",
+        "order": 15,
+        "location": "Ka\u00e7anik",
+        "municipality": "Ka\u00e7anik",
+        "venue": "City centre",
+        "status": "countdown_screen",
+        "statusLabel": "Ora e Pritjes (countdown)",
+        "symbolType": "blue-ring",
+        "severity": "medium",
+        "targetDate": "2026-09-16T10:00:00+02:00",
+        "category": "countdown",
+        "crowdEstimate": "1,500 - 3,000",
+        "tacticalNotes": "Ka\u00e7anik city centre public assembly. Countdown screen operational."
+      }
+    }
+  ]
+}

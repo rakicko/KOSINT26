@@ -38,7 +38,9 @@ const {
 const {
   hasKosovoContext,
   calculateSecurityScore,
-  isSportsOrEntertainment
+  isSportsOrEntertainment,
+  calculateEffectiveRank,
+  calculateRegionalTension
 } = require('./security');
 
 const {
@@ -46,6 +48,13 @@ const {
   normalizeUrl,
   normalizeHeadline,
   calculateTitleSimilarity,
+  calculateJaccardSimilarity,
+  tokenizeTitleForJaccard,
+  extractBilingualBridgeEntities,
+  detectArticleLanguage,
+  computeVerificationStatus,
+  BILINGUAL_LOCATIONS_MAP,
+  BILINGUAL_TACTICAL_MAP,
   isDuplicateStory,
   deduplicateNewsItems,
   generateDeterministicEventId,
@@ -164,13 +173,130 @@ function analyzeArticle(title = '', description = '', publishedAt = null) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Circuit Breaker & Resilient Cooldown (World Monitor Pattern)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MAX_FAILURES = 2;
+const FEED_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const FEED_CIRCUIT_STATE = new Map();
+
+function isFeedInCooldown(url, now = Date.now()) {
+  const state = FEED_CIRCUIT_STATE.get(url);
+  if (!state) return false;
+  return state.cooldownUntil > now;
+}
+
+function recordFeedSuccess(url) {
+  const state = FEED_CIRCUIT_STATE.get(url);
+  if (state) {
+    state.consecutiveFailures = 0;
+    state.cooldownUntil = 0;
+  }
+}
+
+function recordFeedFailure(url, now = Date.now()) {
+  let state = FEED_CIRCUIT_STATE.get(url);
+  if (!state) {
+    state = { consecutiveFailures: 0, cooldownUntil: 0 };
+    FEED_CIRCUIT_STATE.set(url, state);
+  }
+  state.consecutiveFailures += 1;
+  if (state.consecutiveFailures >= MAX_FAILURES) {
+    state.cooldownUntil = now + FEED_COOLDOWN_MS;
+    console.log(`[news-intel] Circuit breaker tripped for ${url}: ${state.consecutiveFailures} consecutive failures, in cooldown until ${new Date(state.cooldownUntil).toISOString()}`);
+  }
+}
+
+/**
+ * Error-safe image extractor for xml2js item structures.
+ * Checks in order:
+ * a) media:content (attributes.url)
+ * b) media:thumbnail (attributes.url)
+ * c) <enclosure> where type starts with image/
+ * d) First <img> tag src matched via regex inside description or content:encoded
+ *
+ * @param {object} item - Parsed RSS xml2js item object
+ * @returns {string|null} Image URL if found, or null
+ */
+function extractImageUrl(item) {
+  if (!item || typeof item !== 'object') return null;
+
+  try {
+    const getAttr = (obj, attr) => {
+      if (!obj) return null;
+      if (obj.$ && obj.$[attr]) return String(obj.$[attr]).trim();
+      if (obj.attributes && obj.attributes[attr]) return String(obj.attributes[attr]).trim();
+      if (obj[attr] && typeof obj[attr] === 'string') return String(obj[attr]).trim();
+      return null;
+    };
+
+    // a) media:content (attributes.url)
+    const mediaContents = Array.isArray(item['media:content'])
+      ? item['media:content']
+      : (item['media:content'] ? [item['media:content']] : []);
+    for (const mc of mediaContents) {
+      const url = getAttr(mc, 'url');
+      if (url) return url;
+    }
+
+    // b) media:thumbnail (attributes.url)
+    const mediaThumbs = Array.isArray(item['media:thumbnail'])
+      ? item['media:thumbnail']
+      : (item['media:thumbnail'] ? [item['media:thumbnail']] : []);
+    for (const mt of mediaThumbs) {
+      const url = getAttr(mt, 'url');
+      if (url) return url;
+    }
+
+    // c) <enclosure> where type starts with image/
+    const enclosures = Array.isArray(item.enclosure)
+      ? item.enclosure
+      : (item.enclosure ? [item.enclosure] : []);
+    for (const enc of enclosures) {
+      const type = getAttr(enc, 'type') || '';
+      const url = getAttr(enc, 'url');
+      if (url && (type.toLowerCase().startsWith('image/') || /\.(jpe?g|png|webp|gif|svg)($|\?)/i.test(url))) {
+        return url;
+      }
+    }
+
+    // d) First <img> tag src matched via regex inside description or content:encoded
+    const getRawVal = (val) => {
+      if (!val) return '';
+      if (typeof val === 'string') return val;
+      if (Array.isArray(val) && val.length > 0) return getRawVal(val[0]);
+      if (typeof val === 'object' && val._) return String(val._);
+      return '';
+    };
+
+    const htmlContent = `${getRawVal(item.description)} ${getRawVal(item['content:encoded'])} ${getRawVal(item.content)}`.trim();
+    if (htmlContent) {
+      const imgMatch = /<img[^>]+src=["']([^"']+)["']/i.exec(htmlContent);
+      if (imgMatch && imgMatch[1]) {
+        return imgMatch[1].trim();
+      }
+    }
+  } catch (err) {
+    return null;
+  }
+
+  return null;
+}
+
 /**
  * RSS Fetch for individual source
  */
 async function fetchRSS(source) {
+  const feedUrl = source.url;
+  if (isFeedInCooldown(feedUrl)) {
+    console.log(`[news-intel] ${source.name} is in cooldown, skipping request`);
+    return [];
+  }
+
   try {
     const response = await axios.get(source.url, {
-      timeout: 15000,
+      timeout: 4000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'application/rss+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8',
@@ -182,6 +308,9 @@ async function fetchRSS(source) {
     const rawXml = (typeof response.data === 'string' ? response.data : '').replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
     const parsed = await xml2js.parseStringPromise(rawXml);
     const items = parsed.rss?.channel?.[0]?.item || parsed['rdf:RDF']?.item || parsed.feed?.entry || [];
+
+    // Success: reset failure tracking for this feed
+    recordFeedSuccess(feedUrl);
 
     return items.map((item, index) => {
       const getRawText = (val) => {
@@ -217,16 +346,21 @@ async function fetchRSS(source) {
 
       let parsedDateIso;
       try {
-        const rawDate = item.pubDate?.[0] || item.updated?.[0] || item.published?.[0];
-        const d = rawDate ? new Date(rawDate) : new Date();
+        const rawDate = (Array.isArray(item.pubDate) ? item.pubDate[0] : item.pubDate) ||
+          (Array.isArray(item['dc:date']) ? item['dc:date'][0] : item['dc:date']) ||
+          (Array.isArray(item.updated) ? item.updated[0] : item.updated) ||
+          (Array.isArray(item.published) ? item.published[0] : item.published);
+        const dateStr = (typeof rawDate === 'object' && rawDate?._) ? String(rawDate._) : (rawDate ? String(rawDate) : '');
+        const d = dateStr ? new Date(dateStr) : new Date();
         parsedDateIso = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
       } catch {
         parsedDateIso = new Date().toISOString();
       }
 
+      const imageUrl = extractImageUrl(item);
       const analysis = analyzeArticle(title, description, parsedDateIso);
 
-      return {
+      const articleObj = {
         id: `${source.name}-${index}`,
         title,
         description: description.substring(0, 300),
@@ -236,6 +370,7 @@ async function fetchRSS(source) {
         sourceCount: 1,
         language: source.lang,
         reliability: SOURCE_RELIABILITY[source.name] || 0.5,
+        pubDate: parsedDateIso,
         publishedAt: parsedDateIso,
         intensityScore: analysis.intensityScore,
         severity: analysis.severity,
@@ -245,10 +380,27 @@ async function fetchRSS(source) {
         tags: analysis.tags,
         isSecurityRelevant: analysis.isSecurityRelevant,
         _signals: analysis.signals,
-        multilingualEntities: analysis.signals.entities
+        multilingualEntities: analysis.signals.entities,
+        _rank: calculateEffectiveRank({
+          severity: analysis.severity,
+          intensityScore: analysis.intensityScore,
+          pubDate: parsedDateIso,
+          publishedAt: parsedDateIso,
+          _signals: analysis.signals,
+          tags: analysis.tags,
+          title,
+          description
+        })
       };
+
+      if (imageUrl) {
+        articleObj.imageUrl = imageUrl;
+      }
+
+      return articleObj;
     }).filter(Boolean);
   } catch (error) {
+    recordFeedFailure(feedUrl);
     console.log(`[news-intel] ${source.name} failed: ${error.message}`);
     return [];
   }
@@ -292,21 +444,25 @@ async function fetchNews({
   // Deduplicate syndicated news items before clustering across all scanned articles
   const deduplicatedArticles = deduplicateNewsItems(allArticles);
 
-  // Partition articles by language to strictly prevent cross-language headline contamination
-  const serbianArticles = deduplicatedArticles.filter(a => a.language === 'sr' || ['KoSSev', 'Radio Mitrovica Sever', 'Radio KIM', 'Kosova.info'].includes(a.source));
-  const albanianArticles = deduplicatedArticles.filter(a => !serbianArticles.includes(a));
+  // Multi-Factor Cross-Source Event Clustering Engine (World Monitor clustering.ts pattern)
+  // Cross-lingual merging via Bilingual Entity Bridge & Jaccard token overlap
+  const deduplicatedEvents = clusterEventArticles(deduplicatedArticles);
 
-  const serbianEvents = clusterEventArticles(serbianArticles).map(e => ({ ...e, language: 'sr' }));
-  const albanianEvents = clusterEventArticles(albanianArticles).map(e => ({ ...e, language: 'al' }));
+  // Dynamic threat & time-decay news ranking (World Monitor)
+  deduplicatedEvents.forEach(ev => {
+    if (!ev.pubDate && ev.publishedAt) {
+      ev.pubDate = ev.publishedAt;
+    }
+    ev._rank = calculateEffectiveRank(ev);
+  });
 
-  // Multi-Factor Event Clustering Engine output combined
-  const deduplicatedEvents = [...serbianEvents, ...albanianEvents];
-
-  // Sort Order: 1. Severity, 2. Score, 3. Confidence, 4. IndependentSourceCount, 5. PublishedAt
-  const severityRank = { critical: 4, high: 3, medium: 2, low: 1 };
+  // Sort Order: Primary by _rank descending (dynamic threat & time-decay)
+  // Tie-breaker: intensityScore, confidence, independentSourceCount, publishedAt
   deduplicatedEvents.sort((a, b) => {
-    if (severityRank[b.severity] !== severityRank[a.severity]) {
-      return (severityRank[b.severity] || 1) - (severityRank[a.severity] || 1);
+    const rankA = typeof a._rank === 'number' ? a._rank : 0;
+    const rankB = typeof b._rank === 'number' ? b._rank : 0;
+    if (rankB !== rankA) {
+      return rankB - rankA;
     }
     if (b.intensityScore !== a.intensityScore) {
       return (b.intensityScore || 0) - (a.intensityScore || 0);
@@ -317,7 +473,7 @@ async function fetchNews({
     if ((b.independentSourceCount || 0) !== (a.independentSourceCount || 0)) {
       return (b.independentSourceCount || 0) - (a.independentSourceCount || 0);
     }
-    return new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime();
+    return new Date(b.pubDate || b.publishedAt || 0).getTime() - new Date(a.pubDate || a.publishedAt || 0).getTime();
   });
 
   const CACHE_FILE = path.join(__dirname, '.news_cache.json');
@@ -350,7 +506,8 @@ async function fetchNews({
       rawScanned: allArticles.length,
       discardedOther: 0,
       highIntensity: deduplicatedEvents.filter(a => a.intensityScore >= 7).length,
-      maxScore: deduplicatedEvents[0]?.intensityScore || 0
+      maxScore: deduplicatedEvents[0]?.intensityScore || 0,
+      maxRank: deduplicatedEvents[0]?._rank || 0
     }
   };
 
@@ -390,6 +547,8 @@ module.exports = {
 
   // Scoring & Ontology
   calculateSecurityScore,
+  calculateEffectiveRank,
+  calculateRegionalTension,
   CANONICAL_ENTITIES,
   CANONICAL_EVENT_TYPES,
   EVENT_COMPATIBILITY_MATRIX,
@@ -401,6 +560,13 @@ module.exports = {
   normalizeUrl,
   normalizeHeadline,
   calculateTitleSimilarity,
+  calculateJaccardSimilarity,
+  tokenizeTitleForJaccard,
+  extractBilingualBridgeEntities,
+  detectArticleLanguage,
+  computeVerificationStatus,
+  BILINGUAL_LOCATIONS_MAP,
+  BILINGUAL_TACTICAL_MAP,
   isDuplicateStory,
   deduplicateNewsItems,
   generateDeterministicEventId,
@@ -410,5 +576,14 @@ module.exports = {
   determineEventStatus,
   generateEventTitle,
   explainEventMatch,
-  clusterEventArticles
+  clusterEventArticles,
+
+  // Ingestion Resilience & Extraction
+  MAX_FAILURES,
+  FEED_COOLDOWN_MS,
+  FEED_CIRCUIT_STATE,
+  isFeedInCooldown,
+  recordFeedSuccess,
+  recordFeedFailure,
+  extractImageUrl
 };

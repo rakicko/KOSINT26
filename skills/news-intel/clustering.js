@@ -118,6 +118,402 @@ function calculateTitleSimilarity(title1, title2) {
   return dice;
 }
 
+// ── World Monitor Text Similarity & Bilingual Entity Bridge ────────────────────
+
+const STOP_WORDS_SR = new Set([
+  'i', 'u', 'na', 'za', 'o', 'sa', 'da', 'je', 'su', 'se', 'od', 'do', 'po', 'iz', 'bi', 'ne',
+  'kao', 'ali', 'pa', 'te', 'ga', 'mu', 'joj', 'im', 'ih', 'sve', 'kod', 'pri', 'dok', 'zbog',
+  'oko', 'tek', 'vec', 'već', 'ili', 'jos', 'još', 'jer', 'pre', 'posle', 'nakon', 'kod', 'bili', 'bilo'
+]);
+
+const STOP_WORDS_SQ = new Set([
+  'i', 'e', 'të', 'te', 'së', 'se', 'në', 'ne', 'për', 'per', 'me', 'nga', 'ka', 'një', 'nje',
+  'dhe', 'ku', 'po', 'si', 'më', 'pa', 'kur', 'do', 'tek', 'a', 'apo', 'ose', 'pas', 'para',
+  'mbi', 'nën', 'nen', 'ishte', 'janë', 'jane', 'këtë', 'kete', 'këto', 'keto', 'ata', 'ato', 'dy', 'tre'
+]);
+
+const STOP_WORDS_EN = new Set([
+  'a', 'an', 'the', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from',
+  'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'it', 'its', 'this',
+  'that', 'these', 'those', 'after', 'before', 'during', 'over', 'under', 'into'
+]);
+
+const ALL_STOP_WORDS = new Set([...STOP_WORDS_SR, ...STOP_WORDS_SQ, ...STOP_WORDS_EN]);
+
+/**
+ * Tokenizes cleaned title into n-grams (default 1-grams) ignoring common stop words in SR/SQ/EN
+ */
+function tokenizeTitleForJaccard(title, nGramSize = 1) {
+  if (!title || typeof title !== 'string') return [];
+  const normalized = normalizeHeadline(title);
+  const words = normalized
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 1 && !ALL_STOP_WORDS.has(w));
+
+  if (nGramSize <= 1 || words.length < nGramSize) {
+    return words;
+  }
+
+  const nGrams = [];
+  for (let i = 0; i <= words.length - nGramSize; i++) {
+    nGrams.push(words.slice(i, i + nGramSize).join('_'));
+  }
+  return nGrams;
+}
+
+/**
+ * Computes Jaccard similarity / n-gram token overlap on cleaned title tokens
+ * (ignoring common stop words in SR/SQ/EN)
+ *
+ * J(A, B) = |A ∩ B| / |A ∪ B|
+ *
+ * @param {string} title1
+ * @param {string} title2
+ * @param {number} [nGramSize=1]
+ * @returns {number} Value between 0.0 and 1.0
+ */
+function calculateJaccardSimilarity(title1, title2, nGramSize = 1) {
+  const tokens1 = tokenizeTitleForJaccard(title1, nGramSize);
+  const tokens2 = tokenizeTitleForJaccard(title2, nGramSize);
+
+  if (tokens1.length === 0 || tokens2.length === 0) return 0.0;
+
+  const set1 = new Set(tokens1);
+  const set2 = new Set(tokens2);
+
+  let intersection = 0;
+  for (const t of set1) {
+    if (set2.has(t)) intersection++;
+  }
+
+  const union = new Set([...set1, ...set2]).size;
+  if (union === 0) return 0.0;
+
+  return Math.round((intersection / union) * 1000) / 1000;
+}
+
+const BILINGUAL_LOCATIONS_MAP = {
+  // Mitrovica
+  'mitrovica': 'bridge_loc:mitrovica',
+  'mitrovice': 'bridge_loc:mitrovica',
+  'mitrovicë': 'bridge_loc:mitrovica',
+  'kosovska mitrovica': 'bridge_loc:mitrovica',
+  'mitrovica sever': 'bridge_loc:mitrovica',
+  'severna mitrovica': 'bridge_loc:mitrovica',
+  'veri i mitrovices': 'bridge_loc:mitrovica',
+  'mitrovices': 'bridge_loc:mitrovica',
+  'mitrovici': 'bridge_loc:mitrovica',
+  'mitrovicu': 'bridge_loc:mitrovica',
+
+  // Zvečan / Zveçan
+  'zvecan': 'bridge_loc:zvecan',
+  'zvečan': 'bridge_loc:zvecan',
+  'zveçan': 'bridge_loc:zvecan',
+  'zvecana': 'bridge_loc:zvecan',
+  'zvečana': 'bridge_loc:zvecan',
+  'zvecani': 'bridge_loc:zvecan',
+  'zveçani': 'bridge_loc:zvecan',
+  'zvečanu': 'bridge_loc:zvecan',
+  'zvecanit': 'bridge_loc:zvecan',
+  'zveçanit': 'bridge_loc:zvecan',
+
+  // Leposavić / Leposaviq
+  'leposavic': 'bridge_loc:leposavic',
+  'leposavić': 'bridge_loc:leposavic',
+  'leposavica': 'bridge_loc:leposavic',
+  'leposavića': 'bridge_loc:leposavic',
+  'leposaviq': 'bridge_loc:leposavic',
+  'leposaviqi': 'bridge_loc:leposavic',
+  'leposaviću': 'bridge_loc:leposavic',
+  'leposaviqit': 'bridge_loc:leposavic',
+
+  // Zubin Potok
+  'zubin potok': 'bridge_loc:zubin_potok',
+  'zubin potoku': 'bridge_loc:zubin_potok',
+  'zubin potokut': 'bridge_loc:zubin_potok',
+
+  // Jarinje / Jarinjë
+  'jarinje': 'bridge_loc:jarinje',
+  'jarinjë': 'bridge_loc:jarinje',
+  'jarinja': 'bridge_loc:jarinje',
+  'jarinju': 'bridge_loc:jarinje',
+
+  // Brnjak / Bërnjak
+  'brnjak': 'bridge_loc:brnjak',
+  'bërnjak': 'bridge_loc:brnjak',
+  'bernjak': 'bridge_loc:brnjak',
+  'brnjaku': 'bridge_loc:brnjak',
+
+  // Banjska / Bajskë
+  'banjska': 'bridge_loc:banjska',
+  'bajskë': 'bridge_loc:banjska',
+  'bajske': 'bridge_loc:banjska',
+  'bajskës': 'bridge_loc:banjska',
+  'bajskes': 'bridge_loc:banjska',
+  'banjskë': 'bridge_loc:banjska',
+  'banjske': 'bridge_loc:banjska',
+  'banjskoj': 'bridge_loc:banjska',
+
+  // Merdare / Merdarë
+  'merdare': 'bridge_loc:merdare',
+  'merdarë': 'bridge_loc:merdare',
+  'merdaru': 'bridge_loc:merdare',
+
+  // Pristina / Prishtinë
+  'pristina': 'bridge_loc:pristina',
+  'prishtina': 'bridge_loc:pristina',
+  'prishtinë': 'bridge_loc:pristina',
+  'prishtine': 'bridge_loc:pristina',
+  'priština': 'bridge_loc:pristina',
+  'prištini': 'bridge_loc:pristina',
+
+  // Gračanica / Graçanicë
+  'gracanica': 'bridge_loc:gracanica',
+  'gračanica': 'bridge_loc:gracanica',
+  'graçanicë': 'bridge_loc:gracanica',
+
+  // Štrpce / Shtërpcë
+  'strpce': 'bridge_loc:strpce',
+  'štrpce': 'bridge_loc:strpce',
+  'shtërpcë': 'bridge_loc:strpce',
+
+  // Gjilan / Gnjilane
+  'gjilan': 'bridge_loc:gjilan',
+  'gnjilane': 'bridge_loc:gjilan',
+
+  // Peja / Peć
+  'peje': 'bridge_loc:peja',
+  'pejë': 'bridge_loc:peja',
+  'peja': 'bridge_loc:peja',
+  'peć': 'bridge_loc:peja',
+  'pec': 'bridge_loc:peja',
+
+  // Prizren
+  'prizren': 'bridge_loc:prizren',
+  'prizreni': 'bridge_loc:prizren',
+
+  // Gjakova / Đakovica
+  'gjakove': 'bridge_loc:gjakova',
+  'gjakovë': 'bridge_loc:gjakova',
+  'gjakova': 'bridge_loc:gjakova',
+  'đakovica': 'bridge_loc:gjakova',
+  'djakovica': 'bridge_loc:gjakova',
+
+  // Ferizaj / Uroševac
+  'ferizaj': 'bridge_loc:ferizaj',
+  'uroševac': 'bridge_loc:ferizaj',
+  'urosevac': 'bridge_loc:ferizaj',
+
+  // Podujevo / Podujevë
+  'podujeve': 'bridge_loc:podujeva',
+  'podujevë': 'bridge_loc:podujeva',
+  'podujevo': 'bridge_loc:podujeva'
+};
+
+const BILINGUAL_TACTICAL_MAP = {
+  // Arrest: uhapšen / arrestuar / arrested
+  'uhapsen': 'bridge_tactical:arrest',
+  'uhapšen': 'bridge_tactical:arrest',
+  'uhapseni': 'bridge_tactical:arrest',
+  'uhapšeni': 'bridge_tactical:arrest',
+  'hapsenje': 'bridge_tactical:arrest',
+  'hapšenje': 'bridge_tactical:arrest',
+  'arrestuar': 'bridge_tactical:arrest',
+  'arrestohet': 'bridge_tactical:arrest',
+  'arrestohen': 'bridge_tactical:arrest',
+  'arrestim': 'bridge_tactical:arrest',
+  'arrestimi': 'bridge_tactical:arrest',
+  'arrested': 'bridge_tactical:arrest',
+  'arrest': 'bridge_tactical:arrest',
+  'lišen slobode': 'bridge_tactical:arrest',
+  'pranga': 'bridge_tactical:arrest',
+  'vetedorëzohen': 'bridge_tactical:arrest',
+  'vetedorezohen': 'bridge_tactical:arrest',
+
+  // Shooting: pucnjava / të shtëna / shooting
+  'pucnjava': 'bridge_tactical:shooting',
+  'pucano': 'bridge_tactical:shooting',
+  'pucanje': 'bridge_tactical:shooting',
+  'te shtena': 'bridge_tactical:shooting',
+  'të shtëna': 'bridge_tactical:shooting',
+  'gjuajtje': 'bridge_tactical:shooting',
+  'gjuajtja': 'bridge_tactical:shooting',
+  'te shtenat': 'bridge_tactical:shooting',
+  'shooting': 'bridge_tactical:shooting',
+  'shots fired': 'bridge_tactical:shooting',
+  'gunfire': 'bridge_tactical:shooting',
+
+  // Explosion: detonacija / shpërthim / explosion
+  'detonacija': 'bridge_tactical:explosion',
+  'detonacije': 'bridge_tactical:explosion',
+  'eksplozija': 'bridge_tactical:explosion',
+  'eksplozije': 'bridge_tactical:explosion',
+  'shperthim': 'bridge_tactical:explosion',
+  'shpërthim': 'bridge_tactical:explosion',
+  'shperthime': 'bridge_tactical:explosion',
+  'shpërthime': 'bridge_tactical:explosion',
+  'explosion': 'bridge_tactical:explosion',
+  'explosions': 'bridge_tactical:explosion',
+  'blast': 'bridge_tactical:explosion',
+
+  // Patrol: patrola / patrullë / patrol
+  'patrola': 'bridge_tactical:patrol',
+  'patrole': 'bridge_tactical:patrol',
+  'patrolu': 'bridge_tactical:patrol',
+  'patrulle': 'bridge_tactical:patrol',
+  'patrullë': 'bridge_tactical:patrol',
+  'patrullat': 'bridge_tactical:patrol',
+  'patrol': 'bridge_tactical:patrol',
+  'patrols': 'bridge_tactical:patrol',
+
+  // Raid: pretres / bastisje / raid
+  'pretres': 'bridge_tactical:raid',
+  'pretresi': 'bridge_tactical:raid',
+  'racija': 'bridge_tactical:raid',
+  'racije': 'bridge_tactical:raid',
+  'bastisje': 'bridge_tactical:raid',
+  'bastisjet': 'bridge_tactical:raid',
+  'bastisur': 'bridge_tactical:raid',
+  'raid': 'bridge_tactical:raid',
+  'raids': 'bridge_tactical:raid',
+  'search operation': 'bridge_tactical:raid',
+
+  // Contraband / smuggling
+  'sverc': 'bridge_tactical:smuggling',
+  'šverc': 'bridge_tactical:smuggling',
+  'krijumčarenje': 'bridge_tactical:smuggling',
+  'krijumcarenje': 'bridge_tactical:smuggling',
+  'kontrabande': 'bridge_tactical:smuggling',
+  'kontrabandë': 'bridge_tactical:smuggling',
+  'smuggling': 'bridge_tactical:smuggling',
+
+  // Weapon: oružje / armë / weapon
+  'oruzje': 'bridge_tactical:weapon',
+  'oružje': 'bridge_tactical:weapon',
+  'oruzja': 'bridge_tactical:weapon',
+  'oružja': 'bridge_tactical:weapon',
+  'naoruzanje': 'bridge_tactical:weapon',
+  'arme': 'bridge_tactical:weapon',
+  'armë': 'bridge_tactical:weapon',
+  'armatim': 'bridge_tactical:weapon',
+  'armatimi': 'bridge_tactical:weapon',
+  'weapon': 'bridge_tactical:weapon',
+  'weapons': 'bridge_tactical:weapon',
+  'firearm': 'bridge_tactical:weapon',
+
+  // Barricade
+  'barikada': 'bridge_tactical:barricade',
+  'barikade': 'bridge_tactical:barricade',
+  'barikadë': 'bridge_tactical:barricade',
+  'blokada': 'bridge_tactical:barricade',
+  'blokade': 'bridge_tactical:barricade',
+  'bllokade': 'bridge_tactical:barricade',
+  'bllokadë': 'bridge_tactical:barricade',
+  'barricade': 'bridge_tactical:barricade',
+
+  // Border checkpoint
+  'granica': 'bridge_tactical:border',
+  'kufi': 'bridge_tactical:border',
+  'kufiri': 'bridge_tactical:border',
+  'vendkalim': 'bridge_tactical:border',
+  'prelaz': 'bridge_tactical:border',
+  'checkpoint': 'bridge_tactical:border'
+};
+
+/**
+ * Extracts bilingual bridge entities from text
+ */
+function extractBilingualBridgeEntities(text) {
+  if (!text || typeof text !== 'string') return [];
+  const normalizedObj = normalizeMultilingualText(text);
+  const translit = (normalizedObj.transliteratedText || '').toLowerCase();
+  const folded = (normalizedObj.foldedText || '').toLowerCase();
+
+  const entities = new Set();
+
+  for (const [term, bridgeId] of Object.entries(BILINGUAL_LOCATIONS_MAP)) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu');
+    if (regex.test(translit) || regex.test(folded)) {
+      entities.add(bridgeId);
+    }
+  }
+
+  for (const [term, bridgeId] of Object.entries(BILINGUAL_TACTICAL_MAP)) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu');
+    if (regex.test(translit) || regex.test(folded)) {
+      entities.add(bridgeId);
+    }
+  }
+
+  return [...entities];
+}
+
+const SERBIAN_SOURCES_SET = new Set([
+  'kossev', 'radio mitrovica sever', 'radio kim', 'kosova.info', 'tanjug', 'politika', 'rts', 'novosti'
+]);
+const ALBANIAN_SOURCES_SET = new Set([
+  'koha', 'gazeta express', 'indeks online', 'lajmi', 'jepize', 'mitropol', 'mitrovicasot',
+  'telegrafi', 'kallxo', 'rtk', 'botasot', 'bota sot', 'reporteri', 'syri', 'veriu.info', 'zeri'
+]);
+const ENGLISH_SOURCES_SET = new Set([
+  'balkan insight', 'reuters', 'ap news', 'pristina insight', 'bbc', 'afp'
+]);
+
+/**
+ * Detects canonical language bloc ('sr', 'sq', 'en', or 'unknown') of an article
+ */
+function detectArticleLanguage(article) {
+  if (!article) return 'unknown';
+
+  const rawLang = String(article.language || article.lang || '').toLowerCase().trim();
+  if (rawLang === 'sr' || rawLang === 'serbian' || rawLang === 'srp') return 'sr';
+  if (rawLang === 'sq' || rawLang === 'al' || rawLang === 'albanian') return 'sq';
+  if (rawLang === 'en' || rawLang === 'english') return 'en';
+
+  const src = String(article.source || article.primarySource || '').toLowerCase().trim();
+  if (Array.from(SERBIAN_SOURCES_SET).some(s => src.includes(s))) return 'sr';
+  if (Array.from(ALBANIAN_SOURCES_SET).some(s => src.includes(s))) return 'sq';
+  if (Array.from(ENGLISH_SOURCES_SET).some(s => src.includes(s))) return 'en';
+
+  // Linguistic word and character markers
+  const text = `${article.title || ''} ${article.description || ''}`;
+  if (/[ëËçÇ]/.test(text) || /\b(në|dhe|për|nga|është|një|së|të|ka|policisë|arrestuar|shpërthim|sekuestrohen)\b/i.test(text)) {
+    return 'sq';
+  }
+  if (/[\u0400-\u04FF]/.test(text) || /\b(u|na|za|od|do|je|su|uhapšen|uhapsen|policija|kosova|sever|istraga|pucnjava|zaplenjeno)\b/i.test(text)) {
+    return 'sr';
+  }
+  if (/\b(the|and|in|of|for|with|police|arrested|suspect|explosion|reported|theft)\b/i.test(text)) {
+    return 'en';
+  }
+
+  return 'unknown';
+}
+
+/**
+ * Computes Cross-Source Verification Status:
+ * - CROSS-VERIFIED: reported by both Serbian and Albanian sources (contains both 'sr' and 'sq' sources).
+ * - MULTI-SOURCE: reported by >= 2 sources of the same linguistic bloc without cross-bloc confirmation.
+ * - SINGLE-SOURCE: reported by only 1 source.
+ */
+function computeVerificationStatus(languages, sourceCount) {
+  const langs = Array.isArray(languages) ? languages : [];
+  const hasSr = langs.includes('sr');
+  const hasSq = langs.includes('sq');
+
+  if (hasSr && hasSq) {
+    return 'CROSS-VERIFIED';
+  }
+  if (sourceCount >= 2) {
+    return 'MULTI-SOURCE';
+  }
+  return 'SINGLE-SOURCE';
+}
+
 /**
  * Checks if two articles represent the exact same story (duplicate/syndicated)
  */
@@ -200,11 +596,15 @@ function deduplicateNewsItems(items, similarityThreshold = 0.82) {
 
     const primary = group[0];
     const allSources = [...new Set(group.flatMap(g => g.sources || [g.source]))];
+    const langs = [...new Set(group.map(g => detectArticleLanguage(g)).filter(l => l !== 'unknown'))];
 
     return {
       ...primary,
       sources: allSources,
-      sourceCount: allSources.length
+      participatingSources: allSources,
+      sourceCount: allSources.length,
+      languages: langs.length > 0 ? langs : [detectArticleLanguage(primary)].filter(l => l !== 'unknown'),
+      verificationStatus: computeVerificationStatus(langs, allSources.length)
     };
   });
 }
@@ -679,6 +1079,30 @@ function clusterEventArticles(articles) {
         }
       }
 
+      // Rule F: World Monitor Bilingual Entity Bridge & Jaccard Title Similarity within rolling 4-hour window
+      if (!isMatch) {
+        const timeDiffHours = (!isNaN(t1) && !isNaN(t2)) ? Math.abs(t1 - t2) / 3600000 : 0;
+        if (timeDiffHours <= 4) {
+          const jaccardSim = calculateJaccardSimilarity(article.title, cluster.primary.title);
+          if (jaccardSim >= 0.40) {
+            isMatch = true;
+          } else {
+            const bridgeA = article._bridgeEntities || extractBilingualBridgeEntities(`${article.title} ${article.description || ''}`);
+            const bridgeB = cluster._bridgeEntities || extractBilingualBridgeEntities(`${cluster.primary.title} ${cluster.primary.description || ''}`);
+            article._bridgeEntities = bridgeA;
+            cluster._bridgeEntities = bridgeB;
+
+            const sharedBridge = bridgeA.filter(e => bridgeB.includes(e));
+            const hasSharedLoc = sharedBridge.some(e => e.startsWith('bridge_loc:'));
+            const hasSharedTactical = sharedBridge.some(e => e.startsWith('bridge_tactical:'));
+
+            if ((hasSharedLoc && hasSharedTactical) || sharedBridge.length >= 2) {
+              isMatch = true;
+            }
+          }
+        }
+      }
+
       if (isMatch) {
         matchedCluster = cluster;
         break;
@@ -730,6 +1154,12 @@ function clusterEventArticles(articles) {
   return clusters.map(c => {
     const primary = c.primary;
     const allSources = [...new Set(c.articles.flatMap(a => Array.isArray(a.sources) ? a.sources : [a.source]))];
+    const participatingSources = allSources;
+    const sourceCount = participatingSources.length;
+
+    // Detect distinct languages across clustered articles
+    const detectedLanguages = [...new Set(c.articles.map(a => detectArticleLanguage(a)).filter(l => l !== 'unknown'))];
+    const verificationStatus = computeVerificationStatus(detectedLanguages, sourceCount);
 
     // Canonical deterministic eventId based on complete cluster entities
     const canonicalEventId = generateDeterministicEventId(primary, c.entities);
@@ -768,8 +1198,11 @@ function clusterEventArticles(articles) {
       lastUpdated: c.lastUpdated,
       publishedAt: c.lastUpdated,
       sources: allSources,
+      participatingSources,
+      sourceCount,
+      languages: detectedLanguages,
+      verificationStatus,
       primarySource: primary.source,
-      sourceCount: allSources.length,
       independentSourceCount,
       uniqueSourceCount: independentSourceCount,
       developmentCount: developments.length,
@@ -783,7 +1216,8 @@ function clusterEventArticles(articles) {
         source: a.source,
         title: a.title,
         url: a.url,
-        publishedAt: a.publishedAt
+        publishedAt: a.publishedAt,
+        language: detectArticleLanguage(a)
       }))
     };
   });
@@ -794,6 +1228,13 @@ module.exports = {
   normalizeUrl,
   normalizeHeadline,
   calculateTitleSimilarity,
+  calculateJaccardSimilarity,
+  tokenizeTitleForJaccard,
+  extractBilingualBridgeEntities,
+  detectArticleLanguage,
+  computeVerificationStatus,
+  BILINGUAL_LOCATIONS_MAP,
+  BILINGUAL_TACTICAL_MAP,
   isDuplicateStory,
   deduplicateNewsItems,
   generateDeterministicEventId,

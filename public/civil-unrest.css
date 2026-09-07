@@ -1,0 +1,1028 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   CIVIL UNREST & PUBLIC GATHERINGS — TACTICAL OSINT MODULE
+   Hague Verdict 16 September 2026 Monitoring
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Tactical Map Markers ─────────────────────────────────────────────── */
+.civil-marker-wrap {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease;
+  z-index: 10;
+}
+
+.civil-marker-wrap:hover {
+  transform: scale(1.15);
+  z-index: 40;
+}
+
+.civil-marker-wrap.active {
+  transform: scale(1.28);
+  z-index: 60;
+  filter: drop-shadow(0 0 12px rgba(56, 189, 248, 1)) drop-shadow(0 0 3px #ffffff);
+}
+
+.civil-marker-wrap.ring_red.active {
+  filter: drop-shadow(0 0 14px rgba(239, 68, 68, 1)) drop-shadow(0 0 3px #ffffff);
+}
+
+.civil-marker-wrap.ring_purple.active {
+  filter: drop-shadow(0 0 14px rgba(168, 85, 247, 1)) drop-shadow(0 0 3px #ffffff);
+}
+
+/* Hide hover tooltip when marker popup is active */
+.civil-marker-wrap.active .civil-marker-tooltip {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Prishtina (Confirmed Viewing): Subtle pulsing CSS border */
+@keyframes pulseBorderRed {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8), 0 0 10px rgba(239, 68, 68, 0.9);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0), 0 0 14px rgba(239, 68, 68, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0), 0 0 10px rgba(239, 68, 68, 0.9);
+  }
+}
+
+.marker-star-circle,
+.civil-marker-wrap.ring_red {
+  border-radius: 50%;
+  animation: pulseBorderRed 2s infinite ease-out;
+}
+
+.marker-ring-blue,
+.civil-marker-wrap.ring_blue {
+  border-radius: 50%;
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.85));
+}
+
+.marker-ring-purple,
+.civil-marker-wrap.ring_purple {
+  border-radius: 50%;
+  filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.85));
+}
+
+.civil-marker-wrap svg {
+  overflow: visible;
+  display: block;
+}
+
+/* Pulsing outer radar ripple for Star-Circle (Prishtina) */
+@keyframes civilRadarPulseRed {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.65);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.marker-pulse-red {
+  transform-origin: center;
+  animation: civilRadarPulseRed 2.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+/* Rotating tactical radar ring for Blue Rings */
+@keyframes civilRadarRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.marker-rotate-blue {
+  transform-origin: center;
+  animation: civilRadarRotate 14s linear infinite;
+}
+
+/* Purple ring subtle pulse */
+@keyframes civilRadarPulsePurple {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  60% {
+    transform: scale(1.5);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.marker-pulse-purple {
+  transform-origin: center;
+  animation: civilRadarPulsePurple 2.6s ease-out infinite;
+}
+
+/* Mini pin tooltip on hover */
+.civil-marker-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: rgba(7, 11, 20, 0.94);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 4px;
+  color: #f8fafc;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 100;
+}
+
+.civil-marker-wrap:hover .civil-marker-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(-10px);
+}
+
+/* ── 2. Tactical Map Popup System (MapLibre & Leaflet) ───────────────────── */
+.civil-unrest-maplibre-popup {
+  z-index: 9999 !important;
+}
+
+/* 1. Eliminate MapLibre default white background, borders and padding */
+.civil-unrest-maplibre-popup .maplibregl-popup-content,
+.civil-unrest-maplibre-popup .mapboxgl-popup-content {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 10px !important;
+  overflow: visible !important;
+}
+
+/* 2. Eliminate MapLibre default white tip and replace with clean dark tactical pointer */
+.civil-unrest-maplibre-popup .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup .mapboxgl-popup-tip {
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+  z-index: 10 !important;
+}
+
+/* Tip pointing down to marker (popup is ABOVE marker) */
+.civil-unrest-maplibre-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.civil-unrest-maplibre-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.civil-unrest-maplibre-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
+  border-top-color: #0b1324 !important;
+}
+
+/* Tip pointing up to marker (popup is BELOW marker) */
+.civil-unrest-maplibre-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.civil-unrest-maplibre-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.civil-unrest-maplibre-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
+  border-bottom-color: #0b1324 !important;
+}
+
+/* Side tips */
+.civil-unrest-maplibre-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: #0b1324 !important;
+}
+.civil-unrest-maplibre-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: #0b1324 !important;
+}
+
+/* Category-specific tip styling */
+.civil-unrest-maplibre-popup.status-confirmed.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.status-confirmed.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.status-confirmed.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: #1a0b12 !important;
+}
+.civil-unrest-maplibre-popup.status-confirmed.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.status-confirmed.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.status-confirmed.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: #1a0b12 !important;
+}
+
+.civil-unrest-maplibre-popup.status-ovl_uck.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.status-ovl_uck.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.status-ovl_uck.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: #140b1e !important;
+}
+.civil-unrest-maplibre-popup.status-ovl_uck.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.status-ovl_uck.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.civil-unrest-maplibre-popup.status-ovl_uck.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: #140b1e !important;
+}
+
+/* 3. Sleek tactical close button with dedicated positioning */
+.civil-unrest-maplibre-popup .maplibregl-popup-close-button,
+.civil-unrest-maplibre-popup .mapboxgl-popup-close-button {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  width: 24px !important;
+  height: 24px !important;
+  line-height: 22px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 6px !important;
+  color: #94a3b8 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  z-index: 50 !important;
+  transition: all 0.18s ease !important;
+  outline: none !important;
+}
+
+.civil-unrest-maplibre-popup .maplibregl-popup-close-button:hover,
+.civil-unrest-maplibre-popup .mapboxgl-popup-close-button:hover {
+  background: rgba(239, 68, 68, 0.3) !important;
+  border-color: rgba(239, 68, 68, 0.7) !important;
+  color: #ffffff !important;
+  transform: scale(1.08);
+}
+
+/* 4. The Card Container */
+.civil-popup-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(14, 23, 42, 0.98) 0%, rgba(9, 15, 30, 0.99) 100%) !important;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(56, 189, 248, 0.18);
+  backdrop-filter: blur(16px);
+  color: #f1f5f9;
+  padding: 12px 14px 14px 14px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  width: 324px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+}
+
+.civil-popup-card.status-confirmed {
+  background: linear-gradient(180deg, rgba(26, 11, 18, 0.98) 0%, rgba(15, 8, 12, 0.99) 100%) !important;
+  border-color: rgba(239, 68, 68, 0.65);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 25px rgba(239, 68, 68, 0.25);
+}
+
+.civil-popup-card.status-ovl_uck {
+  background: linear-gradient(180deg, rgba(20, 11, 30, 0.98) 0%, rgba(12, 8, 20, 0.99) 100%) !important;
+  border-color: rgba(168, 85, 247, 0.65);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 25px rgba(168, 85, 247, 0.25);
+}
+
+.civil-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 7px;
+}
+
+.civil-popup-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 30px); /* Prevents overlapping with the close button */
+}
+
+.civil-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.civil-badge-red {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  color: #fca5a5;
+}
+
+.civil-badge-blue {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #7dd3fc;
+}
+
+.civil-badge-purple {
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.6);
+  color: #d8b4fe;
+}
+
+.civil-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.civil-badge-red .civil-badge-dot {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.civil-badge-blue .civil-badge-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.civil-badge-purple .civil-badge-dot {
+  background: #a855f7;
+  box-shadow: 0 0 6px #a855f7;
+}
+
+.civil-popup-severity {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2.5px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.sev-high {
+  background: #991b1b;
+  color: #fee2e2;
+}
+
+.sev-elevated {
+  background: #581c87;
+  color: #f3e8ff;
+}
+
+.sev-medium {
+  background: #075985;
+  color: #e0f2fe;
+}
+
+.civil-popup-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 2px 0 3px 0;
+}
+
+.civil-popup-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.civil-popup-loc-icon {
+  color: #38bdf8;
+  display: inline-flex;
+  align-items: center;
+}
+
+.civil-popup-card.status-confirmed .civil-popup-loc-icon {
+  color: #ef4444;
+}
+
+.civil-popup-card.status-ovl_uck .civil-popup-loc-icon {
+  color: #c084fc;
+}
+
+.civil-popup-venue {
+  font-size: 11.5px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.civil-popup-venue-icon {
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ── Popup Countdown Clock Block ─────────────────────────────────────────── */
+.civil-popup-countdown-box {
+  background: rgba(7, 12, 23, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 6px;
+  padding: 7px 9px;
+  margin-bottom: 10px;
+}
+
+.civil-popup-card.status-confirmed .civil-popup-countdown-box {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.civil-popup-card.status-ovl_uck .civil-popup-countdown-box {
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+.civil-countdown-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.civil-countdown-meta-tag {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.civil-popup-timer-digits {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #38bdf8;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.8px;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.95);
+  padding: 5px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+.civil-popup-card.status-confirmed .civil-popup-timer-digits {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.25);
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.civil-popup-card.status-ovl_uck .civil-popup-timer-digits {
+  color: #d8b4fe;
+  border-color: rgba(168, 85, 247, 0.25);
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+}
+
+.civil-popup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+
+.civil-grid-item {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 5px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.civil-grid-lbl {
+  font-size: 8.5px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.4px;
+}
+
+.civil-grid-val {
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-top: 1px;
+}
+
+.civil-popup-notes {
+  font-size: 10.5px;
+  color: #cbd5e1;
+  line-height: 1.45;
+  background: rgba(15, 23, 42, 0.6);
+  border-left: 2px solid #38bdf8;
+  padding: 6px 8px;
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 10px;
+}
+
+.civil-popup-card.status-confirmed .civil-popup-notes {
+  border-left-color: #ef4444;
+}
+
+.civil-popup-card.status-ovl_uck .civil-popup-notes {
+  border-left-color: #a855f7;
+}
+
+.civil-popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+}
+
+.civil-popup-coords {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  color: #64748b;
+}
+
+.civil-popup-fly-btn {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.18s ease;
+}
+
+.civil-popup-fly-btn:hover {
+  background: rgba(56, 189, 248, 0.3);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+}
+
+/* ── 3. Dashboard Sidebar Widget ─────────────────────────────────────────── */
+#civilUnrestPanel {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.4) transparent;
+  display: none;
+  flex-direction: column;
+}
+
+#civilUnrestPanel::-webkit-scrollbar {
+  width: 6px;
+}
+#civilUnrestPanel::-webkit-scrollbar-track {
+  background: rgba(7, 11, 20, 0.5);
+}
+#civilUnrestPanel::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.4);
+  border-radius: 3px;
+}
+#civilUnrestPanel::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}
+
+#civilUnrestWidgetMount,
+.civil-unrest-card,
+.civil-unrest-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  color: #e2e8f0;
+  font-family: 'Inter', sans-serif;
+}
+
+.civil-countdown-banner,
+.civil-toolbar {
+  flex-shrink: 0;
+}
+
+/* Global Countdown Banner */
+.civil-countdown-banner {
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(30, 27, 75, 0.9) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.civil-countdown-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ef4444 0%, #38bdf8 50%, #a855f7 100%);
+}
+
+.civil-banner-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.civil-banner-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #fbbf24;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.civil-banner-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: civilPulseDot 1.6s infinite;
+}
+
+@keyframes civilPulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.civil-banner-ref {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  color: #94a3b8;
+}
+
+.civil-banner-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+
+.civil-banner-case {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  line-height: 1.35;
+}
+
+.civil-banner-case strong {
+  color: #e2e8f0;
+}
+
+/* Big Monospace Clock Grid */
+.civil-countdown-clock-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.civil-clock-cell {
+  background: rgba(10, 15, 29, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 6px;
+  padding: 8px 4px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.civil-clock-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px;
+  font-weight: 900;
+  color: #38bdf8;
+  line-height: 1.1;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+}
+
+.civil-clock-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+/* Banner Stats Bar */
+.civil-banner-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.civil-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.civil-stat-item.stat-red { color: #f87171; }
+.civil-stat-item.stat-blue { color: #38bdf8; }
+.civil-stat-item.stat-purple { color: #c084fc; }
+
+/* Filter & Controls Toolbar */
+.civil-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.civil-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.civil-filter-btn {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.16s ease;
+}
+
+.civil-filter-btn:hover {
+  background: rgba(30, 41, 59, 0.9);
+  color: #f8fafc;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.civil-filter-btn.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.civil-filter-btn.filter-confirmed.active {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #fca5a5;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+}
+
+.civil-filter-btn.filter-ovl.active {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: #a855f7;
+  color: #d8b4fe;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.25);
+}
+
+.civil-search-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.civil-search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.civil-search-input {
+  width: 100%;
+  background: rgba(13, 20, 36, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 5px;
+  padding: 6px 28px 6px 28px;
+  color: #f8fafc;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.16s ease;
+}
+
+.civil-search-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+}
+
+.civil-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+.civil-search-clear:hover {
+  color: #f8fafc;
+}
+
+/* Gathering List Table / Cards */
+.civil-list-container {
+  flex: 1;
+  min-height: 240px;
+  max-height: calc(100vh - 420px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.4) transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(10, 16, 30, 0.6);
+}
+
+.civil-table thead,
+.civil-table tbody,
+.civil-row,
+.civil-table tr {
+  flex-shrink: 0;
+}
+
+/* Custom Tactical Scrollbar */
+.civil-list-container::-webkit-scrollbar {
+  width: 5px;
+}
+.civil-list-container::-webkit-scrollbar-track {
+  background: rgba(7, 11, 20, 0.5);
+}
+.civil-list-container::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 3px;
+}
+.civil-list-container::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}
+
+.civil-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  text-align: left;
+}
+
+.civil-table thead {
+  position: sticky;
+  top: 0;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.civil-table th {
+  padding: 7px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.civil-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: background-color 0.14s ease;
+}
+
+.civil-row:hover {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.civil-row.selected {
+  background: rgba(56, 189, 248, 0.16);
+  border-left: 2px solid #38bdf8;
+}
+
+.civil-table td {
+  padding: 8px;
+  vertical-align: middle;
+}
+
+.civil-cell-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #64748b;
+  width: 24px;
+}
+
+.civil-cell-loc {
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.civil-cell-venue {
+  color: #94a3b8;
+  font-size: 10.5px;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.civil-fly-btn {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.civil-fly-btn:hover {
+  background: #38bdf8;
+  color: #0b1329;
+  box-shadow: 0 0 8px #38bdf8;
+}
+
+.civil-empty-state {
+  padding: 24px;
+  text-align: center;
+  color: #64748b;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}

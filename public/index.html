@@ -15,6 +15,8 @@
     rel="stylesheet" />
   <link href="vendor/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css?v=2.6.2" />
+  <link rel="stylesheet" href="civil-unrest.css" />
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 
 <body>
@@ -92,6 +94,22 @@
       </div>
 
       <div class="header-status">
+        <!-- World Monitor-Inspired Regional Tension Index (RTI) Badge -->
+        <div class="regional-tension-badge tension-low" id="regionalTensionBadge" onclick="toggleRegionalTensionTooltip(event)" title="Regional Tension Index (RTI) — Click for 24h breakdown">
+          <span class="tension-label">TENSION:</span>
+          <span class="tension-score" id="tensionScore">1.5</span>
+          <span class="tension-level" id="tensionLevel">LOW / NORMAL</span>
+          <span class="tension-trend" id="tensionTrend">[→]</span>
+          <div class="tension-tooltip" id="tensionTooltip" style="display:none" onclick="event.stopPropagation()">
+            <div class="tension-tooltip-title">REGIONAL TENSION INDEX (24H)</div>
+            <div class="tension-tooltip-row"><span>Status:</span> <strong id="tooltipTensionLevel">LOW / NORMAL</strong></div>
+            <div class="tension-tooltip-row"><span>Index Score:</span> <strong id="tooltipTensionScore">1.5 / 10.0</strong></div>
+            <div class="tension-tooltip-row"><span>12h Trend:</span> <strong id="tooltipTensionTrend">STABLE (→)</strong></div>
+            <div class="tension-tooltip-row"><span>24h Incidents:</span> <strong id="tooltipTensionIncidents">0</strong></div>
+            <div class="tension-tooltip-row"><span>12h Delta:</span> <strong id="tooltipTensionDelta">0.0</strong></div>
+          </div>
+        </div>
+
         <div class="user-badge" id="userBadge" style="display:none">
           <span class="user-role-badge" id="userRoleBadge">OPERATOR</span>
           <span class="user-name" id="userName">Observer</span>
@@ -111,6 +129,12 @@
     <!-- ── OSIRIS AI Inspired Vertical Navigation Rail ───────────────────────── -->
     <nav class="osiris-nav-rail" id="moduleNavRail" aria-label="Intelligence Modules">
       <div class="nav-rail-group">
+        <button class="nav-rail-btn" data-panel="civilUnrestPanel" onclick="toggleModule('civilUnrestPanel')"
+          aria-label="Civil Unrest & Gatherings (Hague Verdict)" id="btnCivilUnrestNav">
+          <span class="nav-rail-icon">⚖️</span>
+          <span class="nav-rail-tooltip">Civil Unrest &amp; Gatherings (Hague Verdict)</span>
+          <span class="nav-rail-active-indicator"></span>
+        </button>
         <button class="nav-rail-btn" data-panel="newsPanel" onclick="toggleModule('newsPanel')"
           aria-label="News Intelligence">
           <span class="nav-rail-icon">📰</span>
@@ -294,7 +318,27 @@
                 <button class="layers-menu-close" onclick="toggleTacticalLayersMenu(false)">✕</button>
               </div>
               <div class="layers-menu-body">
-                <!-- 1. Minefields & UXO Hazards (Top priority) -->
+                <!-- 0. Civil Unrest: Hague Verdict Gatherings (16 Sept) -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerCivilUnrest" onchange="toggleTacticalLayer('civilUnrest', this.checked)">
+                  <span class="layer-toggle-indicator" style="background:#ef4444; box-shadow: 0 0 8px #ef4444;"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Civil Unrest: Hague Verdict Gatherings</span>
+                    <span class="layer-toggle-sub">15 Public viewing &amp; countdown locations (16 Sept 2026)</span>
+                  </div>
+                </label>
+
+                <!-- 1. Active Incidents & Radar Pulse (24h events) -->
+                <label class="layer-toggle-item">
+                  <input type="checkbox" id="toggleLayerIncidents" onchange="toggleTacticalLayer('incidents', this.checked)">
+                  <span class="layer-toggle-indicator indicator-incidents"></span>
+                  <div class="layer-toggle-info">
+                    <span class="layer-toggle-name">Active Incidents & Radar Pulse (24h)</span>
+                    <span class="layer-toggle-sub">Kinetic field events, threat range rings & verification telemetry</span>
+                  </div>
+                </label>
+
+                <!-- 2. Minefields & UXO Hazards (Top priority) -->
                 <label class="layer-toggle-item">
                   <input type="checkbox" id="toggleLayerMines" onchange="toggleTacticalLayer('mines', this.checked)">
                   <span class="layer-toggle-indicator indicator-mines"></span>
@@ -619,14 +663,20 @@
             </div>
             <div class="overlay-content">
 
+              <!-- Civil Unrest & Public Gatherings Panel (Hague Verdict 16 Sept 2026) -->
+              <div class="panel overlay-panel" id="civilUnrestPanel" data-panel-title="Civil Unrest &amp; Public Gatherings"
+                style="display:none">
+                <div id="civilUnrestWidgetMount"></div>
+              </div>
+
               <!-- Live Feeds Broadcast Panel -->
               <div class="panel overlay-panel" id="liveFeedsPanel" data-panel-title="Live Broadcast Feeds"
                 style="display:none">
-                <div class="panel-header">
+                <div class="panel-header feed-panel-header">
                   <div class="panel-title">
                     <span class="module-icon">📺</span>
-                    <span>FEEDS · LIVE SATELLITE &amp; BROADCAST</span>
-                    <span class="panel-badge" id="feedsLiveBadge">11 LIVE</span>
+                    <span class="panel-title-text">LIVE BROADCAST FEEDS</span>
+                    <span class="panel-badge" id="feedsLiveBadge">38 LIVE</span>
                   </div>
                   <div class="panel-meta">FREE BALKAN &amp; GLOBAL CHANNELS</div>
                 </div>
@@ -635,55 +685,45 @@
                 <div class="live-feed-player-card">
                   <div class="feed-player-header">
                     <div class="feed-player-title">
-                      <span class="feed-pulse-dot">●</span>
-                      <span id="activeFeedName">Bloomberg TV</span>
-                      <span class="feed-player-loc" id="activeFeedLoc">New York, US</span>
+                      <span class="feed-pulse-dot" id="activeFeedDot">●</span>
+                      <div class="feed-player-name-wrap">
+                        <span id="activeFeedName">Bloomberg TV</span>
+                        <span class="feed-player-loc" id="activeFeedLoc">New York, US</span>
+                      </div>
                     </div>
                     <div class="feed-player-badges">
-                      <span class="badge-live-stream">LIVE STREAM</span>
+                      <div class="feed-mode-toggle" id="feedModeToggle" title="Toggle between embedded iframe and direct launch mode" style="display:none;">
+                        <button type="button" class="feed-mode-btn active" id="btnFeedModeEmbed" onclick="setFeedPlayerMode('embed')">EMBED</button>
+                        <button type="button" class="feed-mode-btn" id="btnFeedModeDirect" onclick="setFeedPlayerMode('direct')">DIRECT / POP</button>
+                      </div>
+                      <span class="badge-live-stream" id="feedLiveStreamBadge">LIVE HLS</span>
                       <a id="feedExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="feed-ext-btn"
                         title="Open feed in browser tab">↗</a>
                     </div>
                   </div>
-                  <div class="feed-video-wrap">
-                    <iframe id="liveFeedVideoFrame" class="live-feed-iframe" src="" loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
-                    <div class="feed-video-fallback" id="feedVideoFallback"
-                      style="display:none; position:absolute; inset:0; background:rgba(2,6,23,0.95); z-index:10; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px; text-align:center;">
-                      <span style="font-size:24px;">📡</span>
-                      <span style="font-weight:700; color:#f8fafc; font-size:12px;" id="fallbackChannelTitle">Live
-                        Broadcast Feed</span>
-                      <p style="font-size:11px; color:#94a3b8; max-width:280px; margin:0;">Direct player embedding
-                        restricted by broadcaster security policies. Launch official high-definition live stream
-                        directly:</p>
-                      <a id="fallbackExternalLink" href="#" target="_blank" rel="noopener noreferrer"
-                        class="btn-xs btn-primary"
-                        style="display:inline-flex; align-items:center; gap:6px; text-decoration:none; padding:6px 12px; font-weight:700; margin-top:4px;">
-                        ↗ Watch Official Live Stream
-                      </a>
+                  <div class="feed-video-wrap" id="liveFeedVideoFrame">
+                    <div class="tactical-video-wrapper">
+                      <video id="liveFeedVideoPlayer" class="tactical-video-player" controls autoplay muted playsinline></video>
+                      <div id="videoChannelOverlay" class="video-channel-overlay"></div>
+                      <div id="videoPlayerSpinner" class="video-player-spinner" style="display:none;"></div>
                     </div>
+                    <div class="feed-video-fallback" id="feedVideoFallback" style="display:none;"></div>
                   </div>
                 </div>
 
                 <!-- Custom Video / Stream URL Connect Row -->
-                <div class="feed-custom-connect-row"
-                  style="display:flex; gap:6px; margin: 0 14px 10px; align-items:center;">
-                  <input type="text" id="feedCustomStreamInput" class="input-field"
-                    placeholder="Enter custom YouTube / HLS / MP4 live stream URL..."
-                    style="flex:1; font-size:11px; padding:6px 8px;">
-                  <button type="button" class="btn-xs btn-primary" onclick="connectCustomFeedStream()"
-                    style="white-space:nowrap; padding:6px 10px; font-weight:700;">CONNECT</button>
+                <div class="feed-custom-connect-row">
+                  <input type="text" id="feedCustomStreamInput" class="input-field feed-stream-input"
+                    placeholder="Enter custom HLS (.m3u8) / MP4 live stream URL...">
+                  <button type="button" class="btn-feed-connect" onclick="connectCustomFeedStream()">CONNECT</button>
                 </div>
 
-                <!-- Region & Channel Selector -->
+                <!-- Region & Language Selector -->
                 <div class="feed-region-tabs">
-                  <button class="filter-btn active" id="tabFeedsAll" onclick="switchFeedRegion('all', this)">🌐 ALL
-                    FEEDS</button>
-                  <button class="filter-btn" id="tabFeedsBalkans" onclick="switchFeedRegion('balkans', this)">🇽🇰
-                    BALKANS (FREE)</button>
-                  <button class="filter-btn" id="tabFeedsGlobal" onclick="switchFeedRegion('global', this)">🇺🇸 US /
-                    GLOBAL</button>
+                  <button class="filter-btn active" id="tabFeedsAll" onclick="switchFeedRegion('all', this)">🌐 ALL</button>
+                  <button class="filter-btn" id="tabFeedsSr" onclick="switchFeedRegion('sr', this)">🇷🇸 SRPSKI</button>
+                  <button class="filter-btn" id="tabFeedsSq" onclick="switchFeedRegion('sq', this)">🇦🇱 SHQIP</button>
+                  <button class="filter-btn" id="tabFeedsInt" onclick="switchFeedRegion('int', this)">🌐 GLOBAL</button>
                 </div>
 
                 <!-- Channels List -->
@@ -1613,7 +1653,13 @@
     <div class="modal-card staff-auth-card">
       <div class="modal-header staff-auth-header">
         <div class="staff-auth-title-row">
-          <span class="staff-auth-icon">🛡️</span>
+          <span class="staff-auth-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M12 8v4"/>
+              <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
+            </svg>
+          </span>
           <div>
             <h3 class="modal-title">STAFF WARDEN PROTOCOL</h3>
             <div class="modal-subtitle">Restricted Access · Personnel Evacuation & Safe Havens</div>
@@ -1624,12 +1670,19 @@
       <form id="staffLoginForm" onsubmit="submitStaffLogin(event)">
         <div class="modal-body">
           <div class="staff-auth-disclaimer">
-            🔒 <strong>RESTRICTED INFORMATION:</strong> Access is restricted to authorized Security Officers.
-            Unauthorized dissemination of residential locations is strictly prohibited.
+            <span class="staff-disclaimer-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </span>
+            <div>
+              <strong>RESTRICTED INFORMATION:</strong> Access is restricted to authorized Security Officers. Unauthorized dissemination of residential locations is strictly prohibited.
+            </div>
           </div>
           <div class="input-group">
             <label class="input-label" for="staffAuthUser">SECURITY CALLSIGN / USERNAME</label>
-            <input type="text" class="input-field" id="staffAuthUser" placeholder="Enter username"
+            <input type="text" class="input-field" id="staffAuthUser" placeholder="Enter authorized username"
               autocomplete="username" required>
           </div>
           <div class="input-group">
@@ -1642,7 +1695,11 @@
         <div class="modal-footer">
           <button type="button" class="btn-cancel" onclick="closeStaffLoginModal()">Cancel</button>
           <button type="submit" class="btn-submit staff-btn-unlock" id="btnStaffSubmit">
-            🔓 Authenticate & Decrypt
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+            </svg>
+            <span>Authenticate & Decrypt</span>
           </button>
         </div>
       </form>
