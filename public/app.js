@@ -21,6 +21,26 @@ if (typeof window !== 'undefined') {
 }
 
 'use strict';
+
+// Purge any stale legacy cached news arrays or alerts from localStorage or sessionStorage
+if (typeof window !== 'undefined') {
+  try {
+    const legacyKeys = ['kosint_news', 'kosint_alerts', 'cached_news', 'news_cache', 'kosint_feed_cache', 'alertStore', 'kosint_cached_alerts'];
+    legacyKeys.forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+      try { sessionStorage.removeItem(k); } catch (e) {}
+    });
+    if (typeof localStorage !== 'undefined') {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.toLowerCase().includes('news') || key.toLowerCase().includes('alert'))) {
+          try { localStorage.removeItem(key); } catch (e) {}
+        }
+      }
+    }
+  } catch (e) {}
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    SENTINEL Dashboard — Frontend Application v2
    MapLibre GL JS implementation with OSM basemap
@@ -1210,8 +1230,21 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
     };
   }
 
+  // Deduplicate items before calculating RTI so duplicated feeds cannot stack score multipliers
+  const seenFingerprints = new Set();
+  const dedupedNewsItems = [];
+  for (const item of newsItems) {
+    if (!item || typeof item !== 'object') continue;
+    const fp = getAlertFingerprint(item);
+    if (fp && seenFingerprints.has(fp)) continue;
+    if (fp) seenFingerprints.add(fp);
+    dedupedNewsItems.push(item);
+  }
+
   let recentScore = 0;
   let priorScore = 0;
+  let recentActivity = 0;
+  let priorActivity = 0;
   let recent12hCount = 0;
   let prior12hCount = 0;
 
@@ -1228,7 +1261,7 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
 
   const KINETIC_REGEX = /\b(clash|shooting|pucnjava|të\s*shtëna|te\s*shtena|gunfire|armed|weapon|oružj|armë|explosion|eksploz|shpërthim|shperthim|bomb|granat|raid|bastisje|pretres|arrest|uhapšen|uhapsen|arrestuar|barricade|barikad|blockade|bllokad|protest|unrest|trazir|neredi|molotov|assault|attack|sulm|napad|kfor|patrol|special\s*unit|njësia\s*speciale|specijalci|rosu)\b/i;
 
-  for (const item of newsItems) {
+  for (const item of dedupedNewsItems) {
     if (!item || typeof item !== 'object') continue;
     if (item.category === 'other') continue;
 
@@ -1238,13 +1271,22 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
       const pubTime = new Date(rawDate).getTime();
       if (!isNaN(pubTime)) {
         elapsedMs = validRefTime - pubTime;
+      } else {
+        continue;
       }
-    }
-
-    // Rolling 24-hour window filter (allow up to 10 min clock skew)
-    if (elapsedMs < -600000 || elapsedMs > WINDOW_24H_MS) {
+    } else {
       continue;
     }
+
+    const ageHours = elapsedMs / (1000 * 60 * 60);
+
+    // Strict 24h Cutoff: ignore any article older than 24h
+    if (ageHours > 24 || ageHours < -2) {
+      continue;
+    }
+
+    // Linear recency decay weight across the 24h window
+    const recencyWeight = Math.max(0, 1 - (ageHours / 24));
 
     const sev = String(item.severity || '').toLowerCase().trim();
     let weight = SEVERITY_WEIGHTS[sev];
@@ -1258,7 +1300,8 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
 
     const isNorth = typeof isNorthKosovoOrCheckpoint === 'function' ? isNorthKosovoOrCheckpoint(item) : false;
     const multiplier = isNorth ? 1.4 : 1.0;
-    const finalItemScore = weight * multiplier;
+    const baseWeight = weight * multiplier;
+    const finalItemScore = baseWeight * recencyWeight;
 
     if (weight === SEVERITY_WEIGHTS.critical) {
       countCritical++;
@@ -1302,9 +1345,11 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
 
     if (elapsedMs <= WINDOW_12H_MS) {
       recentScore += finalItemScore;
+      recentActivity += baseWeight;
       recent12hCount++;
     } else {
       priorScore += finalItemScore;
+      priorActivity += baseWeight;
       prior12hCount++;
     }
 
@@ -1314,7 +1359,7 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
   const incidentCount24h = recent12hCount + prior12hCount;
   const totalPoints24h = recentScore + priorScore;
 
-  const rawDelta = recentScore - priorScore;
+  const rawDelta = recentActivity - priorActivity;
   const delta24h = Math.round(rawDelta * 10) / 10;
 
   let trend = 'STABLE';
@@ -1677,7 +1722,25 @@ function filterNewsItems(items, filter) {
   ensureTriageTabButtons();
   state.newsTab = filter || state.newsTab || 'all';
   state.newsFilter = state.newsTab;
-  items = (items || []).filter(i => !isWelfareNoiseItem(i));
+
+  const nowMs = Date.now();
+  const seenFp = new Set();
+  const deduped = [];
+
+  for (const item of (items || [])) {
+    if (!item) continue;
+    // TTL Cutoff: Articles older than 48 hours belong exclusively in historical archives/search, NEVER in live feed
+    const pubTime = new Date(item.publishedAt || item.pubDate || 0).getTime();
+    if (pubTime > 0 && (nowMs - pubTime) > 48 * 3600 * 1000) {
+      continue;
+    }
+    const fp = getAlertFingerprint(item);
+    if (fp && seenFp.has(fp)) continue;
+    if (fp) seenFp.add(fp);
+    deduped.push(item);
+  }
+
+  items = deduped.filter(i => !isWelfareNoiseItem(i));
 
   let filtered = items;
 
@@ -6576,7 +6639,35 @@ function buildAlerts(statusData = state.data, borderData = state.borderData, tel
   // 1. NEWS
   const news = statusData?.news;
   if (news?.items && Array.isArray(news.items)) {
+    const seenNewsAlertFp = new Set();
+    const nowMs = Date.now();
+    const TTL_24H_MS = 24 * 3600 * 1000;
+    const TTL_48H_MS = 48 * 3600 * 1000;
+
     news.items.forEach(item => {
+      if (!item) return;
+
+      // TTL Cutoff: An item CANNOT be tagged or displayed as a LIVE ALERT if its publishedAt is older than 24 hours (or max 48 hours for operational items)
+      const rawDate = item.publishedAt || item.pubDate || item.timestamp;
+      if (rawDate) {
+        const pubTime = new Date(rawDate).getTime();
+        if (!isNaN(pubTime)) {
+          const ageMs = nowMs - pubTime;
+          const isOperational = item.isOperational || item.category === 'operational' || item.severity === 'critical' || item.isSecurityIncident;
+          const maxAgeMs = isOperational ? TTL_48H_MS : TTL_24H_MS;
+          if (ageMs > maxAgeMs || ageMs < -3600000) {
+            return; // strictly excluded from LIVE ALERTS
+          }
+        }
+      }
+
+      // Deduplication: Normalized Fingerprint Hash
+      const fp = getAlertFingerprint(item);
+      if (fp && seenNewsAlertFp.has(fp)) {
+        return; // Discard duplicate alert
+      }
+      if (fp) seenNewsAlertFp.add(fp);
+
       let severity = null;
       if (item.intensityScore >= ALERT_THRESHOLDS.news.criticalScore || item.threatLevel === 'critical') {
         severity = 'CRITICAL';
@@ -6587,7 +6678,7 @@ function buildAlerts(statusData = state.data, borderData = state.borderData, tel
       }
       if (severity) {
         alerts.push({
-          id: genFrontendAlertId('news', item.url || item.title),
+          id: genFrontendAlertId('news', fp || item.url || item.title),
           module: 'news',
           panelId: 'newsPanel',
           type: 'SECURITY_EVENT',
@@ -7007,10 +7098,26 @@ function aggregateAndRenderAlerts(statusData = state.data, borderData = state.bo
     state.alertStore = new Map();
   }
 
+  const nowMs = Date.now();
+  const TTL_48H_MS = 48 * 3600 * 1000;
+
+  // Prune any stale alerts older than 48 hours from in-memory alertStore
+  for (const [id, a] of state.alertStore.entries()) {
+    const pubTime = new Date(a.timestamp || 0).getTime();
+    if (pubTime > 0 && (nowMs - pubTime) > TTL_48H_MS) {
+      state.alertStore.delete(id);
+    }
+  }
+
   const freshAlerts = buildAlerts(statusData, borderData, telegramData);
 
   // Merge into state.alertStore with deduplication & stability
+  const seenFreshFps = new Set();
   freshAlerts.forEach(a => {
+    const fp = getAlertFingerprint(a);
+    if (fp && seenFreshFps.has(fp)) return;
+    if (fp) seenFreshFps.add(fp);
+
     if (state.alertStore.has(a.id)) {
       const existing = state.alertStore.get(a.id);
       const shouldUnread = (SEVERITY_WEIGHT[a.severity] || 0) > (SEVERITY_WEIGHT[existing.severity] || 0);
@@ -7028,8 +7135,19 @@ function aggregateAndRenderAlerts(statusData = state.data, borderData = state.bo
     }
   });
 
-  // Convert to array and sort by severity descending, then timestamp descending
-  const allAlerts = Array.from(state.alertStore.values());
+  // Convert to array and deduplicate identical stories across different feed IDs
+  const seenStoreFps = new Set();
+  const allAlerts = [];
+  for (const a of state.alertStore.values()) {
+    const pubTime = new Date(a.timestamp || 0).getTime();
+    if (pubTime > 0 && (nowMs - pubTime) > TTL_48H_MS) continue; // ignore stale
+
+    const fp = getAlertFingerprint(a);
+    if (fp && seenStoreFps.has(fp)) continue;
+    if (fp) seenStoreFps.add(fp);
+    allAlerts.push(a);
+  }
+
   allAlerts.sort((a, b) => {
     const sDiff = (SEVERITY_WEIGHT[b.severity] || 0) - (SEVERITY_WEIGHT[a.severity] || 0);
     if (sDiff !== 0) return sDiff;
@@ -7047,7 +7165,28 @@ function renderLiveAlertTicker(alerts = []) {
   const track = $('liveAlertTickerTrack');
   if (!track) return;
 
-  const validAlerts = (alerts || []).filter(a => a.module !== 'wildfire' && a.category !== 'wildfire');
+  const nowMs = Date.now();
+  const TTL_24H_MS = 24 * 3600 * 1000;
+  const TTL_48H_MS = 48 * 3600 * 1000;
+  const seenTickerFp = new Set();
+
+  const validAlerts = (alerts || []).filter(a => {
+    if (!a || a.module === 'wildfire' || a.category === 'wildfire') return false;
+
+    // Strict TTL Cutoff: Articles older than 24h (or max 48h operational) never in live ticker
+    const pubTime = new Date(a.timestamp || 0).getTime();
+    if (pubTime > 0) {
+      const isOp = a.module === 'operational' || a.severity === 'CRITICAL' || a.type === 'SECURITY_EVENT';
+      const maxAge = isOp ? TTL_48H_MS : TTL_24H_MS;
+      if ((nowMs - pubTime) > maxAge) return false;
+    }
+
+    // Deduplicate identical alerts
+    const fp = getAlertFingerprint(a);
+    if (fp && seenTickerFp.has(fp)) return false;
+    if (fp) seenTickerFp.add(fp);
+    return true;
+  });
 
   if (!validAlerts || validAlerts.length === 0) {
     track.innerHTML = '<span class="ticker-item-placeholder">ALL SYSTEMS NORMAL · KOSINT REAL-TIME INTELLIGENCE ACTIVE</span>';
@@ -7072,7 +7211,7 @@ function renderLiveAlertTicker(alerts = []) {
     `;
   }).join('');
 
-  track.innerHTML = itemsHtml + itemsHtml;
+  track.innerHTML = validAlerts.length > 2 ? (itemsHtml + itemsHtml) : itemsHtml;
   track.style.animation = 'tickerMove 160s linear infinite';
   track.onmouseenter = () => { track.style.animationPlayState = 'paused'; };
   track.onmouseleave = () => { track.style.animationPlayState = 'running'; };
@@ -7084,9 +7223,24 @@ function renderLiveAlertTicker(alerts = []) {
 }
 
 function renderAlertLog(alerts = []) {
-  const cleanAlerts = (alerts || []).filter(a => a.module !== 'wildfire' && a.category !== 'wildfire');
-  alerts = cleanAlerts;
-  renderLiveAlertTicker(alerts);
+  const nowMs = Date.now();
+  const TTL_48H_MS = 48 * 3600 * 1000;
+  const seenLogFp = new Set();
+
+  const cleanAlerts = (alerts || []).filter(a => {
+    if (!a || a.module === 'wildfire' || a.category === 'wildfire') return false;
+
+    // Strict 48h TTL filter on alert log
+    const pubTime = new Date(a.timestamp || 0).getTime();
+    if (pubTime > 0 && (nowMs - pubTime) > TTL_48H_MS) return false;
+
+    const fp = getAlertFingerprint(a);
+    if (fp && seenLogFp.has(fp)) return false;
+    if (fp) seenLogFp.add(fp);
+    return true;
+  });
+
+  renderLiveAlertTicker(cleanAlerts);
 
   const log = $('alertLog');
   const badge = $('unreadBadge');
@@ -7169,10 +7323,24 @@ async function loadAlertHistory() {
     const { alerts } = await fetch('/api/alerts').then(r => r.json());
     if (Array.isArray(alerts) && alerts.length > 0) {
       if (!state.alertStore) state.alertStore = new Map();
+      const nowMs = Date.now();
+      const TTL_48H_MS = 48 * 3600 * 1000;
+      const seenFp = new Set();
+
       alerts.forEach(a => {
+        // Enforce 48h TTL cutoff on alert history: articles older than 48h are strictly discarded
+        const pubTime = new Date(a.timestamp || 0).getTime();
+        if (pubTime > 0 && (nowMs - pubTime) > TTL_48H_MS) {
+          return;
+        }
+
+        const fp = getAlertFingerprint(a);
+        if (fp && seenFp.has(fp)) return;
+        if (fp) seenFp.add(fp);
+
         const mod = a.module || a.category || 'news';
         const normAlert = {
-          id: a.id || `alert-legacy-${Math.random().toString(36).slice(2)}`,
+          id: a.id || `alert-${mod}-${fp || Math.random().toString(36).slice(2)}`,
           module: mod,
           panelId: a.panelId || `${mod}Panel`,
           type: a.type || 'SYSTEM_ALERT',

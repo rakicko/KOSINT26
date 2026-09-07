@@ -26,7 +26,20 @@ function load() {
       fs.writeFileSync(DB_PATH, JSON.stringify(DEFAULT_DB, null, 2));
       return JSON.parse(JSON.stringify(DEFAULT_DB));
     }
-    return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+    const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+    // Enforce 48h TTL on stored alerts: purge stale alerts automatically
+    if (Array.isArray(db.alerts)) {
+      const now = Date.now();
+      const freshAlerts = db.alerts.filter(a => {
+        const pubTime = new Date(a.timestamp || 0).getTime();
+        return pubTime > 0 && (now - pubTime) <= 48 * 3600 * 1000;
+      });
+      if (freshAlerts.length !== db.alerts.length) {
+        db.alerts = freshAlerts;
+        save(db);
+      }
+    }
+    return db;
   } catch (e) {
     console.warn('[memory-bank] read error:', e.message);
     return JSON.parse(JSON.stringify(DEFAULT_DB));
@@ -60,9 +73,12 @@ function addLocation(loc) {
 function addAlerts(newAlerts) {
   if (!Array.isArray(newAlerts) || !newAlerts.length) return;
   const db = load();
+  const now = Date.now();
   const alertMap = new Map((db.alerts || []).map(a => [a.id, a]));
   
   newAlerts.forEach(na => {
+    const pubTime = new Date(na.timestamp || 0).getTime();
+    if (pubTime > 0 && (now - pubTime) > 48 * 3600 * 1000) return; // Drop stale alert
     if (alertMap.has(na.id)) {
       const existing = alertMap.get(na.id);
       alertMap.set(na.id, { ...existing, ...na, read: existing.read });

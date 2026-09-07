@@ -32,7 +32,33 @@ function evaluate({ news, weather, traffic, radiation, aqi, earthquakes, wildfir
 
   // 1. News alerts
   if (news?.items && Array.isArray(news.items)) {
+    const seenNewsFp = new Set();
+    const nowMs = Date.now();
     news.items.forEach(item => {
+      if (!item) return;
+
+      // TTL Cutoff: An item CANNOT be tagged as an alert if older than 24h (or max 48h for operational)
+      const rawDate = item.publishedAt || item.pubDate || item.timestamp;
+      if (rawDate) {
+        const pubTime = new Date(rawDate).getTime();
+        if (!isNaN(pubTime)) {
+          const ageHours = (nowMs - pubTime) / (3600 * 1000);
+          const maxAgeHours = (item.isOperational || item.category === 'operational' || item.severity === 'critical' || item.isSecurityIncident) ? 48 : 24;
+          if (ageHours > maxAgeHours || ageHours < -1) return;
+        }
+      }
+
+      // Deduplication fingerprint
+      const cleanTitle = String(item.title || item.message || '').toLowerCase()
+        .replace(/^[\[\(]news[\]\)]\s*/i, '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 60);
+      const cleanSource = String(item.source || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+      const fp = `${cleanTitle}_${cleanSource}`;
+      if (fp && seenNewsFp.has(fp)) return;
+      if (fp) seenNewsFp.add(fp);
+
       let severity = null;
       if (item.intensityScore >= THRESHOLDS.news.critical || item.threatLevel === 'critical') {
         severity = 'CRITICAL';
@@ -42,7 +68,7 @@ function evaluate({ news, weather, traffic, radiation, aqi, earthquakes, wildfir
         severity = 'MEDIUM';
       }
       if (severity) {
-        const id = genAlertId('news', item.url || item.title);
+        const id = genAlertId('news', fp || item.url || item.title);
         alerts.push({
           id,
           module: 'news',

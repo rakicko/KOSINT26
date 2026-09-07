@@ -132,6 +132,21 @@ function extractLocationName(item) {
 }
 
 /**
+ * Normalized Fingerprint Hash: normalize(title).slice(0, 60) + "_" + source
+ */
+function getAlertFingerprint(item) {
+  if (!item || typeof item !== 'object') return '';
+  const rawTitle = item.title || item.canonicalTitle || item.message || '';
+  const cleanTitle = String(rawTitle).toLowerCase()
+    .replace(/^[\[\(]news[\]\)]\s*/i, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 60);
+  const rawSource = String(item.source || (Array.isArray(item.sources) ? item.sources[0] : '') || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+  return `${cleanTitle}_${rawSource}`;
+}
+
+/**
  * Calculates Regional Tension Index (RTI) with dynamic factors & operational rationale
  *
  * @param {Array<object>} newsItems - List of news/intel items
@@ -187,8 +202,21 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
     };
   }
 
+  // Deduplicate items before calculating RTI so duplicated feeds cannot stack score multipliers
+  const seenFingerprints = new Set();
+  const dedupedNewsItems = [];
+  for (const item of newsItems) {
+    if (!item || typeof item !== 'object') continue;
+    const fp = getAlertFingerprint(item);
+    if (fp && seenFingerprints.has(fp)) continue;
+    if (fp) seenFingerprints.add(fp);
+    dedupedNewsItems.push(item);
+  }
+
   let recentScore = 0;
   let priorScore = 0;
+  let recentActivity = 0;
+  let priorActivity = 0;
   let recent12hCount = 0;
   let prior12hCount = 0;
 
@@ -204,7 +232,7 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
   let oldestHighOrCriticalElapsedMs = 0;
   let newestHighOrCriticalElapsedMs = Infinity;
 
-  for (const item of newsItems) {
+  for (const item of dedupedNewsItems) {
     if (!item || typeof item !== 'object') continue;
     if (item.category === 'other') continue;
 
@@ -214,12 +242,22 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
       const pubTime = new Date(rawDate).getTime();
       if (!isNaN(pubTime)) {
         elapsedMs = validRefTime - pubTime;
+      } else {
+        continue;
       }
+    } else {
+      continue; // Undated items have 0 contribution to active 24h tension index
     }
 
-    if (elapsedMs < -600000 || elapsedMs > WINDOW_24H_MS) {
+    const ageHours = elapsedMs / (1000 * 60 * 60);
+
+    // Strict 24h Cutoff Gate: zero contribution to active tension index if older than 24h
+    if (ageHours > 24 || ageHours < -2) {
       continue;
     }
+
+    // Linear recency decay weight across the 24h window
+    const recencyWeight = Math.max(0, 1 - (ageHours / 24));
 
     const sev = String(item.severity || '').toLowerCase().trim();
     let weight = SEVERITY_WEIGHTS[sev];
@@ -233,7 +271,8 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
 
     const isNorth = isNorthKosovoOrCheckpoint(item);
     const multiplier = isNorth ? 1.4 : 1.0;
-    const finalItemScore = weight * multiplier;
+    const baseWeight = weight * multiplier;
+    const finalItemScore = baseWeight * recencyWeight;
 
     if (weight === SEVERITY_WEIGHTS.critical) {
       countCritical++;
@@ -265,9 +304,11 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
 
     if (elapsedMs <= WINDOW_12H_MS) {
       recentScore += finalItemScore;
+      recentActivity += baseWeight;
       recent12hCount++;
     } else {
       priorScore += finalItemScore;
+      priorActivity += baseWeight;
       prior12hCount++;
     }
 
@@ -277,8 +318,8 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
   const incidentCount24h = recent12hCount + prior12hCount;
   const totalPoints24h = recentScore + priorScore;
 
-  // Trend: Compare last 12 hours vs prior 12 hours (12h-24h)
-  const rawDelta = recentScore - priorScore;
+  // Trend: Compare activity in last 12 hours vs prior 12 hours (12h-24h)
+  const rawDelta = recentActivity - priorActivity;
   const delta24h = Math.round(rawDelta * 10) / 10;
 
   let trend = 'STABLE';
@@ -434,6 +475,7 @@ module.exports = {
   isNorthKosovoOrCheckpoint,
   isKineticOrOperationalEvent,
   getRegionalTension,
+  getAlertFingerprint,
   NORTH_KOSOVO_LOCATIONS_REGEX,
   PRIORITY_CHECKPOINT_REGEX
 };

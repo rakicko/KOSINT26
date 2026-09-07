@@ -407,6 +407,22 @@ async function fetchRSS(source) {
 }
 
 /**
+ * Normalized Fingerprint Hash for deduplication across sources and cycles:
+ * normalize(title).slice(0, 60) + "_" + source
+ */
+function getArticleFingerprint(item) {
+  if (!item || typeof item !== 'object') return '';
+  const rawTitle = item.title || item.canonicalTitle || item.message || '';
+  const cleanTitle = (typeof normalizeHeadline === 'function' ? normalizeHeadline(rawTitle) : String(rawTitle).toLowerCase())
+    .replace(/^[\[\(]news[\]\)]\s*/i, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 60);
+  const rawSource = String(item.source || (Array.isArray(item.sources) ? item.sources[0] : '') || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+  return `${cleanTitle}_${rawSource}`;
+}
+
+/**
  * Main News Scan & Intelligence Aggregator
  */
 async function fetchNews({
@@ -429,20 +445,30 @@ async function fetchNews({
 
   // Filter out any lingering sports/entertainment items immediately during ingestion
   const rawFeeds = feeds.flat().filter(a => a && !isSportsOrEntertainment(a.title, a.description, a._signals));
-  let allArticles = rawFeeds.filter(a => {
-    const pubTime = new Date(a.publishedAt).getTime();
-    if (isNaN(pubTime)) return false;
+
+  // Strict Time-Window Gate for Live Alerts & News (TTL Cutoff):
+  // An item CANNOT be tagged or displayed as a live alert/feed if its publishedAt is older than 24 hours (or max 48 hours for operational items)
+  const allArticles = rawFeeds.filter(a => {
+    const pubTime = new Date(a.publishedAt || a.pubDate || 0).getTime();
+    if (isNaN(pubTime) || pubTime <= 0) return false;
     const diff = now - pubTime;
-    return diff >= -86400000 && diff <= timelineMs;
+    const isOperational = a.isOperational || a.category === 'operational' || a.severity === 'critical' || a.isSecurityIncident;
+    const maxAgeMs = isOperational ? Math.max(timelineMs, 48 * 60 * 60 * 1000) : timelineMs;
+    return diff >= -3600000 && diff <= maxAgeMs;
   });
 
-  // If timeline filtering yielded zero articles but feeds returned data, use rawFeeds
-  if (allArticles.length === 0 && rawFeeds.length > 0) {
-    allArticles = rawFeeds;
+  // Strict Deduplication via Normalized Fingerprint Hash
+  const seenIngestFingerprints = new Set();
+  const dedupedRawArticles = [];
+  for (const article of allArticles) {
+    const fp = getArticleFingerprint(article);
+    if (fp && seenIngestFingerprints.has(fp)) continue;
+    if (fp) seenIngestFingerprints.add(fp);
+    dedupedRawArticles.push(article);
   }
 
   // Deduplicate syndicated news items before clustering across all scanned articles
-  const deduplicatedArticles = deduplicateNewsItems(allArticles);
+  const deduplicatedArticles = deduplicateNewsItems(dedupedRawArticles);
 
   // Multi-Factor Cross-Source Event Clustering Engine (World Monitor clustering.ts pattern)
   // Cross-lingual merging via Bilingual Entity Bridge & Jaccard token overlap
@@ -483,12 +509,25 @@ async function fetchNews({
     try {
       const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
       if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
-        console.log(`[news-intel] Live RSS returned 0 items; using fallback cache with ${cached.items.length} items`);
-        return {
-          ...cached,
-          fetchedAt: new Date().toISOString(),
-          isCachedFallback: true
-        };
+        // Strict TTL check on cache fallback: purge any stale items (>24h or max 48h operational)
+        const freshCachedItems = cached.items.filter(item => {
+          const pubTime = new Date(item.pubDate || item.publishedAt || 0).getTime();
+          if (isNaN(pubTime) || pubTime <= 0) return false;
+          const diff = now - pubTime;
+          const isOperational = item.isOperational || item.category === 'operational' || item.severity === 'critical';
+          const maxAgeMs = isOperational ? 48 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+          return diff >= -3600000 && diff <= maxAgeMs;
+        });
+
+        if (freshCachedItems.length > 0) {
+          console.log(`[news-intel] Live RSS returned 0 items; using fresh fallback cache with ${freshCachedItems.length} items`);
+          return {
+            ...cached,
+            items: freshCachedItems,
+            fetchedAt: new Date().toISOString(),
+            isCachedFallback: true
+          };
+        }
       }
     } catch (err) {
       console.warn('[news-intel] cache read error:', err.message);
@@ -557,6 +596,7 @@ module.exports = {
   NEGATION_LEXICON,
 
   // Deduplication, Clustering & Timeline
+  getArticleFingerprint,
   normalizeUrl,
   normalizeHeadline,
   calculateTitleSimilarity,

@@ -56,7 +56,7 @@ async function runTests() {
   // ── Test 2: Severity Weights and Context Multiplier (North Kosovo / Checkpoint) ─
   console.log('\n--- Test 2: Severity Weights & Context Multiplier (x1.4 North Kosovo) ---');
 
-  // Critical in Pristina: 2.5 pts -> score = 1.5 + 2.5 = 4.0 (MODERATE / GUARDED)
+  // Critical in Pristina 2h old: decay=0.9167 -> 2.5*0.9167=2.29 -> score = 1.5+2.3 = 3.8 (MODERATE/GUARDED)
   const pristinaCritical = [{
     title: 'Major incident in Pristina centre',
     severity: 'critical',
@@ -64,10 +64,10 @@ async function runTests() {
     pubDate: new Date(now - 2 * ONE_HOUR).toISOString()
   }];
   const resPristina = calculateRegionalTension(pristinaCritical, now);
-  assert.strictEqual(resPristina.score, 4.0, `Pristina critical should be 1.5 + 2.5 = 4.0, got ${resPristina.score}`);
+  assert.strictEqual(resPristina.score, 3.8, `Pristina critical (2h old, decay) should score 3.8, got ${resPristina.score}`);
   assert.strictEqual(resPristina.level, 'MODERATE / GUARDED');
 
-  // Critical in North Kosovo (Mitrovica): 2.5 * 1.4 = 3.5 pts -> score = 1.5 + 3.5 = 5.0
+  // Critical in North Mitrovica 2h old: 2.5*1.4*0.9167=3.21 -> score = 1.5+3.2 = 4.7 (MODERATE/GUARDED)
   const northCritical = [{
     title: 'Shooting incident near Ibar Bridge in Mitrovica',
     severity: 'critical',
@@ -75,27 +75,29 @@ async function runTests() {
     pubDate: new Date(now - 2 * ONE_HOUR).toISOString()
   }];
   const resNorth = calculateRegionalTension(northCritical, now);
-  assert.strictEqual(resNorth.score, 5.0, `North critical should be 1.5 + 3.5 = 5.0, got ${resNorth.score}`);
+  assert.strictEqual(resNorth.score, 4.7, `North critical (2h old, decay) should score 4.7, got ${resNorth.score}`);
   assert.ok(resNorth.score > resPristina.score, 'North Kosovo event must yield strictly higher score than non-North event');
 
   // Priority checkpoint test (Jarinje)
   const jarinjeEvent = [{
     title: 'Armed blockage at Jarinje border crossing checkpoint',
-    severity: 'high', // 1.5 * 1.4 = 2.1 pts -> 1.5 + 2.1 = 3.6
+    severity: 'high', // 1h old: 1.5*1.4*(1-1/24)=1.5*1.4*0.9583=2.01 -> 1.5+2.0=3.5 (MODERATE/GUARDED)
     location: 'Jarinje checkpoint',
     pubDate: new Date(now - 1 * ONE_HOUR).toISOString()
   }];
   const resJarinje = calculateRegionalTension(jarinjeEvent, now);
-  assert.strictEqual(resJarinje.score, 3.6, `Jarinje high event should score 3.6, got ${resJarinje.score}`);
+  assert.strictEqual(resJarinje.score, 3.5, `Jarinje high event (1h old, decay) should score 3.5, got ${resJarinje.score}`);
 
-  // Two critical events in North Kosovo: 2 * 3.5 = 7.0 pts -> score = 1.5 + 7.0 = 8.5 (CRITICAL)
+  // Two critical events in North Kosovo with decay:
+  // item1 2h: 2.5*1.4*(1-2/24)=3.5*0.9167=3.21
+  // item2 3h: 2.5*1.4*(1-3/24)=3.5*0.875=3.06 -> total=1.5+3.21+3.06=7.77 -> 7.8 (ELEVATED)
   const dualNorthCritical = [
     { title: 'Gunfire at Banjska', severity: 'critical', location: 'Banjska', pubDate: new Date(now - 2 * ONE_HOUR).toISOString() },
     { title: 'Explosion at Zubin Potok', severity: 'critical', location: 'Zubin Potok', pubDate: new Date(now - 3 * ONE_HOUR).toISOString() }
   ];
   const resDualNorth = calculateRegionalTension(dualNorthCritical, now);
-  assert.strictEqual(resDualNorth.score, 8.5, `Dual north critical should score 8.5, got ${resDualNorth.score}`);
-  assert.strictEqual(resDualNorth.level, 'CRITICAL / ACTIVE CONFLICT');
+  assert.strictEqual(resDualNorth.score, 7.8, `Dual north critical (decay) should score 7.8, got ${resDualNorth.score}`);
+  assert.strictEqual(resDualNorth.level, 'ELEVATED / HIGH ALERT');
 
   // Guard: KEK / Obiliq should NOT receive North context boost
   const obiliqEvent = [{
