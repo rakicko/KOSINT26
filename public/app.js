@@ -4461,6 +4461,9 @@ function ensureMapVisible() {
 }
 
 function toggleModule(panelId) {
+  if (panelId !== 'liveFeedsPanel' && typeof stopLiveFeedPlayback === 'function') {
+    stopLiveFeedPlayback();
+  }
   const overlay = $('moduleOverlay');
 
   // Weather & AQI are now persistent tactical layers on the map: focus map and ensure layer is active
@@ -4642,6 +4645,10 @@ function toggleModule(panelId) {
 }
 
 function closeModulePanel() {
+  if (typeof stopLiveFeedPlayback === 'function') {
+    stopLiveFeedPlayback();
+  }
+
   const overlay = $('moduleOverlay');
   if (overlay) {
     overlay.classList.remove('active');
@@ -9865,6 +9872,66 @@ function showFeedSpinner() {
 }
 
 /**
+ * Completely stops all live feed media playback, detaches HLS, clears timers,
+ * and blanks any active iframe to immediately eliminate background audio/video.
+ */
+function stopLiveFeedPlayback() {
+  if (streamWatchdogTimer) {
+    clearTimeout(streamWatchdogTimer);
+    streamWatchdogTimer = null;
+  }
+  hideFeedSpinner();
+
+  if (currentHlsInstance) {
+    try {
+      currentHlsInstance.stopLoad();
+      currentHlsInstance.detachMedia();
+      currentHlsInstance.destroy();
+    } catch (e) {
+      console.warn('[Hls] Stop error:', e);
+    }
+    currentHlsInstance = null;
+  }
+  if (typeof window !== 'undefined' && window.currentHlsInstance) {
+    try {
+      window.currentHlsInstance.stopLoad();
+      window.currentHlsInstance.detachMedia();
+      window.currentHlsInstance.destroy();
+    } catch (e) {
+      console.warn('[Hls] Window destroy error:', e);
+    }
+    window.currentHlsInstance = null;
+  }
+
+  const videoEl = $('liveFeedVideoPlayer');
+  if (videoEl) {
+    try {
+      videoEl.pause();
+      videoEl.currentTime = 0;
+      videoEl.src = '';
+      videoEl.removeAttribute('src');
+      videoEl.load();
+    } catch (e) {}
+    videoEl.style.display = 'none';
+  }
+
+  const iframeEl = $('liveFeedIframePlayer');
+  if (iframeEl) {
+    try {
+      iframeEl.src = 'about:blank';
+      iframeEl.removeAttribute('src');
+    } catch (e) {}
+    iframeEl.style.display = 'none';
+  }
+
+  const overlay = $('videoChannelOverlay');
+  if (overlay) overlay.style.display = 'none';
+  const fallback = $('feedVideoFallback');
+  if (fallback) fallback.style.display = 'none';
+}
+window.stopLiveFeedPlayback = stopLiveFeedPlayback;
+
+/**
  * Seamlessly transitions active player from HLS video into the official broadcaster web embed.
  * Ensures 0 black screens or endless spinners when regional streams enforce DRM or token auth.
  */
@@ -11628,6 +11695,7 @@ window.renderLiveFeeds = renderLiveFeeds;
 window.switchFeedRegion = switchFeedRegion;
 window.switchFeedChannel = switchFeedChannel;
 window.connectCustomFeedStream = connectCustomFeedStream;
+window.stopLiveFeedPlayback = stopLiveFeedPlayback;
 window.toggleDrawingToolsWidget = toggleDrawingToolsWidget;
 window.setDrawingShape = setDrawingShape;
 window.clearDrawnAoi = clearDrawnAoi;

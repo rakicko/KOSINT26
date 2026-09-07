@@ -146,4 +146,24 @@ assert.ok(appJs.includes('4000'), '4-second timeout watchdog must be present');
 
 console.log('✓ Passed: switchPlayerToEmbed and 4-second watchdog escalation logic verified');
 
+// 6. Verify Instant Audio/Video Stream Termination on Module Exit (X Button)
+console.log('Test 6: Verifying stopLiveFeedPlayback and audio/video termination on module exit...');
+assert.ok(appJs.includes('function stopLiveFeedPlayback()'), 'Must define stopLiveFeedPlayback function');
+assert.ok(appJs.includes('window.stopLiveFeedPlayback = stopLiveFeedPlayback'), 'Must export stopLiveFeedPlayback on window');
+assert.ok(appJs.includes('currentHlsInstance.stopLoad()'), 'stopLiveFeedPlayback must stop Hls loading');
+assert.ok(appJs.includes('videoEl.pause()'), 'stopLiveFeedPlayback must pause video playback');
+assert.ok(appJs.includes("iframeEl.src = 'about:blank'"), 'stopLiveFeedPlayback must blank active iframe to cut off audio');
+
+// Check that closeModulePanel invokes stopLiveFeedPlayback
+const closePanelMatches = appJs.match(/function closeModulePanel\(\)\s*\{([\s\S]*?)\}/);
+assert.ok(closePanelMatches, 'Must have closeModulePanel function');
+assert.ok(closePanelMatches[1].includes('stopLiveFeedPlayback()'), 'closeModulePanel must call stopLiveFeedPlayback() when user clicks X');
+
+// Check that toggleModule stops live feed when switching to another panel
+const toggleModuleMatches = appJs.match(/function toggleModule\([^)]*\)\s*\{([\s\S]*?)\n\}/);
+assert.ok(toggleModuleMatches, 'Must have toggleModule function');
+assert.ok(toggleModuleMatches[1].includes('stopLiveFeedPlayback()'), 'toggleModule must call stopLiveFeedPlayback() when switching panels');
+
+console.log('✓ Passed: stopLiveFeedPlayback cuts background audio/video and executes on closeModulePanel (X button)');
+
 console.log('\n--- ALL LIVE FEEDS STREAM & PROXY HEALTH TESTS PASSED ---');
