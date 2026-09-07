@@ -6653,7 +6653,8 @@ function buildAlerts(statusData = state.data, borderData = state.borderData, tel
         const pubTime = new Date(rawDate).getTime();
         if (!isNaN(pubTime)) {
           const ageMs = nowMs - pubTime;
-          const isOperational = item.isOperational || item.category === 'operational' || item.severity === 'critical' || item.isSecurityIncident;
+          const itemSevStr = String(item.severity || '').toLowerCase();
+          const isOperational = item.isOperational || item.category === 'operational' || itemSevStr === 'critical' || item.isSecurityIncident;
           const maxAgeMs = isOperational ? TTL_48H_MS : TTL_24H_MS;
           if (ageMs > maxAgeMs || ageMs < -3600000) {
             return; // strictly excluded from LIVE ALERTS
@@ -6668,14 +6669,26 @@ function buildAlerts(statusData = state.data, borderData = state.borderData, tel
       }
       if (fp) seenNewsAlertFp.add(fp);
 
+      const itemSevStr = String(item.severity || '').toLowerCase();
+      const itemCat = String(item.category || '').toLowerCase();
+      const intScore = Number(item.intensityScore) || 0;
+
       let severity = null;
-      if (item.intensityScore >= ALERT_THRESHOLDS.news.criticalScore || item.threatLevel === 'critical') {
+
+      // CRITICAL: intensityScore >= 9, OR threatLevel=critical, OR severity string is 'critical'
+      if (intScore >= ALERT_THRESHOLDS.news.criticalScore || item.threatLevel === 'critical' || itemSevStr === 'critical') {
         severity = 'CRITICAL';
-      } else if (item.intensityScore >= ALERT_THRESHOLDS.news.highScore || item.isSecurityIncident) {
+      // HIGH: intensityScore >= 7, OR isSecurityIncident, OR severity string is 'high'
+      } else if (intScore >= ALERT_THRESHOLDS.news.highScore || item.isSecurityIncident || itemSevStr === 'high') {
         severity = 'HIGH';
-      } else if (item.intensityScore >= ALERT_THRESHOLDS.news.mediumScore && (item.category === 'security' || item.category === 'civil_unrest' || item.category === 'military' || item.category === 'border')) {
+      // MEDIUM: intensityScore >= 5 AND (security/military/unrest/border/political category, OR severity string is 'medium')
+      } else if (intScore >= ALERT_THRESHOLDS.news.mediumScore && (
+        itemCat === 'security' || itemCat === 'civil_unrest' || itemCat === 'military' ||
+        itemCat === 'border' || itemCat === 'political' || itemSevStr === 'medium'
+      )) {
         severity = 'MEDIUM';
       }
+
       if (severity) {
         alerts.push({
           id: genFrontendAlertId('news', fp || item.url || item.title),
@@ -6685,11 +6698,11 @@ function buildAlerts(statusData = state.data, borderData = state.borderData, tel
           severity,
           title: item.title,
           message: item.description || item.title,
-          timestamp: item.publishedAt || now,
+          timestamp: item.publishedAt || item.pubDate || now,
           source: item.source || 'News Intelligence',
           sourceUrl: item.url || '#',
           location,
-          value: item.intensityScore,
+          value: intScore,
           threshold: `score >= ${severity === 'CRITICAL' ? 9 : severity === 'HIGH' ? 7 : 5}`,
           isCached: false
         });

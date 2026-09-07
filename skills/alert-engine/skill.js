@@ -60,11 +60,21 @@ function evaluate({ news, weather, traffic, radiation, aqi, earthquakes, wildfir
       if (fp) seenNewsFp.add(fp);
 
       let severity = null;
-      if (item.intensityScore >= THRESHOLDS.news.critical || item.threatLevel === 'critical') {
+      const itemSevStr = String(item.severity || '').toLowerCase();
+      const itemCat = String(item.category || '').toLowerCase();
+      const intScore = Number(item.intensityScore) || 0;
+
+      // CRITICAL: intensityScore >= 9, threatLevel=critical, OR severity string = 'critical'
+      if (intScore >= THRESHOLDS.news.critical || item.threatLevel === 'critical' || itemSevStr === 'critical') {
         severity = 'CRITICAL';
-      } else if (item.intensityScore >= THRESHOLDS.news.high || item.isSecurityIncident) {
+      // HIGH: intensityScore >= 7, isSecurityIncident, OR severity string = 'high'
+      } else if (intScore >= THRESHOLDS.news.high || item.isSecurityIncident || itemSevStr === 'high') {
         severity = 'HIGH';
-      } else if (item.intensityScore >= THRESHOLDS.news.medium && (item.category === 'security' || item.category === 'civil_unrest' || item.category === 'military')) {
+      // MEDIUM: score >= 5 AND relevant category (incl. political) OR severity string = 'medium'
+      } else if (intScore >= THRESHOLDS.news.medium && (
+        itemCat === 'security' || itemCat === 'civil_unrest' || itemCat === 'military' ||
+        itemCat === 'border' || itemCat === 'political' || itemSevStr === 'medium'
+      )) {
         severity = 'MEDIUM';
       }
       if (severity) {
@@ -77,11 +87,11 @@ function evaluate({ news, weather, traffic, radiation, aqi, earthquakes, wildfir
           severity,
           title: `[News] ${item.title}`,
           message: item.description || item.title,
-          timestamp: item.publishedAt || now,
+          timestamp: item.publishedAt || item.pubDate || now,
           source: item.source || 'News Intelligence',
           sourceUrl: item.url || '#',
           location: location || 'Kosovo',
-          value: item.intensityScore,
+          value: intScore,
           threshold: `score >= ${severity === 'CRITICAL' ? 9 : severity === 'HIGH' ? 7 : 5}`,
           isCached: false
         });
