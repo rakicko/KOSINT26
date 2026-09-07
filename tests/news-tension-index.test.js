@@ -212,6 +212,65 @@ async function runTests() {
 
   console.log('✓ Passed Test 5: UI badge, tooltips, CSS states, and app.js integration verified');
 
+  // ── Test 6: Dynamic Factors & Operational Rationale Payload ─────────────────
+  console.log('\n--- Test 6: Dynamic Factors & Operational Rationale Payload ---');
+  const tensionIndexModule = require('../skills/news-intel/tension-index');
+  assert.strictEqual(typeof tensionIndexModule.calculateRegionalTension, 'function', 'tension-index.js must export calculateRegionalTension');
+  assert.strictEqual(typeof tensionIndexModule.isNorthKosovoOrCheckpoint, 'function', 'tension-index.js must export isNorthKosovoOrCheckpoint');
+  assert.strictEqual(typeof tensionIndexModule.getRegionalTension, 'function', 'tension-index.js must export getRegionalTension');
+
+  const kineticEvents = [
+    { title: 'Shooting incident in North Mitrovica', severity: 'critical', location: 'Mitrovicë', isNorth: true, pubDate: new Date(now - 1 * ONE_HOUR).toISOString() },
+    { title: 'Armed raid in Zvečan', severity: 'high', location: 'Zvečan', isNorth: true, pubDate: new Date(now - 3 * ONE_HOUR).toISOString() },
+    { title: 'Police operation in Prishtinë', severity: 'high', location: 'Prishtinë', isNorth: false, pubDate: new Date(now - 5 * ONE_HOUR).toISOString() }
+  ];
+  const factorRes = tensionIndexModule.calculateRegionalTension(kineticEvents, now);
+
+  assert.ok(factorRes.factors, 'Payload must include factors object');
+  assert.strictEqual(typeof factorRes.factors.criticalEventsCount, 'number', 'factors.criticalEventsCount must be numeric');
+  assert.strictEqual(factorRes.factors.criticalEventsCount, 1, 'Should detect 1 critical event');
+  assert.strictEqual(factorRes.factors.highEventsCount, 2, 'Should detect 2 high events');
+  assert.ok(Array.isArray(factorRes.factors.activeFlashpoints), 'activeFlashpoints must be an array');
+  assert.ok(factorRes.factors.activeFlashpoints.includes('Mitrovicë'), 'Mitrovicë must be in activeFlashpoints');
+  assert.ok(Array.isArray(factorRes.factors.primaryDrivers), 'primaryDrivers must be an array');
+  assert.ok(factorRes.factors.primaryDrivers.length >= 1, 'primaryDrivers must contain at least 1 driver');
+  assert.ok(Array.isArray(factorRes.factors.flashpointHeat), 'flashpointHeat must be an array');
+  assert.strictEqual(typeof factorRes.factors.decayTime, 'string', 'decayTime must be a string');
+  assert.strictEqual(factorRes.factors.isCeilingApplied, false, 'Ceiling should not apply to kinetic unrest');
+  console.log('✓ Passed Test 6: Dynamic factors payload structure verified');
+
+  // ── Test 7: Recalibration Check (Non-Kinetic Ceiling Cap) ────────────────────
+  console.log('\n--- Test 7: Recalibration Check (Non-Kinetic Ceiling Cap <= 6.5) ---');
+  const peacefulNews = [];
+  for (let i = 0; i < 40; i++) {
+    peacefulNews.push({
+      title: `Routine dialogue press statement announcement #${i}`,
+      category: 'political',
+      severity: 'high',
+      pubDate: new Date(now - (i % 12) * ONE_HOUR).toISOString()
+    });
+  }
+  const peacefulRes = tensionIndexModule.calculateRegionalTension(peacefulNews, now);
+  assert.ok(peacefulRes.score <= 6.5, `Purely political statements must not exceed 6.5, got ${peacefulRes.score}`);
+  assert.strictEqual(peacefulRes.factors.isCeilingApplied, true, 'isCeilingApplied must be true for non-kinetic overload');
+  assert.ok(peacefulRes.factors.primaryDrivers.some(d => d.includes('Non-kinetic ceiling active')), 'Must mention non-kinetic ceiling in primary drivers');
+  console.log(`✓ Passed Test 7: Non-kinetic ceiling cap verified (Score: ${peacefulRes.score} <= 6.5)`);
+
+  // ── Test 8: Tactical Rationale Popover UI Elements in index.html & style.css ─
+  console.log('\n--- Test 8: Tactical Rationale Popover UI Elements in index.html & style.css ---');
+  assert.ok(htmlContent.includes('id="tensionPopoverHeader"'), 'index.html must contain #tensionPopoverHeader');
+  assert.ok(htmlContent.includes('id="tooltipDefconBadge"'), 'index.html must contain #tooltipDefconBadge');
+  assert.ok(htmlContent.includes('id="tensionPrimaryDrivers"'), 'index.html must contain #tensionPrimaryDrivers');
+  assert.ok(htmlContent.includes('id="tensionFlashpointHeat"'), 'index.html must contain #tensionFlashpointHeat');
+  assert.ok(htmlContent.includes('id="tensionDecayTime"'), 'index.html must contain #tensionDecayTime');
+  assert.ok(htmlContent.includes('tensionIndexWidget'), 'index.html must support tensionIndexWidget widget attribute');
+
+  assert.ok(cssContent.includes('.tension-popover-header'), 'style.css must define .tension-popover-header');
+  assert.ok(cssContent.includes('.tension-drivers-list'), 'style.css must define .tension-drivers-list');
+  assert.ok(cssContent.includes('.flashpoint-heat-pill'), 'style.css must define .flashpoint-heat-pill');
+  assert.ok(cssContent.includes('.tension-decay-box'), 'style.css must define .tension-decay-box');
+  console.log('✓ Passed Test 8: Tactical rationale popover markup and styling verified');
+
   console.log('\n🎉 ALL REGIONAL TENSION INDEX (RTI) TESTS PASSED 100%! 🎉');
 }
 

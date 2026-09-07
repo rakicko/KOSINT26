@@ -1175,6 +1175,7 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
   const BASELINE_SCORE = 1.5;
   const WINDOW_24H_MS = 24 * 3600 * 1000;
   const WINDOW_12H_MS = 12 * 3600 * 1000;
+  const NON_KINETIC_CEILING = 6.5;
 
   if (!Array.isArray(newsItems) || newsItems.length === 0) {
     return {
@@ -1192,6 +1193,19 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
         recent12hCount: 0,
         prior12hCount: 0
       },
+      factors: {
+        criticalEventsCount: 0,
+        highEventsCount: 0,
+        activeFlashpoints: [],
+        primaryDrivers: [
+          'Baseline ambient stability — no critical security alerts detected in 24h window',
+          'Border crossings and transit corridors operating under nominal conditions'
+        ],
+        flashpointHeat: [],
+        decayTime: 'Stable baseline — no active decay required',
+        kineticEventsCount: 0,
+        isCeilingApplied: false
+      },
       generatedAt: new Date(validRefTime).toISOString()
     };
   }
@@ -1206,6 +1220,13 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
   let countMedium = 0;
   let countLow = 0;
   let countNorth = 0;
+  let countKinetic = 0;
+
+  const flashpointCounts = {};
+  const validItemsIn24h = [];
+  let oldestHighOrCriticalElapsedMs = 0;
+
+  const KINETIC_REGEX = /\b(clash|shooting|pucnjava|të\s*shtëna|te\s*shtena|gunfire|armed|weapon|oružj|armë|explosion|eksploz|shpërthim|shperthim|bomb|granat|raid|bastisje|pretres|arrest|uhapšen|uhapsen|arrestuar|barricade|barikad|blockade|bllokad|protest|unrest|trazir|neredi|molotov|assault|attack|sulm|napad|kfor|patrol|special\s*unit|njësia\s*speciale|specijalci|rosu)\b/i;
 
   for (const item of newsItems) {
     if (!item || typeof item !== 'object') continue;
@@ -1235,16 +1256,49 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
       else weight = SEVERITY_WEIGHTS.low;
     }
 
-    const isNorth = isNorthKosovoOrCheckpoint(item);
+    const isNorth = typeof isNorthKosovoOrCheckpoint === 'function' ? isNorthKosovoOrCheckpoint(item) : false;
     const multiplier = isNorth ? 1.4 : 1.0;
     const finalItemScore = weight * multiplier;
 
-    if (weight === SEVERITY_WEIGHTS.critical) countCritical++;
-    else if (weight === SEVERITY_WEIGHTS.high) countHigh++;
-    else if (weight === SEVERITY_WEIGHTS.medium) countMedium++;
-    else countLow++;
+    if (weight === SEVERITY_WEIGHTS.critical) {
+      countCritical++;
+      if (elapsedMs > oldestHighOrCriticalElapsedMs) oldestHighOrCriticalElapsedMs = elapsedMs;
+    } else if (weight === SEVERITY_WEIGHTS.high) {
+      countHigh++;
+      if (elapsedMs > oldestHighOrCriticalElapsedMs) oldestHighOrCriticalElapsedMs = elapsedMs;
+    } else if (weight === SEVERITY_WEIGHTS.medium) {
+      countMedium++;
+    } else {
+      countLow++;
+    }
 
     if (isNorth) countNorth++;
+
+    const itemText = `${item.title || ''} ${item.description || ''}`.trim();
+    const isKinetic = item.category === 'operational' || item.isKinetic === true || KINETIC_REGEX.test(itemText);
+    if (isKinetic) countKinetic++;
+
+    // Extract location for flashpoints
+    let locName = typeof item.location === 'string' ? item.location.trim() : (item.location?.name || null);
+    if (!locName) {
+      if (/\b(mitrovic|severna\s*mitrovica|north\s*mitrovica)\b/i.test(itemText)) locName = 'Mitrovicë';
+      else if (/\b(zve[cč]an)\b/i.test(itemText)) locName = 'Zvečan';
+      else if (/\b(leposavi[cć]|leposaviq)\b/i.test(itemText)) locName = 'Leposavić';
+      else if (/\b(zubin\s*potok)\b/i.test(itemText)) locName = 'Zubin Potok';
+      else if (/\b(prishtin|pristina)\b/i.test(itemText)) locName = 'Prishtinë';
+      else if (/\b(gra[cč]anica)\b/i.test(itemText)) locName = 'Gračanica';
+      else if (/\b(jarinj)\b/i.test(itemText)) locName = 'Jarinje (Border)';
+      else if (/\b(brnjak|b[eë]rnjak)\b/i.test(itemText)) locName = 'Bërnjak (Border)';
+      else locName = isNorth ? 'North Kosovo' : 'Central Kosovo';
+    }
+
+    if (!flashpointCounts[locName]) {
+      flashpointCounts[locName] = { name: locName, count: 0, isNorth, maxWeight: 0 };
+    }
+    flashpointCounts[locName].count++;
+    if (weight > flashpointCounts[locName].maxWeight) {
+      flashpointCounts[locName].maxWeight = weight;
+    }
 
     if (elapsedMs <= WINDOW_12H_MS) {
       recentScore += finalItemScore;
@@ -1253,6 +1307,8 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
       priorScore += finalItemScore;
       prior12hCount++;
     }
+
+    validItemsIn24h.push({ item, weight, finalItemScore, elapsedMs, isNorth, isKinetic, locName });
   }
 
   const incidentCount24h = recent12hCount + prior12hCount;
@@ -1268,7 +1324,14 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
     trend = 'FALLING';
   }
 
-  const rawNormalized = BASELINE_SCORE + totalPoints24h;
+  // Base calculation with non-kinetic ceiling check
+  let rawNormalized = BASELINE_SCORE + totalPoints24h;
+  let isCeilingApplied = false;
+  if (countKinetic === 0 && rawNormalized > NON_KINETIC_CEILING) {
+    rawNormalized = NON_KINETIC_CEILING;
+    isCeilingApplied = true;
+  }
+
   const score = Math.min(10.0, Math.max(1.0, Math.round(rawNormalized * 10) / 10));
 
   let level = 'LOW / NORMAL';
@@ -1280,6 +1343,54 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
     level = 'MODERATE / GUARDED';
   } else {
     level = 'LOW / NORMAL';
+  }
+
+  // Flashpoint heat sorting
+  const flashpointHeat = Object.values(flashpointCounts)
+    .sort((a, b) => (b.count * b.maxWeight) - (a.count * a.maxWeight))
+    .map(f => ({
+      name: f.name,
+      count: f.count,
+      isNorth: f.isNorth,
+      severity: f.maxWeight >= 2.5 ? 'critical' : f.maxWeight >= 1.5 ? 'high' : 'medium'
+    }));
+
+  const activeFlashpoints = flashpointHeat.slice(0, 5).map(f => f.name);
+
+  // Dynamic Primary Drivers
+  const primaryDrivers = [];
+  if (countCritical > 0) {
+    const critItem = validItemsIn24h.find(v => v.weight === SEVERITY_WEIGHTS.critical);
+    const title = critItem?.item?.title || `${countCritical} critical security incidents`;
+    primaryDrivers.push(`${countCritical} CRITICAL alert${countCritical > 1 ? 's' : ''} detected: "${title.slice(0, 75)}${title.length > 75 ? '...' : ''}"`);
+  }
+  if (countHigh > 0) {
+    primaryDrivers.push(`Multiple HIGH severity security alerts (${countHigh}) active in 24h window`);
+  }
+  if (countNorth > 0) {
+    const northLocs = flashpointHeat.filter(f => f.isNorth).map(f => f.name).slice(0, 3).join(', ');
+    primaryDrivers.push(`Flashpoint multiplier active (x1.4): ${northLocs || 'Mitrovica North & Border'}`);
+  }
+  if (isCeilingApplied) {
+    primaryDrivers.push('Non-kinetic ceiling active: rhetoric capped at 6.5 until physical unrest is detected');
+  } else if (countKinetic > 0) {
+    primaryDrivers.push(`Kinetic / operational unrest confirmed (${countKinetic} field incidents)`);
+  }
+  if (primaryDrivers.length === 0) {
+    primaryDrivers.push('Baseline ambient stability — nominal security conditions across municipalities');
+  }
+
+  // Decay Projection
+  let decayTime = 'Score stable — continuous rolling window monitoring';
+  if (oldestHighOrCriticalElapsedMs > 0) {
+    const msUntilOldestDrops = Math.max(0, WINDOW_24H_MS - oldestHighOrCriticalElapsedMs);
+    const hours = Math.floor(msUntilOldestDrops / (3600 * 1000));
+    const mins = Math.floor((msUntilOldestDrops % (3600 * 1000)) / (60 * 1000));
+    if (hours > 0 || mins > 0) {
+      decayTime = `Initial step-down expected in ~${hours}h ${mins}m if no new critical incidents occur`;
+    } else {
+      decayTime = 'Decay cycle imminent (oldest critical event exiting 24h window)';
+    }
   }
 
   return {
@@ -1296,6 +1407,16 @@ function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
       northKosovo: countNorth,
       recent12hCount,
       prior12hCount
+    },
+    factors: {
+      criticalEventsCount: countCritical,
+      highEventsCount: countHigh,
+      activeFlashpoints,
+      primaryDrivers: primaryDrivers.slice(0, 4),
+      flashpointHeat,
+      decayTime,
+      kineticEventsCount: countKinetic,
+      isCeilingApplied
     },
     generatedAt: new Date(validRefTime).toISOString()
   };
@@ -1805,6 +1926,48 @@ function renderRegionalTension(data) {
   if (ttDelta) {
     const delta = typeof data.delta24h === 'number' ? data.delta24h : 0;
     ttDelta.textContent = `${delta > 0 ? '+' : ''}${delta.toFixed(1)} pts`;
+  }
+
+  // Tactical Rationale Popover Details
+  const popoverHeader = $('tensionPopoverHeader');
+  if (popoverHeader) {
+    popoverHeader.textContent = `REGIONAL TENSION INDEX: ${scoreStr}/10.0 [${shortLevel}]`;
+  }
+
+  const defconBadge = $('tooltipDefconBadge');
+  if (defconBadge) {
+    const defconStr = score >= 8.0 ? 'DEFCON 1' : score >= 6.0 ? 'DEFCON 2' : score >= 3.5 ? 'DEFCON 3' : 'DEFCON 5';
+    defconBadge.textContent = defconStr;
+    defconBadge.className = `tension-popover-defcon ${badgeClass}`;
+  }
+
+  const driversList = $('tensionPrimaryDrivers');
+  if (driversList) {
+    const drivers = (data.factors && Array.isArray(data.factors.primaryDrivers) && data.factors.primaryDrivers.length > 0)
+      ? data.factors.primaryDrivers
+      : (score >= 8.0 ? ['Multiple critical armed or physical unrest alerts detected in 24h window'] : ['Baseline regional stability maintained across monitoring corridors']);
+    driversList.innerHTML = drivers.map(d => `<li>${escapeHtml(d)}</li>`).join('');
+  }
+
+  const heatEl = $('tensionFlashpointHeat');
+  if (heatEl) {
+    const heatItems = (data.factors && Array.isArray(data.factors.flashpointHeat) && data.factors.flashpointHeat.length > 0)
+      ? data.factors.flashpointHeat
+      : [];
+    if (heatItems.length > 0) {
+      heatEl.innerHTML = heatItems.map(f => {
+        const sevClass = f.severity === 'critical' ? 'heat-crit' : f.severity === 'high' ? 'heat-high' : 'heat-med';
+        const northBadge = f.isNorth ? '<span class="heat-north">NORTH</span>' : '';
+        return `<span class="flashpoint-heat-pill ${sevClass}">${escapeHtml(f.name)} <span class="heat-count">${f.count}</span>${northBadge}</span>`;
+      }).join('');
+    } else {
+      heatEl.innerHTML = '<span class="flashpoint-heat-pill heat-none">Nominal / No Critical Hotspots</span>';
+    }
+  }
+
+  const decayEl = $('tensionDecayTime');
+  if (decayEl) {
+    decayEl.textContent = data.factors?.decayTime || 'Score stable — continuous rolling window monitoring';
   }
 }
 

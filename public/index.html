@@ -94,19 +94,42 @@
       </div>
 
       <div class="header-status">
-        <!-- World Monitor-Inspired Regional Tension Index (RTI) Badge -->
-        <div class="regional-tension-badge tension-low" id="regionalTensionBadge" onclick="toggleRegionalTensionTooltip(event)" title="Regional Tension Index (RTI) — Click for 24h breakdown">
+        <!-- World Monitor-Inspired Regional Tension Index (RTI) Badge & Tactical Rationale Popover -->
+        <div class="regional-tension-badge tension-low" id="regionalTensionBadge" data-widget="tensionIndexWidget" onclick="toggleRegionalTensionTooltip(event)" title="Regional Tension Index (RTI) — Click for operational rationale & breakdown" role="button" tabindex="0">
           <span class="tension-label">TENSION:</span>
           <span class="tension-score" id="tensionScore">1.5</span>
           <span class="tension-level" id="tensionLevel">LOW / NORMAL</span>
           <span class="tension-trend" id="tensionTrend">[→]</span>
-          <div class="tension-tooltip" id="tensionTooltip" style="display:none" onclick="event.stopPropagation()">
-            <div class="tension-tooltip-title">REGIONAL TENSION INDEX (24H)</div>
-            <div class="tension-tooltip-row"><span>Status:</span> <strong id="tooltipTensionLevel">LOW / NORMAL</strong></div>
-            <div class="tension-tooltip-row"><span>Index Score:</span> <strong id="tooltipTensionScore">1.5 / 10.0</strong></div>
-            <div class="tension-tooltip-row"><span>12h Trend:</span> <strong id="tooltipTensionTrend">STABLE (→)</strong></div>
-            <div class="tension-tooltip-row"><span>24h Incidents:</span> <strong id="tooltipTensionIncidents">0</strong></div>
-            <div class="tension-tooltip-row"><span>12h Delta:</span> <strong id="tooltipTensionDelta">0.0</strong></div>
+          <div class="tension-tooltip tension-rationale-popover" id="tensionTooltip" style="display:none" onclick="event.stopPropagation()">
+            <div class="tension-popover-header">
+              <div class="tension-tooltip-title" id="tensionPopoverHeader">REGIONAL TENSION INDEX: 1.5/10.0 [LOW]</div>
+              <span class="tension-popover-defcon tension-low" id="tooltipDefconBadge">DEFCON 5</span>
+            </div>
+            <div class="tension-metric-grid">
+              <div class="tension-tooltip-row"><span>Status:</span> <strong id="tooltipTensionLevel">LOW / NORMAL</strong></div>
+              <div class="tension-tooltip-row"><span>Index Score:</span> <strong id="tooltipTensionScore">1.5 / 10.0</strong></div>
+              <div class="tension-tooltip-row"><span>12h Trend:</span> <strong id="tooltipTensionTrend">STABLE (→)</strong></div>
+              <div class="tension-tooltip-row"><span>24h Incidents:</span> <strong id="tooltipTensionIncidents">0</strong></div>
+              <div class="tension-tooltip-row"><span>12h Delta:</span> <strong id="tooltipTensionDelta">0.0 pts</strong></div>
+            </div>
+            <div class="tension-rationale-section">
+              <div class="tension-section-title">CORE OPERATIONAL RATIONALE</div>
+              <ul class="tension-drivers-list" id="tensionPrimaryDrivers">
+                <li>Baseline ambient stability — nominal conditions across monitored areas</li>
+              </ul>
+            </div>
+            <div class="tension-rationale-section">
+              <div class="tension-section-title">ACTIVE FLASHPOINTS &amp; MUNICIPALITY HEAT</div>
+              <div class="tension-flashpoints-wrap" id="tensionFlashpointHeat">
+                <span class="flashpoint-heat-pill heat-none">Nominal / No Critical Hotspots</span>
+              </div>
+            </div>
+            <div class="tension-rationale-section tension-decay-section">
+              <div class="tension-section-title">INDEX DECAY PROJECTION</div>
+              <div class="tension-decay-box" id="tensionDecayTime">
+                Stable baseline — continuous rolling window monitoring
+              </div>
+            </div>
           </div>
         </div>
 

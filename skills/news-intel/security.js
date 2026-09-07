@@ -389,7 +389,9 @@ function isNorthKosovoOrCheckpoint(item) {
  * @param {number|Date|string} [referenceTime=Date.now()] - Point in time to compute 24h rolling index
  * @returns {object} { score: number, level: string, trend: 'RISING'|'STABLE'|'FALLING', delta24h: number, incidentCount24h: number }
  */
-function calculateRegionalTension(newsItems, referenceTime = Date.now()) {
+const { calculateRegionalTension } = require('./tension-index');
+
+function calculateRegionalTensionLegacy(newsItems, referenceTime = Date.now()) {
   const refTime = referenceTime ? new Date(referenceTime).getTime() : Date.now();
   const validRefTime = isNaN(refTime) ? Date.now() : refTime;
 

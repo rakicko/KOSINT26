@@ -1,6 +1,6 @@
 'use strict';
 
-const { calculateRegionalTension, isNorthKosovoOrCheckpoint } = require('../skills/news-intel/security');
+const { calculateRegionalTension, isNorthKosovoOrCheckpoint, getRegionalTension: computeTension } = require('../skills/news-intel/tension-index');
 const { fetchNews } = require('../skills/news-intel/skill');
 
 /**

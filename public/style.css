@@ -5889,40 +5889,94 @@ body {
 }
 
 /* RTI Breakdown Tooltip */
+/* RTI Breakdown Popover & Tactical Rationale Drawer */
 .tension-tooltip {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 250px;
-  background: rgba(13, 20, 32, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  width: 330px;
+  background: rgba(13, 20, 32, 0.97);
+  border: 1px solid rgba(56, 189, 248, 0.28);
   border-radius: 8px;
-  padding: 10px 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 12px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
+  padding: 12px 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), 0 0 16px rgba(56, 189, 248, 0.15);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 9px;
   cursor: default;
+  animation: popoverFadeIn 0.18s ease-out;
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tension-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 6px;
+  margin-bottom: 2px;
 }
 
 .tension-tooltip-title {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: 'Space Grotesk', var(--font-mono, monospace);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.7px;
-  color: #94a3b8;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 5px;
-  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+  color: #f8fafc;
+}
+
+.tension-popover-defcon {
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.tension-popover-defcon.tension-critical {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.6);
+}
+.tension-popover-defcon.tension-elevated {
+  background: rgba(249, 115, 22, 0.25);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.6);
+}
+.tension-popover-defcon.tension-moderate {
+  background: rgba(234, 179, 8, 0.22);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.5);
+}
+.tension-popover-defcon.tension-low {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.5);
+}
+
+.tension-metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 12px;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 7px 9px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .tension-tooltip-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11px;
+  font-size: 10.5px;
   color: #cbd5e1;
 }
 
@@ -5931,8 +5985,106 @@ body {
 }
 
 .tension-tooltip-row strong {
-  font-family: var(--font-mono);
+  font-family: var(--font-mono, monospace);
   color: #f8fafc;
+}
+
+.tension-rationale-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tension-section-title {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #38bdf8;
+  text-transform: uppercase;
+}
+
+.tension-drivers-list {
+  margin: 0;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tension-drivers-list li {
+  font-size: 10.5px;
+  color: #e2e8f0;
+  line-height: 1.35;
+}
+
+.tension-flashpoints-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.flashpoint-heat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+}
+
+.flashpoint-heat-pill.heat-crit {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.flashpoint-heat-pill.heat-high {
+  background: rgba(249, 115, 22, 0.18);
+  border-color: rgba(249, 115, 22, 0.5);
+  color: #fdba74;
+}
+
+.flashpoint-heat-pill.heat-med {
+  background: rgba(234, 179, 8, 0.16);
+  border-color: rgba(234, 179, 8, 0.45);
+  color: #fde047;
+}
+
+.flashpoint-heat-pill.heat-none {
+  color: #94a3b8;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.flashpoint-heat-pill .heat-count {
+  background: rgba(255, 255, 255, 0.14);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 8.5px;
+}
+
+.flashpoint-heat-pill .heat-north {
+  color: #38bdf8;
+  font-size: 8px;
+  font-weight: 800;
+  margin-left: 2px;
+}
+
+.tension-decay-box {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px dashed rgba(56, 189, 248, 0.3);
+  padding: 5px 8px;
+  border-radius: 4px;
+  line-height: 1.35;
 }
 
 .news-item-card,
