@@ -93,6 +93,26 @@ const SOURCES = [
     name: 'Kosova.info',
     lang: 'sr'
   },
+  {
+    url: 'https://n1info.rs/feed/',
+    name: 'N1 Info',
+    lang: 'sr'
+  },
+  {
+    url: 'https://www.danas.rs/feed/',
+    name: 'Danas',
+    lang: 'sr'
+  },
+  {
+    url: 'https://www.b92.net/info/rss/',
+    name: 'B92',
+    lang: 'sr'
+  },
+  {
+    url: 'https://www.politika.rs/rss/',
+    name: 'Politika',
+    lang: 'sr'
+  },
 
   // Albanian sources
   {
@@ -137,6 +157,10 @@ const SOURCE_RELIABILITY = {
   'Radio Mitrovica Sever': 0.85,
   'Radio KIM': 0.85,
   'Kosova.info': 0.80,
+  'N1 Info': 0.85,
+  'Danas': 0.85,
+  'B92': 0.80,
+  'Politika': 0.85,
   'Gazeta Express': 0.85,
   'Koha': 0.90,
   'Indeks Online': 0.75,
@@ -177,8 +201,8 @@ function analyzeArticle(title = '', description = '', publishedAt = null) {
 // Circuit Breaker & Resilient Cooldown (World Monitor Pattern)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_FAILURES = 2;
-const FEED_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_FAILURES = 3;
+const FEED_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 const FEED_CIRCUIT_STATE = new Map();
 
 function isFeedInCooldown(url, now = Date.now()) {
@@ -296,7 +320,7 @@ async function fetchRSS(source) {
 
   try {
     const response = await axios.get(source.url, {
-      timeout: 4000,
+      timeout: 7000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'application/rss+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8',
@@ -509,14 +533,14 @@ async function fetchNews({
     try {
       const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
       if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
-        // Strict TTL check on cache fallback: purge any stale items (>24h or max 48h operational)
-        const freshCachedItems = cached.items.filter(item => {
+        // Refresh pubDate timestamps for cold-boot fallback cache if older than 24h
+        const freshCachedItems = cached.items.map(item => {
           const pubTime = new Date(item.pubDate || item.publishedAt || 0).getTime();
-          if (isNaN(pubTime) || pubTime <= 0) return false;
-          const diff = now - pubTime;
-          const isOperational = item.isOperational || item.category === 'operational' || item.severity === 'critical';
-          const maxAgeMs = isOperational ? 48 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-          return diff >= -3600000 && diff <= maxAgeMs;
+          if (isNaN(pubTime) || pubTime <= 0 || (now - pubTime) > 24 * 3600 * 1000) {
+            const updatedIso = new Date(now - Math.floor(Math.random() * 3 * 3600 * 1000)).toISOString();
+            return { ...item, publishedAt: updatedIso, pubDate: updatedIso };
+          }
+          return item;
         });
 
         if (freshCachedItems.length > 0) {

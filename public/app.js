@@ -1608,7 +1608,11 @@ function isOperationalNewsItem(item) {
 
 function isOpinionNewsItem(item) {
   if (!item) return false;
-  return (item.category || '').toLowerCase() === 'opinion';
+  if ((item.category || '').toLowerCase() === 'opinion') return true;
+  if (Array.isArray(item.tags) && item.tags.includes('opinion')) return true;
+  if (item.eventType === 'commentary') return true;
+  const text = `${item.title || item.canonicalTitle || ''} ${item.description || ''}`.toLowerCase();
+  return /\b(opinion|opinione|opinionist|opinionisti|analist|analisti|analistët|analiste|analitičar|analitičari|kolumn[ae]|kolumnist|intervist[aëe]|intervju|komentar|komentator|aludon|aludoi|në\s*studio|ne\s*studio|pressing|debat\s*plus|rubikon|shtron\s*pyetjen|polemik|replikë|replike|debat\s*politik|op-ed|editorial|autorski\s*tekst|reagovanje|mišljenje|misli|qëndrim|vlerësim|stav)\b/i.test(text);
 }
 
 function timeAgo(iso) {
@@ -1648,36 +1652,49 @@ function renderNewsVerificationBadge(item) {
   return `<span class="news-badge-verify verify-single" title="Reported by a single news source">[SINGLE]</span>`;
 }
 
-const SERBIAN_NEWS_SOURCES = ['kossev', 'radio mitrovica sever', 'radio kim', 'kosova.info'];
-const ALBANIAN_NEWS_SOURCES = ['koha', 'gazeta express', 'indeks online', 'lajmi', 'jepize', 'mitropol', 'mitrovicasot', 'telegrafi', 'kallxo'];
+const SERBIAN_NEWS_SOURCES = [
+  'kossev', 'radio mitrovica sever', 'radiomitrovicasever',
+  'radio kim', 'radiokim', 'kosova.info', 'bih.kosova.info',
+  'n1', 'n1info', 'danas', 'b92', 'politika', 'rts', 'tanjug', 'novosti'
+];
+const ALBANIAN_NEWS_SOURCES = [
+  'koha', 'gazeta express', 'gazetaexpress', 'indeks online', 'indeksonline',
+  'lajmi', 'jepize', 'mitropol', 'mitrovicasot', 'mitrovica sot', 'telegrafi',
+  'kallxo', 'rtk', 'botasot', 'bota sot', 'reporteri', 'syri', 'zeri',
+  'dukagjini', 'klankosova', 'klan kosova', 'nacionale', 'paparaci',
+  'kosovapress', 'insajderi', 'sinjali', 'periskopi', 'infokus', 'epokaere'
+];
 
 function isSerbianNewsItem(item) {
   if (!item) return false;
-  // If cross-verified across blocs, preserve visibility on Serbian tab
-  if (item.verificationStatus === 'CROSS-VERIFIED') return true;
-  if (Array.isArray(item.languages) && item.languages.includes('sr')) return true;
-  if (item.language === 'al' || item.language === 'sq') return false;
-  const src = String(item.primarySource || item.source || '').toLowerCase();
-  if (ALBANIAN_NEWS_SOURCES.some(s => src.includes(s))) return false;
 
-  // Strict Albanian character and word detection in title
-  const text = `${item.title || ''} ${item.description || ''}`;
-  if (/[ëËçÇ]/.test(text)) return false;
-  if (/\b(në|dhe|për|nga|është|një|së|të|ka|me|pas\s+takimit|marrëveshja|lajme|aksidenti|policisë)\b/i.test(item.title || '')) return false;
+  const lang = String(item.language || item.lang || '').toLowerCase().trim();
+  const src = String(item.primarySource || item.source || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const title = String(item.title || item.canonicalTitle || item.headline || '');
+  const text = `${title} ${item.description || ''}`;
 
-  if (item.language === 'sr' || item.language === 'serbian') return true;
-  if (SERBIAN_NEWS_SOURCES.some(s => src.includes(s))) return true;
-  const sources = Array.isArray(item.sources) ? item.sources : (Array.isArray(item.participatingSources) ? item.participatingSources : []);
-  if (sources.some(s => SERBIAN_NEWS_SOURCES.some(ss => String(s).toLowerCase().includes(ss)))) return true;
+  if (lang === 'sr' || lang === 'serbian' || lang === 'srp') return true;
   if (/[\u0400-\u04FF]/.test(text)) return true;
+
+  if (SERBIAN_NEWS_SOURCES.some(s => src.includes(s.replace(/[^a-z0-9]/g, '')))) {
+    if (/[ëËçÇ]/.test(title) && !/\b(u|na|za|od|do|je|su|policija|izjava|sastanak|pretres)\b/i.test(title)) {
+      return false;
+    }
+    return true;
+  }
+
+  const sources = (Array.isArray(item.sources) ? item.sources : (Array.isArray(item.participatingSources) ? item.participatingSources : []))
+    .map(s => String(s).toLowerCase().replace(/[^a-z0-9]/g, ''));
+  if (sources.some(s => SERBIAN_NEWS_SOURCES.some(ss => s.includes(ss.replace(/[^a-z0-9]/g, ''))))) {
+    if (/[ëËçÇ]/.test(title)) return false;
+    return true;
+  }
+
   return false;
 }
 
 function isAlbanianNewsItem(item) {
   if (!item) return false;
-  // If cross-verified across blocs, preserve visibility on Albanian tab
-  if (item.verificationStatus === 'CROSS-VERIFIED') return true;
-  if (Array.isArray(item.languages) && item.languages.includes('sq')) return true;
   return !isSerbianNewsItem(item);
 }
 
@@ -1843,7 +1860,7 @@ function filterNewsItems(items, filter) {
   try {
     if (state.newsTab === 'all') {
       // All tab: Shows all valid articles chronologically (deduplicated)
-      filtered = items.filter(i => i && i.category !== 'other');
+      filtered = items.filter(Boolean);
     } else if (state.newsTab === 'operational') {
       // Operational tab: Shows ONLY items where item.category === 'operational'
       filtered = items.filter(i => isOperationalNewsItem(i));
@@ -1851,12 +1868,12 @@ function filterNewsItems(items, filter) {
       // Political tab: Shows ONLY items where item.category === 'political'
       filtered = items.filter(i => isPoliticalNewsItem(i));
     } else if (state.newsTab === 'opinion') {
-      // Opinion tab: Shows ONLY items where item.category === 'opinion'
+      // Opinion tab: Shows ONLY items matching opinion criteria
       filtered = items.filter(i => isOpinionNewsItem(i));
     } else if (state.newsTab === 'serbian') {
-      filtered = items.filter(i => isSerbianNewsItem(i) && i.category !== 'other');
+      filtered = items.filter(i => isSerbianNewsItem(i));
     } else if (state.newsTab === 'albanian') {
-      filtered = items.filter(i => isAlbanianNewsItem(i) && i.category !== 'other');
+      filtered = items.filter(i => isAlbanianNewsItem(i));
     } else if (state.newsTab === 'critical') {
       filtered = items.filter(i => i && (i.severity === 'critical' || i.intensityScore >= 9));
     } else if (state.newsTab === 'high') {
@@ -1864,7 +1881,7 @@ function filterNewsItems(items, filter) {
     } else if (state.newsTab === 'medium') {
       filtered = items.filter(i => i && (i.severity === 'medium' || (i.intensityScore >= 4 && i.intensityScore <= 6)));
     } else {
-      filtered = items.filter(i => i && i.category !== 'other');
+      filtered = items.filter(Boolean);
     }
   } catch (fErr) {
     console.warn('[news-filter] Error filtering items by tab:', fErr);

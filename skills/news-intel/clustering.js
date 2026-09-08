@@ -453,7 +453,7 @@ function extractBilingualBridgeEntities(text) {
 }
 
 const SERBIAN_SOURCES_SET = new Set([
-  'kossev', 'radio mitrovica sever', 'radio kim', 'kosova.info', 'tanjug', 'politika', 'rts', 'novosti'
+  'kossev', 'radio mitrovica sever', 'radio kim', 'kosova.info', 'tanjug', 'politika', 'rts', 'novosti', 'n1', 'danas', 'b92'
 ]);
 const ALBANIAN_SOURCES_SET = new Set([
   'koha', 'gazeta express', 'indeks online', 'lajmi', 'jepize', 'mitropol', 'mitrovicasot',

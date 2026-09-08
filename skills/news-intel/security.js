@@ -95,7 +95,8 @@ function calculateSecurityScore(signals, title = '', description = '', published
 
   const isOperational = hasOperationalEvent || hasOperationalKeywords;
 
-  const isOpinion = /\b(analist|analisti|analistët|analiste|analitičar|analitičari|opinionist|opinionisti|kolumn[ae]|kolumnist|intervist[aëe]|intervju|komentar|komentator|aludon|aludoi|në\s*studio|ne\s*studio|pressing|debat\s*plus|rubikon|shtron\s*pyetjen|polemik|replikë|replike|debat\s*politik)\b/i.test(fullText);
+  const isExplicitOpinionHeader = /^(komentar|stav|analiza|intervju|opinione|kolumna|op-ed|editorial|debat|rekontra)[\s:]/i.test(title);
+  const isOpinion = isExplicitOpinionHeader || /\b(opinion|opinione|opinionist|opinionisti|analist|analisti|analistët|analiste|analitičar|analitičari|kolumn[ae]|kolumnist|intervist[aëe]|intervju|komentar|komentator|aludon|aludoi|në\s*studio|ne\s*studio|pressing|debat\s*plus|rubikon|shtron\s*pyetjen|polemik|replikë|replike|debat\s*politik|op-ed|editorial|autorski\s*tekst|reagovanje|mišljenje|misli|qëndrim|vlerësim|stav)\b/i.test(fullText);
 
   const isPolitical = POLITICAL_KEYWORDS_REGEX.test(fullText) ||
     signals.institutions.some(i => ['inst:government_kosovo', 'inst:parliament_kosovo', 'inst:ministry_interior'].includes(i.id)) ||
@@ -106,7 +107,13 @@ function calculateSecurityScore(signals, title = '', description = '', published
   let baseScore = 3;
   let severity = 'low';
 
-  if (isOperational) {
+  if (isExplicitOpinionHeader || (isOpinion && !hasOperationalEvent)) {
+    // Explicit commentary / op-ed -> Opinion category
+    category = 'opinion';
+    eventType = 'commentary';
+    baseScore = 3;
+    severity = 'medium';
+  } else if (isOperational) {
     // Step 1 (Operational - Highest Priority) -> STOP
     category = 'operational';
     eventType = 'event';
