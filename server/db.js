@@ -215,6 +215,11 @@ migrateLegacyJsonDb();
 
 function seedBootstrapAdmin() {
   try {
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction && (!process.env.ADMIN_BOOTSTRAP_PASS || process.env.ADMIN_BOOTSTRAP_PASS === 'Medjurecko1')) {
+      console.warn('[database] Production notice: ADMIN_BOOTSTRAP_PASS not set or default; skipping insecure bootstrap admin seeding.');
+      return;
+    }
     const defaultUser = process.env.ADMIN_BOOTSTRAP_USER || 'rakicko';
     const defaultPass = process.env.ADMIN_BOOTSTRAP_PASS || 'Medjurecko1';
     const existing = db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE').get(defaultUser);

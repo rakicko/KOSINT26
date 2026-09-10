@@ -201,8 +201,8 @@ function analyzeArticle(title = '', description = '', publishedAt = null) {
 // Circuit Breaker & Resilient Cooldown (World Monitor Pattern)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_FAILURES = 3;
-const FEED_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+const MAX_FAILURES = 2;
+const FEED_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 const FEED_CIRCUIT_STATE = new Map();
 
 function isFeedInCooldown(url, now = Date.now()) {
@@ -320,7 +320,7 @@ async function fetchRSS(source) {
 
   try {
     const response = await axios.get(source.url, {
-      timeout: 7000,
+      timeout: 4000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'application/rss+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8',
