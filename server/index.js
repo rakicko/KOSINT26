@@ -78,27 +78,60 @@ const authLimiter = rateLimit({
   message: { error: 'Too many authentication attempts, please try again after 15 minutes' }
 });
 
-// ── Strict Origin Protection (Supporting Localhost and Codespaces) ─────────────
-const codespaceOrigin = process.env.CODESPACE_NAME
-  ? `https://${process.env.CODESPACE_NAME}-${PORT}.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN || 'app.github.dev'}`
-  : null;
-
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT},http://127.0.0.1:${PORT}`)
+// ── Dynamic Origin Protection (Supporting Same-Origin, Localhost, Codespaces, Render) ──
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
 
-if (codespaceOrigin && !allowedOrigins.includes(codespaceOrigin)) {
-  allowedOrigins.push(codespaceOrigin);
+if (process.env.CODESPACE_NAME) {
+  const codespaceOrigin = `https://${process.env.CODESPACE_NAME}-${PORT}.${process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN || 'app.github.dev'}`;
+  if (!allowedOrigins.includes(codespaceOrigin)) allowedOrigins.push(codespaceOrigin);
+}
+
+if (process.env.RENDER_EXTERNAL_URL && !allowedOrigins.includes(process.env.RENDER_EXTERNAL_URL)) {
+  allowedOrigins.push(process.env.RENDER_EXTERNAL_URL);
+}
+
+function isAllowedOrigin(origin, req) {
+  if (!origin) return true;
+  
+  // 1. Same-origin check: if origin host matches request Host header, always allow
+  const host = req.get('host');
+  if (host) {
+    try {
+      const parsed = new URL(origin);
+      if (parsed.host === host || parsed.hostname === host.split(':')[0]) {
+        return true;
+      }
+    } catch {
+      // ignore invalid URL
+    }
+  }
+
+  // 2. Explicitly allowed origin list
+  if (allowedOrigins.includes(origin)) return true;
+
+  // 3. Localhost & Loopback on any port
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i.test(origin)) return true;
+
+  // 4. GitHub Codespaces domains
+  if (/^https:\/\/[a-z0-9\-]+(-\d+)?\.(app\.github\.dev|github\.dev)$/i.test(origin)) return true;
+
+  // 5. Render hosting domains
+  if (/^https:\/\/[a-z0-9\-]+\.onrender\.com$/i.test(origin)) return true;
+
+  return false;
 }
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (!origin) return next();
-  if (allowedOrigins.includes(origin)) {
+
+  if (isAllowedOrigin(origin, req)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE, PUT, PATCH');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token, X-Staff-Token');
   } else {
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
