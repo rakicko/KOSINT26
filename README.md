@@ -1,95 +1,112 @@
-# 🛰️ SENTINEL — Situational Awareness Dashboard
+# 🛰️ KOSINT26 — SENTINEL Situational Awareness Dashboard
 
-> Real-time multi-feed situational awareness: news, weather, traffic, radiation, air quality, and earthquakes for any location — with push alerts and an interactive map.
+> Real-time tactical operational awareness: multilingual news intelligence, severe weather, traffic incidents, border crossings, radiation, air quality, wildfire hotspots, seismic activity, ADS-B military/civil aviation, and staff warden tracking — with high-performance MapLibre GL 3D WebGL visualization, SSE live alerts, and hardened SQLite storage.
 
-![SENTINEL Dashboard](https://img.shields.io/badge/stack-Node.js%20%2B%20Express%20%2B%20Vanilla%20JS-38bdf8?style=flat-square)
+![KOSINT26 Dashboard](https://img.shields.io/badge/stack-Node.js%2020%2B%20%7C%20Express%20%7C%20MapLibre%20GL-38bdf8?style=flat-square)
+![Database](https://img.shields.io/badge/database-SQLite%20(WAL%20Mode)-003B57?style=flat-square&logo=sqlite)
 ![License](https://img.shields.io/badge/license-MIT-34d399?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-50%2F50%20passing%20(100%25)-brightgreen?style=flat-square)
 
-## Features
+---
 
-| Panel | Data Source | API Key? |
-|-------|-------------|----------|
-| 📰 News Intelligence | GNews API — intensity-scored, categorized | Optional (free tier) |
-| 🌤 Weather Monitor | Open-Meteo — with severe weather alerts | ❌ Not needed |
-| 🚦 Traffic Intelligence | News RSS — traffic keywords detection | ❌ Not needed |
-| ☢️ Radiation Monitor | Radmon.org — neighboring region table | ❌ Not needed |
-| 🌍 Air Quality Index | Open-Meteo Air Quality — European AQI | ❌ Not needed |
-| 🌊 Seismic Monitor | USGS Earthquake — magnitude + distance | ❌ Not needed |
-| 🗺️ Interactive Map | Leaflet.js + OpenStreetMap — incident pins | ❌ Not needed |
-| 🎯 Threat Level | Composite score across all 6 feeds | — |
-| 🔍 Custom Keywords | Add personal tracking terms | — |
-| 📤 Export Report | Download situation report as text | — |
-| 🔔 Push Alerts | SSE real-time + browser notifications | — |
-| 💾 Memory Bank | JSON persistence — location history, alerts | — |
+## 🎯 Architecture & Data Feeds
 
-## Quick Start
+| Module | Engine / Source | Capabilities |
+|---|---|---|
+| 📰 **News Intelligence** | Multilingual NLP RSS Ontology (Albanian, Serbian, International) | Real-time cross-lingual clustering, dynamic threat scoring, TF-IDF location extraction, and flash 3-bullet SitRep synthesis. |
+| 🗺️ **Tactical Map** | MapLibre GL JS (WebGL 3D) + OSM Carto & Satellite | Tactical MSR routes, KFOR base perimeters, minefield polygons, border checkpoints, and 3D aviation pitch/bearing rendering. |
+| 🚦 **Border Crossings** | QKMK / Nakordoni Official Feeds | 13 Kosovo border checkpoints with entry/exit car & truck waiting times and queue lengths. |
+| 🌤 **Weather & Hazards** | Open-Meteo & MET Norway | Severe weather tracking, temperature, wind gusts, and proactive 429 backoff cache. |
+| ✈️ **ADS-B Aviation** | OpenSky Network / ADS-B Exchange | Live aircraft telemetry over the Balkans with military/KFOR/rotary classification and 3D altitude vectors. |
+| 🔥 **Thermal Hotspots** | NASA FIRMS (VIIRS/MODIS) | Active thermal anomaly detections with tactical threat buffers. |
+| 🌊 **Seismic Monitor** | USGS FDSN Earthquake API | Real-time regional seismic event telemetry with epicentral distance and magnitude rings. |
+| ☢️ **Radiation Monitor** | Radmon.org & EURDEP | Environmental gamma radiation monitoring from regional sensor stations. |
+| 🌍 **Air Quality Index** | Open-Meteo Air Quality | European Air Quality Index (AQI) with PM2.5 and PM10 breakdown. |
+| 🛡️ **Staff Warden** | Mitrovica Ward No. 10 Evacuation Roster | Authenticated tactical personnel tracking, emergency communications, and rally routing. |
+| 💾 **Persistence Engine** | SQLite 3 (`sentinel.db`) with WAL Mode | Zero-latency atomic transactions, prepared statements, and automated 48h TTL cleanup. |
+
+---
+
+## 🚀 Quick Start (Local)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/sentinel-dashboard
-cd sentinel-dashboard
+# 1. Clone repository
+git clone https://github.com/rakicko/KOSINT26.git
+cd KOSINT26
+
+# 2. Install dependencies (Node.js 20+ recommended)
 npm install
-cp .env.example .env    # add optional API keys
-node server/index.js
-# Open http://localhost:3000
+
+# 3. Configure environment
+cp .env.example .env
+
+# 4. Start dashboard
+npm start
+
+# Open http://localhost:3000 in your browser
 ```
 
-## API Keys (All Optional)
+---
 
-The dashboard works fully without any keys. Add these to `.env` for live data:
+## 🐳 Docker Deployment
 
-```env
-GNEWS_API_KEY=      # https://gnews.io — 100 req/day free
-```
+The repository includes an optimized multi-stage `Dockerfile` and `docker-compose.yml` with healthchecks and persistent volume storage.
 
-## Skills Architecture
+### Using Docker Compose:
 
-Each data feed is a self-contained, reusable skill module:
-
-```
-skills/
-├── news-intel/          # GNews + intensity scoring
-├── weather-monitor/     # Open-Meteo (no key needed)
-├── traffic-intel/       # News RSS traffic keyword detection
-├── radiation-monitor/   # Radmon.org + neighbour regions
-├── aqi-monitor/         # Open-Meteo Air Quality (no key)
-├── earthquake-monitor/  # USGS FDSN API (no key needed)
-├── wildfire-monitor/    # NASA FIRMS thermal anomaly detection
-├── aviation-monitor/    # OpenSky & ADS-B aircraft monitoring
-├── telegram-monitor/    # Telegram official API public channel monitor
-├── border-monitor/      # QKMK Kosovo border crossing waiting times
-├── alert-engine/        # Threshold evaluator → SSE
-└── memory-bank/         # JSON persistence layer
-```
-
-Test any skill independently:
 ```bash
-node skills/news-intel/skill.js --test --location "Mumbai, India"
-node skills/weather-monitor/skill.js --test --location "Delhi"
-node skills/earthquake-monitor/skill.js --test --location "Tokyo"
-node skills/telegram-monitor/skill.js --test
-node skills/border-monitor/skill.js
+# Build and run container in background
+docker compose up -d
+
+# Check healthcheck status
+docker compose ps
+
+# View live application logs
+docker compose logs -f sentinel-app
 ```
 
-## API Endpoints
+### Using Docker CLI:
+
+```bash
+docker build -t kosint26-sentinel .
+docker run -d -p 3000:3000 -v $(pwd)/server/data:/app/server/data --name sentinel-app kosint26-sentinel
+```
+
+---
+
+## 🩺 Healthchecks & Observability
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/status` | Fetch all core skills for a location |
-| `GET` | `/api/alerts` | Alert history |
-| `GET` | `/events` | SSE stream for real-time push |
-| `GET` | `/api/locations` | Location history |
-| `GET` | `/api/wildfire` | Wildfire detections |
-| `GET` | `/api/aviation` | Aviation telemetry |
-| `GET` | `/api/telegram` | Telegram public channel feed |
-| `GET` | `/api/borders` | Kosovo border crossing waiting times |
+|---|---|---|
+| `GET` | `/healthz` | **Liveness probe**: Returns `{ status: "ok", uptime, timestamp }`. |
+| `GET` | `/ready` | **Readiness probe**: Performs active SQLite connection test (`SELECT 1`). Returns `200 OK` or `503 Service Unavailable`. |
+| `GET` | `/api/breakers` | Real-time upstream circuit breaker statuses and failure telemetry (Requires auth). |
+| `GET` | `/api/cache/stats` | Cache hit/miss rates and memory utilization (Requires auth). |
 
-## Deploying to Render (Free)
+---
 
-1. Push to GitHub
-2. Go to [render.com](https://render.com) → New Web Service → Connect repo
-3. Runtime: **Node**, Build: `npm install`, Start: `node server/index.js`
-4. Add environment variables from `.env.example`
+## 🔒 Security & Performance Features
 
-## License
+- **HTTP Compression & Headers**: Enabled `compression` (Gzip/Brotli) and `helmet` security headers (`X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`).
+- **Graceful Shutdown**: Intercepts `SIGTERM` and `SIGINT`, flushes and closes active SSE streams, safely closes the HTTP server, and cleanly terminates SQLite WAL connections.
+- **Circuit Breaker**: Upstream external APIs (Open-Meteo, NASA FIRMS, USGS) are guarded against cascading 5xx and 429 rate limit failures with automatic 60-second cooldown fast-fails.
+- **Strict CORS & CSRF**: Unauthorized cross-origin mutating requests (`POST`, `PUT`, `DELETE`, `PATCH`) are rejected with `403 Forbidden`.
+- **DOM XSS Defense**: All dynamic HTML injections are strictly escaped using hardened entity replacement (`&`, `<`, `>`, `"`, `'`, `` ` ``).
 
-MIT
+---
+
+## 🧪 Forensic Test Suite
+
+Run the full suite of **50 automated test suites** across unit, adversarial, clustering, and E2E verifications:
+
+```bash
+npm test
+```
+
+All 50 test suites execute sequentially in isolated child processes with duration metrics and exit status verification.
+
+---
+
+## 📄 License
+
+MIT License. Developed for open-source situational awareness and regional operational resilience.
