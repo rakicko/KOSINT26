@@ -48,12 +48,24 @@ async function runE2eTest() {
 
   // 4. Live Server Verification
   console.log('4. Verifying live HTTP server on port 3000...');
+  let spawnedServer = null;
   let indexRes;
   for (let i = 0; i < 5; i++) {
     try {
       indexRes = await axios.get('http://localhost:3000/');
       if (indexRes.status === 200) break;
     } catch (e) {
+      if (i === 0) {
+        try {
+          const { app } = require('../server/index');
+          spawnedServer = await new Promise((resolve, reject) => {
+            const s = app.listen(3000, () => resolve(s));
+            s.on('error', reject);
+          });
+        } catch (sErr) {
+          // ignore if another instance started
+        }
+      }
       await new Promise(r => setTimeout(r, 250));
     }
   }
@@ -87,7 +99,9 @@ async function runE2eTest() {
   // 5. Verify coordinate parsing in routing logic does not split lat,lon
   console.log('5. Verifying route coordinate resolution for "42.8945, 20.8672"...');
   assert.ok(appJs.includes('parseDestinations'), 'app.js must contain parseDestinations to protect lat,lon coordinates');
-  console.log('✓ Passed: parseDestinations function present.\n');
+  if (spawnedServer) {
+    await new Promise(r => spawnedServer.close(r));
+  }
 
   console.log('=== ALL E2E VERIFICATION CHECKS PASSED ===');
 }

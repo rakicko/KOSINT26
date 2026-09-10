@@ -807,7 +807,11 @@
                     title="Filter Critical & High alerts only">
                     <span class="urgent-pulse-dot">●</span> Urgent Only
                   </button>
+                  <button class="news-sitrep-btn" id="btnNewsSitRep" onclick="requestFlashSitRep()" title="Generate Flash Tactical SitRep">
+                    ⚡ SitRep
+                  </button>
                 </div>
+                <div id="newsSitrepContainer" style="display:none"></div>
                 <div class="news-list" id="newsList"></div>
               </div>
 
@@ -1677,7 +1681,7 @@
       <span class="ticker-pulse">●</span> LIVE ALERTS
     </div>
     <div class="ticker-viewport">
-      <div class="ticker-track" id="liveAlertTickerTrack">
+      <div class="ticker-track" id="liveAlertTickerTrack" aria-live="polite">
         <span class="ticker-item-placeholder">INITIALIZING KOSINT REAL-TIME INTELLIGENCE ALERTS...</span>
       </div>
     </div>
@@ -1886,7 +1890,7 @@
   <div id="styleStudioGrain" class="style-studio-grain" style="display:none;" aria-hidden="true"></div>
   <div id="styleStudioVignette" class="style-studio-vignette" style="display:none;" aria-hidden="true"></div>
 
-  <script type="module" src="app.js?v=2.6.2"></script>
+  <script type="module" src="app.js?v=2.6.6"></script>
 </body>
 
 </html>

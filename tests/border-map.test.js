@@ -189,8 +189,10 @@ const renderBorderMapMarkersCode = appJs.slice(
   appJs.indexOf('function focusBorderCrossing(crossingId) {')
 );
 
+function isTacticalLayerVisible() { return true; }
+
 const evalRenderBorder = new Function(
-  'state', 'moduleLayers', 'BORDER_CROSSING_LOCATIONS', 'clearMarkerList', 'updateMapBadgeAndMeta', 'selectBorderCrossing', 'maplibregl', 'escHtml',
+  'state', 'moduleLayers', 'BORDER_CROSSING_LOCATIONS', 'clearMarkerList', 'updateMapBadgeAndMeta', 'selectBorderCrossing', 'maplibregl', 'escHtml', 'isTacticalLayerVisible',
   `
     ${renderBorderMapMarkersCode}
     return { renderBorderMapMarkers, createBorderMarkerElement };
@@ -198,7 +200,7 @@ const evalRenderBorder = new Function(
 );
 
 const { renderBorderMapMarkers, createBorderMarkerElement } = evalRenderBorder(
-  state, moduleLayers, BORDER_CROSSING_LOCATIONS_EVAL, clearMarkerList, updateMapBadgeAndMeta, selectBorderCrossing, global.maplibregl, escHtml
+  state, moduleLayers, BORDER_CROSSING_LOCATIONS_EVAL, clearMarkerList, updateMapBadgeAndMeta, selectBorderCrossing, global.maplibregl, escHtml, isTacticalLayerVisible
 );
 
 renderBorderMapMarkers(null);

@@ -30,7 +30,7 @@ console.log('✓ Passed: CSS rules verify slowed marquee speed (160s) for easy r
 // Test 3: App.js functions and integration
 console.log('Test 3: Verifying renderLiveAlertTicker and window exports in app.js...');
 assert.strictEqual(appJs.includes('function renderLiveAlertTicker'), true, 'renderLiveAlertTicker function defined');
-assert.strictEqual(appJs.includes('renderLiveAlertTicker(alerts);'), true, 'renderAlertLog invokes renderLiveAlertTicker');
+assert.strictEqual(appJs.includes('renderLiveAlertTicker(cleanAlerts);') || appJs.includes('renderLiveAlertTicker(alerts);'), true, 'renderAlertLog invokes renderLiveAlertTicker');
 assert.strictEqual(appJs.includes('window.renderLiveAlertTicker = renderLiveAlertTicker'), true, 'window.renderLiveAlertTicker exported');
 console.log('✓ Passed: App.js ticker render logic and exports verified');
 
@@ -60,16 +60,17 @@ global.document = {
 
 function escHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function formatTimeAgo() { return '2m ago'; }
+function getAlertFingerprint(item) { return item ? (item.id || item.title) : ''; }
 
 const codeExtract = `
   ${appJs.slice(appJs.indexOf('function renderLiveAlertTicker('), appJs.indexOf('function handleAlertClick('))}
 `;
 
-const runtimeTicker = new Function('document', 'escHtml', 'formatTimeAgo', '$', `
+const runtimeTicker = new Function('document', 'escHtml', 'formatTimeAgo', '$', 'getAlertFingerprint', `
   function $(id) { return document.getElementById(id); }
   ${codeExtract}
   return { renderLiveAlertTicker };
-`)(global.document, escHtml, formatTimeAgo, (id) => global.document.getElementById(id));
+`)(global.document, escHtml, formatTimeAgo, (id) => global.document.getElementById(id), getAlertFingerprint);
 
 const sampleAlerts = [
   { id: 'a1', severity: 'CRITICAL', module: 'NEWS', title: 'Të shtëna me armë në Mitrovicë', timestamp: new Date().toISOString() },

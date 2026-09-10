@@ -11,86 +11,84 @@ test('WARD No. 10 (Regional Centre Mitrovicë/Mitrovica) Staff Verification', as
     assert.strictEqual(locations.length, 15, 'Expected 15 total locations (12 staff residences + 3 safe havens/facilities)');
   });
 
-  await t.test('2. Verify Warden Nikolaos Kavallaris Ladis details & email privacy', () => {
+  await t.test('2. Verify Warden details & email privacy', () => {
     const warden = locations.find(l => l.callsign === '61 A');
     assert.ok(warden, 'Warden with callsign 61 A must exist');
-    assert.strictEqual(warden.name, 'Nikolaos Kavallaris Ladis');
+    assert.strictEqual(warden.name, 'WARDEN-LEAD (61 A)');
     assert.strictEqual(warden.role, 'Warden');
-    assert.strictEqual(warden.nationality, 'Greece');
     assert.strictEqual(warden.staffType, 'international');
     assert.strictEqual(warden.radioChannel, 'CH-04');
-    assert.strictEqual(warden.phone, '+383 49 957 537');
+    assert.strictEqual(warden.phone, '+383 49 000 001');
     assert.strictEqual(warden.email, undefined, 'User personal email must be omitted for privacy/OPSEC');
     assert.strictEqual(warden.totalSouls, 3, 'Warden + 2 dependants = 3 souls');
-    assert.ok(warden.dependants.includes('Venera'), 'Dependant wife Venera must be listed');
-    assert.ok(warden.dependants.includes('Leon Georgios'), 'Dependant son Leon Georgios must be listed');
-    assert.ok(warden.address.includes('Alpet Shqiptare'));
+    assert.ok(warden.dependants.includes('Spouse'), 'Dependant spouse must be listed');
+    assert.ok(warden.dependants.includes('Son'), 'Dependant son must be listed');
+    assert.ok(warden.address.includes('Tactical Sector Alpha'));
     assert.strictEqual(warden.zone, 'Prishtinë');
   });
 
-  await t.test('3. Verify Deputy Warden Viola Gaba details & email privacy', () => {
+  await t.test('3. Verify Deputy Warden details & email privacy', () => {
     const deputy = locations.find(l => l.callsign === '64W');
     assert.ok(deputy, 'Deputy Warden with callsign 64W must exist');
-    assert.strictEqual(deputy.name, 'Viola Gaba');
+    assert.strictEqual(deputy.name, 'DEPUTY-WARDEN (64W)');
     assert.strictEqual(deputy.role, 'Deputy Warden');
-    assert.strictEqual(deputy.nationality, 'Albania');
     assert.strictEqual(deputy.staffType, 'international');
     assert.strictEqual(deputy.radioChannel, 'CH-04');
-    assert.strictEqual(deputy.phone, '+383 49 957 550');
+    assert.strictEqual(deputy.phone, '+383 49 000 002');
     assert.strictEqual(deputy.email, undefined, 'User personal email must be omitted for privacy/OPSEC');
     assert.strictEqual(deputy.zone, 'Mitrovica South');
     assert.ok(Math.abs(deputy.lat - 42.8893) < 0.005);
     assert.ok(Math.abs(deputy.lon - 20.8715) < 0.005);
   });
 
-  await t.test('4. Verify Daniela Popovova details & email privacy', () => {
+  await t.test('4. Verify INTL-OFFICER-01 (63 B) details & email privacy', () => {
     const staff = locations.find(l => l.callsign === '63 B');
-    assert.ok(staff, 'Staff Daniela Popovova with callsign 63 B must exist');
+    assert.ok(staff, 'Staff with callsign 63 B must exist');
     assert.strictEqual(staff.nationality, 'Czech Republic');
     assert.strictEqual(staff.staffType, 'international');
     assert.strictEqual(staff.radioChannel, 'CH-04');
-    assert.ok(staff.phone.includes('+383 49 950 286'));
-    assert.ok(staff.secondaryPhone.includes('+381 64 826 1557'));
+    assert.ok(staff.phone.includes('+383 49 000 003'));
+    assert.ok(staff.secondaryPhone.includes('+381 64 000 003'));
     assert.strictEqual(staff.email, undefined, 'User personal email must be omitted for privacy/OPSEC');
     assert.strictEqual(staff.zone, 'Mitrovica North');
-    assert.ok(staff.address.includes('Knjaza Miloša'));
+    assert.ok(staff.address.includes('Mitrovica North Sector 1'));
   });
 
-  await t.test('5. Verify Anne Sophie Marie Veyrier details & email privacy', () => {
+  await t.test('5. Verify INTL-OFFICER-02 (64 M) details & email privacy', () => {
     const staff = locations.find(l => l.callsign === '64 M');
-    assert.ok(staff, 'Staff Anne Sophie Marie Veyrier with callsign 64 M must exist');
+    assert.ok(staff, 'Staff with callsign 64 M must exist');
     assert.strictEqual(staff.nationality, 'France');
     assert.strictEqual(staff.staffType, 'international');
     assert.strictEqual(staff.radioChannel, 'CH-04');
-    assert.strictEqual(staff.phone, '+383 49 957 511');
+    assert.strictEqual(staff.phone, '+383 49 000 004');
     assert.strictEqual(staff.email, undefined, 'User personal email must be omitted for privacy/OPSEC');
     assert.strictEqual(staff.zone, 'Mitrovica South');
-    assert.ok(staff.address.includes('Fadil Ismajli'));
+    assert.ok(staff.address.includes('Tavnik Sector'));
   });
 
-  await t.test('6. Verify Caleb Arboit Waugh details & email privacy', () => {
+  await t.test('6. Verify INTL-OFFICER-03 (64 R) details & email privacy', () => {
     const staff = locations.find(l => l.callsign === '64 R');
-    assert.ok(staff, 'Staff Caleb Arboit Waugh with callsign 64 R must exist');
+    assert.ok(staff, 'Staff with callsign 64 R must exist');
     assert.strictEqual(staff.nationality, 'USA');
     assert.strictEqual(staff.staffType, 'international');
     assert.strictEqual(staff.radioChannel, 'CH-04');
-    assert.strictEqual(staff.phone, '+383 49 957 521');
+    assert.strictEqual(staff.phone, '+383 49 000 005');
     assert.strictEqual(staff.email, undefined, 'User personal email must be omitted for privacy/OPSEC');
     assert.strictEqual(staff.zone, 'Mitrovica North');
-    assert.ok(staff.address.includes('Čika Jovina'));
+    assert.ok(staff.address.includes('Central Sector'));
   });
 
-  await t.test('7. Verify Krsto Gracun details & email privacy', () => {
+  await t.test('7. Verify INTL-OFFICER-04 (64J) details & email privacy', () => {
     const staff = locations.find(l => l.callsign === '64J');
-    assert.ok(staff, 'Staff Krsto Gracun with callsign 64J must exist');
+    assert.ok(staff, 'Staff with callsign 64J must exist');
     assert.strictEqual(staff.nationality, 'Montenegro');
     assert.strictEqual(staff.staffType, 'international');
     assert.strictEqual(staff.radioChannel, 'CH-04');
-    assert.ok(staff.phone.includes('+383 49 956 935'));
-    assert.ok(staff.secondaryPhone.includes('+381 64 82 60145'));
+    assert.ok(staff.phone.includes('+383 49 000 006'));
+    assert.ok(staff.secondaryPhone.includes('+381 64 000 006'));
     assert.strictEqual(staff.email, undefined, 'User personal email must be omitted for privacy/OPSEC');
     assert.strictEqual(staff.zone, 'Mitrovica North');
-    assert.ok(staff.address.includes('Kralja Petra I'));
+    assert.ok(staff.address.includes('North Sector'));
   });
 
   await t.test('8. Verify 6 National Staff members in WARD No. 10', () => {
@@ -98,36 +96,36 @@ test('WARD No. 10 (Regional Centre Mitrovicë/Mitrovica) Staff Verification', as
     assert.strictEqual(natStaff.length, 6, 'Must have 6 national staff members');
 
     const dejan = natStaff.find(s => s.callsign === '62C');
-    assert.ok(dejan, 'Dejan 62C must exist');
+    assert.ok(dejan, 'National officer 62C must exist');
     assert.strictEqual(dejan.totalSouls, 4);
     assert.strictEqual(dejan.lat, 42.89943);
     assert.strictEqual(dejan.lon, 20.86372);
-    assert.ok(dejan.dependants.includes('Marijana'));
+    assert.ok(dejan.dependants.includes('Spouse'));
 
     const aleksandar = natStaff.find(s => s.callsign === '62G');
-    assert.ok(aleksandar, 'Aleksandar 62G must exist');
+    assert.ok(aleksandar, 'National officer 62G must exist');
     assert.strictEqual(aleksandar.totalSouls, 4);
     assert.strictEqual(aleksandar.lat, 42.89801);
     assert.strictEqual(aleksandar.lon, 20.86508);
 
     const branislav = natStaff.find(s => s.callsign === '62M');
-    assert.ok(branislav, 'Branislav 62M must exist');
+    assert.ok(branislav, 'National officer 62M must exist');
     assert.strictEqual(branislav.totalSouls, 2);
     assert.strictEqual(branislav.zone, 'Leposavić');
 
     const milos = natStaff.find(s => s.callsign === '62P');
-    assert.ok(milos, 'Milos 62P must exist');
+    assert.ok(milos, 'National officer 62P must exist');
     assert.strictEqual(milos.totalSouls, 1);
     assert.strictEqual(milos.zone, 'Zvečan');
 
     const ivica = natStaff.find(s => s.callsign === '62T');
-    assert.ok(ivica, 'Ivica 62T must exist');
+    assert.ok(ivica, 'National officer 62T must exist');
     assert.strictEqual(ivica.totalSouls, 4);
     assert.strictEqual(ivica.lat, 42.21906);
     assert.strictEqual(ivica.lon, 20.99951);
 
     const vladan = natStaff.find(s => s.callsign === '62H');
-    assert.ok(vladan, 'Vladan 62H must exist');
+    assert.ok(vladan, 'National officer 62H must exist');
     assert.strictEqual(vladan.totalSouls, 4);
     assert.strictEqual(vladan.lat, 42.8962);
     assert.strictEqual(vladan.lon, 20.8648);

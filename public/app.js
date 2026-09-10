@@ -1913,12 +1913,7 @@ function filterNewsItems(items, filter) {
   });
 
   // World Monitor dynamic threat & time-decay news ranking (_rank descending)
-  let sorted = filtered;
-  try {
-    sorted = sortNewsByRank(filtered);
-  } catch (sErr) {
-    console.warn('[news-sort] Fallback sorting used:', sErr);
-  }
+  const sorted = sortNewsByRank(filtered);
 
   // Preserve cached tactical SitRep banner across tab transitions
   if (state.cachedSitrep) {
@@ -7466,7 +7461,7 @@ function renderLiveAlertTicker(alerts = []) {
     const titleText = a.title || a.message || 'Alert Notice';
 
     return `
-      <div class="ticker-item" onclick="handleAlertClick('${escHtml(a.id)}')" title="Click to view alert details">
+      <div class="ticker-item" role="button" tabindex="0" onclick="handleAlertClick('${escHtml(a.id)}')" title="Click to view alert details">
         <span class="ticker-tag sev-${sevClass}">[${escHtml(sev)}]</span>
         <span class="ticker-mod">${escHtml(mod)}</span>
         <span class="ticker-title">${escHtml(titleText)}</span>
@@ -7475,7 +7470,7 @@ function renderLiveAlertTicker(alerts = []) {
     `;
   }).join('');
 
-  track.innerHTML = validAlerts.length > 2 ? (itemsHtml + itemsHtml) : itemsHtml;
+  track.innerHTML = validAlerts.length >= 2 ? (itemsHtml + itemsHtml) : itemsHtml;
   track.style.animation = 'tickerMove 160s linear infinite';
   track.onmouseenter = () => { track.style.animationPlayState = 'paused'; };
   track.onmouseleave = () => { track.style.animationPlayState = 'running'; };
@@ -7535,7 +7530,9 @@ function renderAlertLog(alerts = []) {
 
     return `
       <div class="alert-log-item severity-${sevClass} ${isUnread ? 'unread' : ''}" 
+           role="button" tabindex="0"
            onclick="handleAlertClick('${escHtml(a.id)}')" 
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();handleAlertClick('${escHtml(a.id)}');}"
            title="Click to open ${escHtml(moduleName)} module">
         <div class="alert-log-header">
           <span class="alert-sev-tag sev-${sevClass}">[${sev}]</span>
@@ -7653,7 +7650,7 @@ function hideWelcome() {
   if (panel) panel.style.display = 'none';
 }
 
-function escHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function escHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/`/g, '&#96;'); }
 function isValidArticleUrl(url) {
   if (typeof url !== 'string') return false;
   const trimmed = url.trim();
@@ -8078,7 +8075,7 @@ function renderBorder(borderData) {
     const linkText = c.source === 'NAKORDONI' ? 'Nakordoni ↗' : 'Official Source ↗';
 
     return `
-      <div class="border-card ${delayClass}" data-crossing-id="${escHtml(c.id)}" onclick="focusBorderCrossing('${escHtml(c.id)}')">
+      <div class="border-card ${delayClass}" role="button" tabindex="0" data-crossing-id="${escHtml(c.id)}" onclick="focusBorderCrossing('${escHtml(c.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusBorderCrossing('${escHtml(c.id)}');}">
         <div class="border-card-header">
           <div class="border-name-info">
             <span class="border-crossing-name">${escHtml(c.name)}</span>
@@ -12301,3 +12298,22 @@ window.setDrawingShape = setDrawingShape;
 window.clearDrawnAoi = clearDrawnAoi;
 window.finishCurrentShape = finishCurrentShape;
 window.exportAoiGeoJson = exportAoiGeoJson;
+
+// ── Global Accessibility Keyboard Delegator ─────────────────────────────────
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const target = e.target;
+      if (
+        target &&
+        (target.getAttribute('role') === 'button' || target.classList?.contains('ticker-item') || target.classList?.contains('border-card') || target.classList?.contains('alert-log-item')) &&
+        target.tagName !== 'BUTTON' &&
+        target.tagName !== 'INPUT' &&
+        target.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault();
+        target.click();
+      }
+    }
+  });
+}

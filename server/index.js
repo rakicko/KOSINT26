@@ -20,10 +20,54 @@ const rateLimit = require('express-rate-limit');
 const cache = require('./cache');
 const { CACHE_TTL } = cache;
 const { streamProxyRouter } = require('./stream-proxy');
+const helmet = require('helmet');
+const compression = require('compression');
+const db = require('./db');
+const { getCircuitBreaker, getAllBreakerStatuses } = require('./circuit-breaker');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const isProduction = process.env.NODE_ENV === 'production';
+
+// ── HTTP Compression & Security Headers ───────────────────────────────────────
+app.use(compression());
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+// ── Healthcheck & Observability Endpoints ─────────────────────────────────────
+app.get('/healthz', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/ready', (req, res) => {
+  try {
+    const row = db.prepare('SELECT 1 as alive').get();
+    if (row && row.alive === 1) {
+      return res.status(200).json({
+        status: 'ready',
+        db: 'connected',
+        timestamp: new Date().toISOString()
+      });
+    }
+    throw new Error('Database ping query returned invalid result');
+  } catch (err) {
+    return res.status(503).json({
+      status: 'unready',
+      error: err.message || 'Database unavailable',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/breakers', auth.requireAuth, (req, res) => {
+  res.json(getAllBreakerStatuses());
+});
 
 // Rate limiters
 const authLimiter = rateLimit({
@@ -56,6 +100,10 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token, X-Staff-Token');
+  } else {
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+      return res.status(403).json({ error: 'Origin not allowed' });
+    }
   }
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -216,7 +264,7 @@ app.post('/api/status', auth.requireAuth, async (req, res) => {
 });
 
 // ── API: Flash SitRep Generator ───────────────────────────────────────────────
-app.post('/api/news/sitrep', async (req, res) => {
+app.post('/api/news/sitrep', auth.requireAuth, async (req, res) => {
   try {
     const { items } = req.body || {};
     const sitrepData = await synthesizeFlashSitRep(items);
@@ -228,7 +276,7 @@ app.post('/api/news/sitrep', async (req, res) => {
 });
 
 // ── API: Regional Tension Index (RTI) ─────────────────────────────────────────
-app.get('/api/news/tension', async (req, res) => {
+app.get('/api/news/tension', auth.requireAuth, async (req, res) => {
   try {
     const tensionData = await getRegionalTension();
     res.json(tensionData);
@@ -237,9 +285,6 @@ app.get('/api/news/tension', async (req, res) => {
     res.status(500).json({ error: err.message || 'Failed to compute regional tension' });
   }
 });
-
-// ── API: Stream Manifest-Only Proxy ──────────────────────────────────────────
-app.use('/api/stream', streamProxyRouter);
 
 // ── API: Get alert history ────────────────────────────────────────────────────
 app.get('/api/alerts', auth.requireAuth, (req, res) => {
@@ -471,7 +516,7 @@ function requireStaffAuth(req, res, next) {
   next();
 }
 
-app.post('/api/staff/login', (req, res) => {
+app.post('/api/staff/login', authLimiter, (req, res) => {
   const { username, password } = req.body || {};
   const authResult = staffService.login(username, password);
   if (!authResult.success) {
@@ -481,6 +526,11 @@ app.post('/api/staff/login', (req, res) => {
 });
 
 app.post('/api/staff/logout', (req, res) => {
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : req.headers['x-staff-token'];
+  if (token) {
+    staffService.revokeToken(token);
+  }
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -535,4 +585,45 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server };
+function gracefulShutdown(signal) {
+  console.log(`\n[server] Received ${signal}. Initiating graceful shutdown...`);
+
+  // Close SSE clients
+  sseClients.forEach(clientRes => {
+    try {
+      clientRes.write('event: shutdown\ndata: server closing\n\n');
+      clientRes.end();
+    } catch {}
+  });
+  sseClients.clear();
+
+  if (server && server.listening) {
+    server.close(() => {
+      console.log('[server] HTTP server closed.');
+      try {
+        db.close();
+        console.log('[server] SQLite database connection closed.');
+      } catch (e) {
+        console.warn('[server] Error closing SQLite database:', e.message);
+      }
+      process.exit(0);
+    });
+
+    const forceTimer = setTimeout(() => {
+      console.error('[server] Force shutdown timeout exceeded. Exiting immediately.');
+      process.exit(1);
+    }, 5000);
+    forceTimer.unref();
+  } else {
+    try {
+      db.close();
+      console.log('[server] SQLite database connection closed.');
+    } catch {}
+    process.exit(0);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+module.exports = { app, server, gracefulShutdown };
