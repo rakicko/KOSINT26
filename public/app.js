@@ -9028,9 +9028,15 @@ async function submitStaffLogin(e) {
       body: JSON.stringify({ username: user, password: pass })
     });
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || 'Authentication failed');
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+
+    if (!res.ok || !data || !data.success) {
+      throw new Error((data && data.error) || 'Invalid username or passphrase');
     }
 
     state.staffToken = data.token;
@@ -9050,7 +9056,10 @@ async function submitStaffLogin(e) {
     fetchStaffLocations();
   } catch (err) {
     if (errEl) {
-      errEl.textContent = err.message || 'Invalid username or passphrase';
+      const msg = (err && err.message && !err.message.includes('JSON'))
+        ? err.message
+        : 'Connection error or server restarting. Please try again.';
+      errEl.textContent = msg;
       errEl.style.display = 'block';
     }
   } finally {
