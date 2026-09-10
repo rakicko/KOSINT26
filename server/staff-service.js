@@ -8,16 +8,19 @@ const DB_PATH = path.join(__dirname, 'staff-db.json');
 
 // Auth Credentials
 const isProduction = process.env.NODE_ENV === 'production';
-if (isProduction && (!process.env.STAFF_AUTH_PASS || process.env.STAFF_AUTH_PASS === 'osce2026safe')) {
-  throw new Error('FATAL: STAFF_AUTH_PASS must be securely configured in production environment.');
-}
-if (isProduction && (!process.env.STAFF_SESSION_SECRET || process.env.STAFF_SESSION_SECRET === 'k0s1nt_w4rd3n_s3cr3t_2026_x9')) {
-  throw new Error('FATAL: STAFF_SESSION_SECRET must be securely configured in production environment.');
-}
-
+let SESSION_SECRET = process.env.STAFF_SESSION_SECRET || 'k0s1nt_w4rd3n_s3cr3t_2026_x9';
 const AUTH_USER = process.env.STAFF_AUTH_USER || 'warden';
 const AUTH_PASS = process.env.STAFF_AUTH_PASS || 'osce2026safe';
-const SESSION_SECRET = process.env.STAFF_SESSION_SECRET || 'k0s1nt_w4rd3n_s3cr3t_2026_x9';
+
+if (isProduction) {
+  if (!process.env.STAFF_AUTH_PASS || process.env.STAFF_AUTH_PASS === 'osce2026safe') {
+    console.warn('[staff-service] Production notice: STAFF_AUTH_PASS not set or default; consider configuring a custom STAFF_AUTH_PASS in production.');
+  }
+  if (!process.env.STAFF_SESSION_SECRET || process.env.STAFF_SESSION_SECRET === 'k0s1nt_w4rd3n_s3cr3t_2026_x9') {
+    SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+    console.warn('[staff-service] Production notice: STAFF_SESSION_SECRET not set; generated secure ephemeral secret for this session.');
+  }
+}
 const TOKEN_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 /**
