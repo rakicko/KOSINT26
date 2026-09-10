@@ -928,11 +928,11 @@ function renderWidgetTable() {
     const p = feat.properties;
     const isSelected = p.id === state.selectedId;
 
-    let badgeMarkup = `<span class="civil-badge civil-badge-blue"><span class="civil-badge-dot"></span> Ora e Pritjes</span>`;
+    let badgeMarkup = `<span class="civil-badge civil-badge-blue" title="Ora e Pritjes (Countdown Screen)"><span class="civil-badge-dot"></span> Ora e Pritjes</span>`;
     if (p.category === 'confirmed') {
-      badgeMarkup = `<span class="civil-badge civil-badge-red"><span class="civil-badge-dot"></span> Confirmed 16 Sept</span>`;
+      badgeMarkup = `<span class="civil-badge civil-badge-red" title="Confirmed public viewing on 16 September"><span class="civil-badge-dot"></span> Confirmed</span>`;
     } else if (p.category === 'ovl_uck') {
-      badgeMarkup = `<span class="civil-badge civil-badge-purple"><span class="civil-badge-dot"></span> OVL-UÇK Branch</span>`;
+      badgeMarkup = `<span class="civil-badge civil-badge-purple" title="OVL-UÇK Veteran Branch"><span class="civil-badge-dot"></span> OVL-UÇK</span>`;
     }
 
     let symbolIcon = '◎';
@@ -942,19 +942,19 @@ function renderWidgetTable() {
     rowsHtml += `
       <tr class="civil-row ${isSelected ? 'selected' : ''}" data-id="${p.id}" onclick="window.CivilUnrestMap.flyToGathering('${p.id}')">
         <td class="civil-cell-num">${p.order}</td>
-        <td>
+        <td class="civil-cell-loc-td">
           <div class="civil-cell-loc">
             <span>${symbolIcon}</span>
             <span>${p.location}</span>
           </div>
         </td>
-        <td>
+        <td class="civil-cell-venue-td">
           <div class="civil-cell-venue" title="${p.venue}">${p.venue}</div>
         </td>
-        <td>
+        <td class="civil-cell-status-td">
           ${badgeMarkup}
         </td>
-        <td style="text-align:right;">
+        <td class="civil-cell-fly-td">
           <button type="button" class="civil-fly-btn" title="Fly to ${p.location}"
             onclick="event.stopPropagation(); window.CivilUnrestMap.flyToGathering('${p.id}')">
             ⌖ Fly
@@ -968,11 +968,11 @@ function renderWidgetTable() {
     <table class="civil-table">
       <thead>
         <tr>
-          <th style="width:24px">#</th>
-          <th>Location</th>
-          <th>Venue</th>
-          <th>Status</th>
-          <th style="text-align:right;">Map</th>
+          <th class="col-num">#</th>
+          <th class="col-loc">Location</th>
+          <th class="col-venue">Venue</th>
+          <th class="col-status">Status</th>
+          <th class="col-fly">Map</th>
         </tr>
       </thead>
       <tbody>

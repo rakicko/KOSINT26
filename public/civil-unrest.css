@@ -362,16 +362,21 @@
   padding: 3px 8px;
   border-radius: 4px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   max-width: 100%;
   box-sizing: border-box;
-  overflow-wrap: anywhere;
-  word-break: normal;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  line-height: 1.25;
+}
+
+.civil-popup-tags .civil-badge {
   white-space: normal;
-  line-height: 1.35;
+  overflow-wrap: break-word;
 }
 
 .civil-badge-red {
@@ -964,6 +969,7 @@
 
 .civil-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 11px;
   text-align: left;
@@ -979,13 +985,53 @@
 }
 
 .civil-table th {
-  padding: 7px 8px;
+  padding: 7px 4px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 700;
   color: #64748b;
   letter-spacing: 0.6px;
   text-transform: uppercase;
+  box-sizing: border-box;
+}
+
+.civil-table th.col-num,
+.civil-table td.civil-cell-num {
+  width: 22px;
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 2px;
+}
+
+.civil-table th.col-loc,
+.civil-table td.civil-cell-loc-td {
+  width: 82px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.civil-table th.col-venue,
+.civil-table td.civil-cell-venue-td {
+  width: auto;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.civil-table th.col-status,
+.civil-table td.civil-cell-status-td {
+  width: 98px;
+  text-align: center;
+  padding-left: 2px;
+  padding-right: 2px;
+  white-space: nowrap;
+}
+
+.civil-table th.col-fly,
+.civil-table td.civil-cell-fly-td {
+  width: 44px;
+  text-align: right;
+  padding-left: 2px;
+  padding-right: 6px;
 }
 
 .civil-row {
@@ -1004,15 +1050,27 @@
 }
 
 .civil-table td {
-  padding: 8px;
+  padding: 7px 4px;
   vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.civil-table .civil-badge {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  font-size: 8px;
+  padding: 2.5px 5px;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
 }
 
 .civil-cell-num {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 9.5px;
   color: #64748b;
-  width: 24px;
 }
 
 .civil-cell-loc {
@@ -1020,13 +1078,22 @@
   color: #ffffff;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10.5px;
+}
+
+.civil-cell-loc span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .civil-cell-venue {
   color: #94a3b8;
-  font-size: 10.5px;
-  max-width: 140px;
+  font-size: 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
