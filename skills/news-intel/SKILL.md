@@ -21,7 +21,7 @@ description: |
 ```json
 {
   "skill": "news-intel",
-  "location": "Mumbai, India",
+  "location": "Prishtina, Kosovo",
   "fetchedAt": "ISO timestamp",
   "items": [
     {
